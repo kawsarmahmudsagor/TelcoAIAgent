@@ -6,6 +6,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from app.models.telco import (
+    CasePriority,
+    CaseSource,
+    CaseStatus,
+    IncidentKind,
+    IncidentStatus,
     PackageKind,
     PlanType,
     TxnChannel,
@@ -142,3 +147,55 @@ class TransactionView(_Base):
     failure_reason: str | None
     created_at: datetime
     package_name: str | None
+
+
+class OfferView(_Base):
+    id: UUID
+    title: str
+    description: str | None
+    terms: str | None
+    points_cost: int | None
+    cashback_percent: Decimal | None
+    cashback_cap: Decimal | None
+    min_recharge: Decimal | None
+    package: PackageView | None
+    ends_on: date | None
+
+
+class OffersAndPoints(_Base):
+    reward_points: int
+    offers: list[OfferView]
+
+
+class RedeemQuote(_Base):
+    offer: OfferView
+    points_after: int
+
+
+class RedeemResult(_Base):
+    transaction_ref: str
+    offer_title: str
+    reward_points: int
+    expires_at: datetime | None
+
+
+class CaseView(_Base):
+    ref: str
+    category: str
+    description: str
+    priority: CasePriority
+    status: CaseStatus
+    source: CaseSource
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: datetime | None
+
+
+class IncidentView(_Base):
+    district: str
+    area: str
+    kind: IncidentKind
+    status: IncidentStatus
+    message: str
+    starts_at: datetime
+    ends_at: datetime | None

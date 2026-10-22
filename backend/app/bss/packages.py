@@ -169,6 +169,23 @@ def _result_from(db: Session, txn: Transaction) -> PurchaseResult:
     )
 
 
+def grant_package(db: Session, subscriber_id: uuid.UUID, pkg: Package, now: datetime) -> datetime:
+    """Add a fresh subscription for `pkg`; returns its expiry. Caller commits."""
+    expires_at = now + timedelta(days=pkg.validity_days)
+    db.add(
+        Subscription(
+            subscriber_id=subscriber_id,
+            package_id=pkg.id,
+            data_left_mb=pkg.data_mb,
+            minutes_left=pkg.minutes,
+            sms_left=pkg.sms,
+            activated_at=now,
+            expires_at=expires_at,
+        )
+    )
+    return expires_at
+
+
 def execute_purchase(
     db: Session,
     subscriber_id: uuid.UUID,
@@ -195,18 +212,7 @@ def execute_purchase(
             bal.main_balance = bal.main_balance - pkg.price
         else:
             bal.postpaid_due = bal.postpaid_due + pkg.price
-    expires_at = now + timedelta(days=pkg.validity_days)
-    db.add(
-        Subscription(
-            subscriber_id=subscriber_id,
-            package_id=pkg.id,
-            data_left_mb=pkg.data_mb,
-            minutes_left=pkg.minutes,
-            sms_left=pkg.sms,
-            activated_at=now,
-            expires_at=expires_at,
-        )
-    )
+    expires_at = grant_package(db, subscriber_id, pkg, now)
     ref = _txn.next_ref(db)
     db.add(
         Transaction(
