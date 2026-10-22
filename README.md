@@ -60,6 +60,7 @@ uv sync
 uv run python -m app.scripts.hash_password "yourpassword"   # paste into .env as ADMIN_PASSWORD_HASH
 uv run alembic upgrade head
 uv run python -m app.data.seed_all      # telco demo data: packages, 5 subscribers, usage, cases, incidents, offers
+uv run python -m app.data.seed_all --reset   # before each demo: wipe the demo rows and reseed relative to now
 uv run uvicorn app.main:app --reload --port 8011   # terminal 1
 uv run python -m app.agent.worker start # terminal 2
 uv run python -m app.scheduler.worker   # terminal 3

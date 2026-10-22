@@ -8,7 +8,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.bss._txn import next_ref
@@ -78,6 +78,18 @@ SUBSCRIPTIONS = {
     "01512346620": [("B20-200", 12000, 150, 0, 20)],
 }
 
+REWARD_CODE = "RW-1G-3D"
+PACKAGE_CODES = [p[0] for p in PACKAGES] + [REWARD_CODE]
+
+# (district, area) of the seeded incidents and the seeded offers' titles, so
+# reset() can find them again.
+INCIDENT_AREAS = [("Sylhet", "Sylhet Sadar"), ("Gazipur", "Gazipur Sadar")]
+OFFER_TITLES = [
+    "20 GB + 200 min exclusive",
+    "1 GB bonus for 700 points",
+    "10% cashback on ৳200+ recharge",
+]
+
 VAS = [
     ("Caller tune renewal", D("5.00")),
     ("News alert subscription", D("2.50")),
@@ -137,10 +149,10 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
             db.add(pkg)
             counts["packages"] += 1
         pkgs[code] = pkg
-    reward = db.scalar(select(Package).where(Package.code == "RW-1G-3D"))
+    reward = db.scalar(select(Package).where(Package.code == REWARD_CODE))
     if reward is None:
         reward = Package(
-            code="RW-1G-3D",
+            code=REWARD_CODE,
             name="1 GB Bonus (3 days)",
             kind=PackageKind.data,
             data_mb=1024,
@@ -267,8 +279,11 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     txn(sam, rc, TxnChannel.nagad, "100", now - timedelta(days=8), st.success)
     txn(sam, rc, TxnChannel.bkash, "300", now - timedelta(days=12), st.failed,
         reason="Payment timed out")
-    txn(sam, pu, TxnChannel.balance, "399", now - timedelta(days=1), st.success,
-        pkg=pkgs["B15-300"])
+    # Dated when the pack was activated (validity minus days left).
+    b15 = pkgs["B15-300"]
+    b15_left = next(d[4] for d in SUBSCRIPTIONS[sam] if d[0] == b15.code)
+    txn(sam, pu, TxnChannel.balance, "399",
+        now - timedelta(days=b15.validity_days - b15_left), st.success, pkg=b15)
     txn(rafi, rc, TxnChannel.nagad, "300", now - timedelta(hours=1), st.pending)
 
     def case(msisdn, category, desc, status, *, priority=CasePriority.normal, ref=None,
@@ -307,8 +322,8 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     tomorrow = today + timedelta(days=1)
     db.add(
         NetworkIncident(
-            district="Sylhet",
-            area="Sylhet Sadar",
+            district=INCIDENT_AREAS[0][0],
+            area=INCIDENT_AREAS[0][1],
             kind=IncidentKind.congestion,
             status=IncidentStatus.investigating,
             message="Some subscribers may experience slower data speeds during peak hours.",
@@ -318,8 +333,8 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     )
     db.add(
         NetworkIncident(
-            district="Gazipur",
-            area="Gazipur Sadar",
+            district=INCIDENT_AREAS[1][0],
+            area=INCIDENT_AREAS[1][1],
             kind=IncidentKind.maintenance,
             status=IncidentStatus.scheduled,
             message="Planned maintenance; short interruptions are possible.",
@@ -332,7 +347,7 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     ends = today + timedelta(days=60)
     db.add(
         Offer(
-            title="20 GB + 200 min exclusive",
+            title=OFFER_TITLES[0],
             description="Our exclusive bundle: 20 GB data and 200 minutes for 30 days.",
             package_id=pkgs["B20-200"].id,
             audience=OfferAudience.all,
@@ -342,7 +357,7 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     )
     db.add(
         Offer(
-            title="1 GB bonus for 700 points",
+            title=OFFER_TITLES[1],
             description="Redeem 700 reward points for a 1 GB bonus valid for 3 days.",
             package_id=reward.id,
             points_cost=700,
@@ -353,7 +368,7 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     )
     db.add(
         Offer(
-            title="10% cashback on ৳200+ recharge",
+            title=OFFER_TITLES[2],
             description="Get 10% cashback (up to ৳30) on any recharge of ৳200 or more.",
             cashback_percent=D("10"),
             cashback_cap=D("30"),
@@ -366,3 +381,45 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     counts["offers"] = 3
     db.flush()
     return counts
+
+
+def clear(db: Session) -> dict[str, int]:
+    """Delete the demo rows: every subscriber outside the reserved 01999 test
+    range (balances, subscriptions, usage, transactions, cases, OTPs,
+    notifications and audit rows cascade; conversations keep their row with
+    subscriber_id set to NULL), the seeded incidents and offers, and the seeded
+    packages nothing else references. Caller commits."""
+    out = {}
+    out["subscribers"] = db.execute(
+        delete(Subscriber).where(~Subscriber.msisdn.like("01999%"))
+    ).rowcount
+    out["incidents"] = sum(
+        db.execute(
+            delete(NetworkIncident).where(
+                NetworkIncident.district == district, NetworkIncident.area == area
+            )
+        ).rowcount
+        for district, area in INCIDENT_AREAS
+    )
+    out["offers"] = db.execute(
+        delete(Offer).where(
+            Offer.title.in_(OFFER_TITLES),
+            ~exists().where(Transaction.offer_id == Offer.id),
+        )
+    ).rowcount
+    out["packages"] = db.execute(
+        delete(Package).where(
+            Package.code.in_(PACKAGE_CODES),
+            ~exists().where(Subscription.package_id == Package.id),
+            ~exists().where(Transaction.package_id == Package.id),
+            ~exists().where(Offer.package_id == Package.id),
+        )
+    ).rowcount
+    db.expire_all()
+    return out
+
+
+def reset(db: Session, *, now: datetime | None = None) -> dict[str, int]:
+    """clear() then seed() relative to `now`. Caller commits."""
+    clear(db)
+    return seed(db, now=now)

@@ -172,7 +172,7 @@ class Settings(BaseSettings):
 
     # Real phone calls (Twilio Elastic SIP Trunk -> self-hosted livekit-sip). A
     # scheduled call with a dial_number rings that phone instead of the browser.
-    # The trunk id comes from `python -m app.scripts.create_sip_trunk`.
+    # The LiveKit outbound trunk id (ST_...), from registering the trunk with LiveKit.
     sip_outbound_trunk_id: str = ""
     # Comma-separated numbers that may be dialed; empty = no number may be dialed.
     # Guards against ringing strangers (seed clients carry real-looking numbers).
@@ -183,7 +183,7 @@ class Settings(BaseSettings):
     # Cost cap: the SIP leg is dropped after this long regardless.
     sip_max_call_duration_s: int = 600
 
-    # Twilio Elastic SIP Trunk -- only read by app.scripts.create_sip_trunk.
+    # Twilio Elastic SIP Trunk details -- kept for reference, not read by the app.
     twilio_phone_number: str = ""
     twilio_sip_termination_uri: str = ""
     twilio_sip_username: str = ""

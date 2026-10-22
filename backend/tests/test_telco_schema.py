@@ -3,13 +3,18 @@ tables are gone and the reference sequences exist."""
 
 import re
 import subprocess
+from pathlib import Path
 
 from sqlalchemy import inspect, text
 
 
 def test_alembic_head_matches_models():
     # `alembic check` exits 0 when models and DB agree
-    r = subprocess.run(["uv", "run", "alembic", "check"], capture_output=True, text=True)
+    # Run from backend/ (where alembic.ini lives) wherever pytest was started.
+    backend = Path(__file__).resolve().parents[1]
+    r = subprocess.run(
+        ["uv", "run", "alembic", "check"], capture_output=True, text=True, cwd=backend
+    )
     assert r.returncode == 0, r.stdout + r.stderr
 
 
