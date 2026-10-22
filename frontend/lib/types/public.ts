@@ -27,7 +27,7 @@ export interface PublicListing {
 /** The names the agent introduces itself with (`GET /api/public/agent-info`). */
 export interface PublicAgentInfo {
   assistant_name: string;
-  agency_name: string;
+  operator_name: string;
 }
 
 export interface PublicListingParams {

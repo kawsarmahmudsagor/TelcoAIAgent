@@ -38,7 +38,7 @@ export function AgentTab({ form, options }: { form: ConfigDraftApi; options: Age
 
   // A greeting's reset: back to the saved text if that is the default, otherwise to null
   // ("use the default" on save; the server fills the text back in).
-  function resetGreeting(key: 'greeting_inbound' | 'greeting_coldcall' | 'greeting_followup') {
+  function resetGreeting(key: 'greeting_inbound' | 'greeting_nudge') {
     const isDefault = saved[`${key}_is_default`];
     set(key, isDefault ? saved[key] : null);
   }
@@ -64,45 +64,45 @@ export function AgentTab({ form, options }: { form: ConfigDraftApi; options: Age
               />
             )}
           </FormField>
-          <FormField id="agency_name" label="Agency name" error={errors.agency_name}>
+          <FormField id="operator_name" label="Operator name" error={errors.operator_name}>
             {(control) => (
               <Input
                 {...control}
-                value={draft.agency_name}
-                onChange={(e) => set('agency_name', e.target.value)}
+                value={draft.operator_name}
+                onChange={(e) => set('operator_name', e.target.value)}
                 maxLength={255}
                 autoComplete="organization"
               />
             )}
           </FormField>
           <FormField
-            id="agency_phone"
-            label="Contact phone"
+            id="operator_phone"
+            label="Hotline number"
             hint="The agent gives this number for details it doesn't have. Blank uses the default."
-            error={errors.agency_phone}
+            error={errors.operator_phone}
           >
             {(control) => (
               <Input
                 {...control}
                 type="tel"
-                value={draft.agency_phone}
-                onChange={(e) => set('agency_phone', e.target.value)}
+                value={draft.operator_phone}
+                onChange={(e) => set('operator_phone', e.target.value)}
                 maxLength={50}
                 autoComplete="off"
               />
             )}
           </FormField>
           <FormField
-            id="agency_address"
-            label="Office address"
+            id="operator_address"
+            label="Address"
             hint="Offered alongside the phone number for an in-person visit."
-            error={errors.agency_address}
+            error={errors.operator_address}
           >
             {(control) => (
               <Input
                 {...control}
-                value={draft.agency_address}
-                onChange={(e) => set('agency_address', e.target.value)}
+                value={draft.operator_address}
+                onChange={(e) => set('operator_address', e.target.value)}
                 maxLength={255}
                 autoComplete="off"
               />
@@ -113,7 +113,7 @@ export function AgentTab({ form, options }: { form: ConfigDraftApi; options: Age
 
       <SectionCard
         title="Opening instructions"
-        description="While left at the default, the agent opens with one of a few ready-made Bangla greetings, picked at random, so it starts speaking right away. A customised text is an instruction, not a script: the agent writes its own first message from it. A scheduled call to a lead with a booked viewing uses the follow-up greeting; any other scheduled call is a cold call."
+        description="While left at the default, the agent opens with one of a few ready-made Bangla greetings, picked at random, so it starts speaking right away. A customised text is an instruction, not a script: the agent writes its own first message from it."
       >
         <div className="grid gap-5">
           <GreetingEditor
@@ -128,26 +128,15 @@ export function AgentTab({ form, options }: { form: ConfigDraftApi; options: Age
             onReset={() => resetGreeting('greeting_inbound')}
           />
           <GreetingEditor
-            id="greeting_coldcall"
-            label="Cold call: the lead has no booked viewing"
-            value={draft.greeting_coldcall}
-            savedIsDefault={saved.greeting_coldcall_is_default}
-            savedValue={saved.greeting_coldcall}
-            placeholders={placeholders('greeting_coldcall')}
-            error={errors.greeting_coldcall}
-            onChange={(value) => set('greeting_coldcall', value)}
-            onReset={() => resetGreeting('greeting_coldcall')}
-          />
-          <GreetingEditor
-            id="greeting_followup"
-            label="Follow-up call: the lead has a booked viewing"
-            value={draft.greeting_followup}
-            savedIsDefault={saved.greeting_followup_is_default}
-            savedValue={saved.greeting_followup}
-            placeholders={placeholders('greeting_followup')}
-            error={errors.greeting_followup}
-            onChange={(value) => set('greeting_followup', value)}
-            onReset={() => resetGreeting('greeting_followup')}
+            id="greeting_nudge"
+            label="Nudge greeting"
+            value={draft.greeting_nudge}
+            savedIsDefault={saved.greeting_nudge_is_default}
+            savedValue={saved.greeting_nudge}
+            placeholders={placeholders('greeting_nudge')}
+            error={errors.greeting_nudge}
+            onChange={(value) => set('greeting_nudge', value)}
+            onReset={() => resetGreeting('greeting_nudge')}
           />
         </div>
       </SectionCard>

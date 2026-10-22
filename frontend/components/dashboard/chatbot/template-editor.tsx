@@ -10,7 +10,9 @@ import { cn } from '@/lib/shadcn/utils';
 
 const PLACEHOLDER_HELP: Record<string, string> = {
   agent_name: 'the assistant’s name',
-  agency_name: 'your agency’s name',
+  operator_name: 'the operator’s name',
+  customer_name: 'the customer’s name',
+  nudge_text: 'the reminder the agent is nudging the customer about',
   client_name: 'the lead’s name',
   current_date: 'today’s date',
   timezone: 'the agency timezone',

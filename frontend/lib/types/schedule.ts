@@ -39,7 +39,7 @@ export interface CallScheduleEntry extends CallScheduleOut {
 
 export interface IncomingCall extends CallScheduleEntry {
   agent_display_name: string;
-  agency_name: string;
+  operator_name: string;
 }
 
 /** cancelled: the callee pressed Decline; missed: nobody answered in time. */

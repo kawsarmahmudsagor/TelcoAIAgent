@@ -158,7 +158,7 @@ export default function IncomingCallPage() {
 
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold">{call.agent_display_name}</h1>
-            <p className="text-muted-foreground text-sm">{call.agency_name}</p>
+            <p className="text-muted-foreground text-sm">{call.operator_name}</p>
             <p className="mt-3 text-sm">{describeTopic(call.client)}</p>
             <p className="text-muted-foreground text-xs">Calling {call.client.full_name}</p>
           </div>

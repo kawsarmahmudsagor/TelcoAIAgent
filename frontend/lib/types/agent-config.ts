@@ -16,19 +16,16 @@ export type EmbeddingMigrationStatus = 'running' | 'succeeded' | 'failed';
 /** Effective values (saved value, else the env/code default) plus `*_is_default` flags. */
 export interface AgentConfig {
   assistant_name: string;
-  agency_name: string;
+  operator_name: string;
   /** Where the agent sends customers for details it doesn't have. */
-  agency_phone: string;
-  agency_address: string;
+  operator_phone: string;
+  operator_address: string;
   prompt_identity_rules: string;
   prompt_is_default: boolean;
   greeting_inbound: string;
   greeting_inbound_is_default: boolean;
-  greeting_coldcall: string;
-  greeting_coldcall_is_default: boolean;
-  /** A scheduled call to a lead with a booked viewing; greeting_coldcall is the rest. */
-  greeting_followup: string;
-  greeting_followup_is_default: boolean;
+  greeting_nudge: string;
+  greeting_nudge_is_default: boolean;
 
   llm_provider: LlmProvider;
   llm_model: string;
@@ -81,13 +78,12 @@ export interface AgentConfig {
  */
 export interface AgentConfigUpdate {
   assistant_name?: string | null;
-  agency_name?: string | null;
-  agency_phone?: string | null;
-  agency_address?: string | null;
+  operator_name?: string | null;
+  operator_phone?: string | null;
+  operator_address?: string | null;
   prompt_identity_rules?: string | null;
   greeting_inbound?: string | null;
-  greeting_coldcall?: string | null;
-  greeting_followup?: string | null;
+  greeting_nudge?: string | null;
 
   llm_provider?: LlmProvider | null;
   llm_model?: string | null;

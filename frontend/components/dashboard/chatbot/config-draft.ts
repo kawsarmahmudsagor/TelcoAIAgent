@@ -14,13 +14,12 @@ import type {
  */
 export interface ConfigDraft {
   assistant_name: string;
-  agency_name: string;
-  agency_phone: string;
-  agency_address: string;
+  operator_name: string;
+  operator_phone: string;
+  operator_address: string;
   prompt_identity_rules: string;
   greeting_inbound: string | null;
-  greeting_coldcall: string | null;
-  greeting_followup: string | null;
+  greeting_nudge: string | null;
 
   llm_provider: LlmProvider;
   llm_model: string;
@@ -55,13 +54,12 @@ export type DraftKey = keyof ConfigDraft;
 /** Which tab each field is on, so a refused value can switch to it. */
 export const FIELD_TAB: Record<DraftKey, ChatbotTab> = {
   assistant_name: 'agent',
-  agency_name: 'agent',
-  agency_phone: 'agent',
-  agency_address: 'agent',
+  operator_name: 'agent',
+  operator_phone: 'agent',
+  operator_address: 'agent',
   prompt_identity_rules: 'agent',
   greeting_inbound: 'agent',
-  greeting_coldcall: 'agent',
-  greeting_followup: 'agent',
+  greeting_nudge: 'agent',
   llm_provider: 'model',
   llm_model: 'model',
   temperature: 'model',
@@ -90,13 +88,12 @@ export const CHATBOT_TABS: ChatbotTab[] = ['agent', 'model', 'knowledge'];
 export function draftFrom(config: AgentConfig): ConfigDraft {
   return {
     assistant_name: config.assistant_name,
-    agency_name: config.agency_name,
-    agency_phone: config.agency_phone,
-    agency_address: config.agency_address,
+    operator_name: config.operator_name,
+    operator_phone: config.operator_phone,
+    operator_address: config.operator_address,
     prompt_identity_rules: config.prompt_identity_rules,
     greeting_inbound: config.greeting_inbound,
-    greeting_coldcall: config.greeting_coldcall,
-    greeting_followup: config.greeting_followup,
+    greeting_nudge: config.greeting_nudge,
     llm_provider: config.llm_provider,
     llm_model: config.llm_model,
     temperature: config.temperature === null ? '' : String(config.temperature),
@@ -166,14 +163,14 @@ export function buildUpdate(
   for (const key of changedKeys(draft, saved)) {
     switch (key) {
       case 'assistant_name':
-      case 'agency_name': {
+      case 'operator_name': {
         const value = draft[key].trim();
         if (!value) errors[key] = 'Enter a name, or put back the saved one.';
         else payload[key] = value;
         break;
       }
-      case 'agency_phone':
-      case 'agency_address':
+      case 'operator_phone':
+      case 'operator_address':
         // Blank = back to the default.
         payload[key] = draft[key].trim() || null;
         break;
@@ -183,8 +180,7 @@ export function buildUpdate(
         } else payload[key] = draft.prompt_identity_rules;
         break;
       case 'greeting_inbound':
-      case 'greeting_coldcall':
-      case 'greeting_followup':
+      case 'greeting_nudge':
         // null or blank = back to the default.
         payload[key] = draft[key]?.trim() ? draft[key] : null;
         break;
