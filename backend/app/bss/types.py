@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.telco import PlanType, UsageKind
+from app.models.telco import PackageKind, PlanType, TxnChannel, UsageKind
 
 
 class _Base(BaseModel):
@@ -63,3 +63,41 @@ class Deduction(_Base):
     description: str
     amount: Decimal
     source: Literal["usage", "purchase"]
+
+
+class PackageView(_Base):
+    code: str
+    name: str
+    kind: PackageKind
+    data_mb: int
+    minutes: int
+    sms: int
+    validity_days: int
+    price: Decimal
+    tag: str | None
+
+
+class Recommendation(_Base):
+    package: PackageView
+    reason: str
+
+
+class PurchaseRequest(_Base):
+    package_code: str
+    pay_from: TxnChannel
+
+
+class PurchaseQuote(_Base):
+    request: PurchaseRequest
+    package: PackageView
+    pay_from: TxnChannel
+    price: Decimal
+    balance_after: Decimal | None
+
+
+class PurchaseResult(_Base):
+    transaction_ref: str
+    package: PackageView
+    expires_at: datetime
+    main_balance: Decimal
+    postpaid_due: Decimal
