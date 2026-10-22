@@ -6,6 +6,7 @@ import { Loader2Icon, MapPinIcon, RotateCwIcon } from 'lucide-react';
 import { ApiError } from '@/lib/api-client';
 import { portalApi } from '@/lib/portal-api';
 import { cn } from '@/lib/shadcn/utils';
+import { initials } from '@/lib/telco-format';
 import type { PersonaCard } from '@/lib/types/portal';
 
 type LoadState =
@@ -21,13 +22,6 @@ const AVATAR_GRADIENTS = [
   'from-[#ff9b55] to-[#f6c177]',
   'from-[#e45b73] to-[#b46fe0]',
 ];
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return (
-    (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
-  ).toUpperCase();
-}
 
 function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : 'The portal could not be reached.';

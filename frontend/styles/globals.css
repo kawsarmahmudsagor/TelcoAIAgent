@@ -3,6 +3,12 @@
 @source "../node_modules/streamdown/dist/index.js";
 
 @custom-variant dark (&:is(.dark *));
+/* The reference UI's breakpoints, inclusive like its `max-width` queries (Tailwind's `max-[…]`
+ * is exclusive): `tablet:` at 1100px and below, `phone:` at 760px and below (the off-canvas
+ * sidebar), `narrow:` at 390px and below. */
+@custom-variant tablet (@media (max-width: 1100px));
+@custom-variant phone (@media (max-width: 760px));
+@custom-variant narrow (@media (max-width: 390px));
 
 /*
  * telco. design tokens (spec 6.6; values from the reference UI, telco_dashboard.html).

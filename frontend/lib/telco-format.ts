@@ -41,3 +41,16 @@ export function formatDay(iso: string): string {
   if (DATE_ONLY.test(iso)) return dayUtc.format(new Date(`${iso}T00:00:00Z`));
   return dayDhaka.format(new Date(iso));
 }
+
+/** `"SK"` from `"Samiha Khan"`: first and last initials, for avatars. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return (
+    (parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase();
+}
+
+/** `"Prepaid"` / `"Postpaid"`. */
+export function formatPlan(plan: 'prepaid' | 'postpaid'): string {
+  return plan === 'prepaid' ? 'Prepaid' : 'Postpaid';
+}
