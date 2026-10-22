@@ -10,8 +10,7 @@ class ConversationOut(BaseModel):
     id: uuid.UUID
     channel: str
     room_name: str | None
-    client_id: uuid.UUID | None
-    call_schedule_id: uuid.UUID | None
+    subscriber_id: uuid.UUID | None
     is_phone_call: bool
     status: str
     message_count: int
@@ -20,7 +19,7 @@ class ConversationOut(BaseModel):
 
 
 class ConversationListItem(ConversationOut):
-    client_name: str | None = None
+    subscriber_name: str | None = None
     # First thing the customer said, trimmed.
     preview: str | None = None
 
@@ -45,9 +44,6 @@ class ConversationMessageOut(BaseModel):
 
 
 class ConversationDetail(ConversationOut):
-    client_name: str | None = None
-    client_email: str | None = None
-    client_phone: str | None = None
     messages: list[ConversationMessageOut]
 
 

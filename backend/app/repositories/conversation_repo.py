@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import Date, cast, delete, func, null, select, update
+from sqlalchemy import Date, cast, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.conversation import (
@@ -10,6 +10,7 @@ from app.models.conversation import (
     ConversationStatus,
     MessageRole,
 )
+from app.models.telco import Subscriber
 
 
 def get(db: Session, conversation_id: uuid.UUID) -> Conversation | None:
@@ -21,16 +22,14 @@ def create(
     *,
     channel: str,
     room_name: str | None,
-    client_id: uuid.UUID | None = None,
-    call_schedule_id: uuid.UUID | None = None,
+    subscriber_id: uuid.UUID | None = None,
     is_phone_call: bool = False,
     visitor_id: uuid.UUID | None = None,
 ) -> Conversation:
     conversation = Conversation(
         channel=channel,
         room_name=room_name,
-        client_id=client_id,
-        call_schedule_id=call_schedule_id,
+        subscriber_id=subscriber_id,
         is_phone_call=is_phone_call,
         visitor_id=visitor_id,
         status=ConversationStatus.active.value,
@@ -72,10 +71,12 @@ def add_message(
     db.commit()
 
 
-def end(db: Session, conversation_id: uuid.UUID, *, client_id: uuid.UUID | None = None) -> None:
+def end(
+    db: Session, conversation_id: uuid.UUID, *, subscriber_id: uuid.UUID | None = None
+) -> None:
     values: dict = {"status": ConversationStatus.ended.value, "ended_at": func.now()}
-    if client_id is not None:
-        values["client_id"] = client_id
+    if subscriber_id is not None:
+        values["subscriber_id"] = subscriber_id
     db.execute(update(Conversation).where(Conversation.id == conversation_id).values(**values))
     db.commit()
 
@@ -115,23 +116,24 @@ def list_page(
     *,
     channel: str | None = None,
     status: str | None = None,
-    client_id: uuid.UUID | None = None,
+    subscriber_id: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[tuple[Conversation, str | None, str | None]], int]:
-    """Newest first. Rows are (conversation, None, first user message): the client
-    slot is kept for the row shape but is no longer populated."""
+    """Newest first. Rows are (conversation, subscriber's full name or None, first
+    user message)."""
     filters = []
     if channel is not None:
         filters.append(Conversation.channel == channel)
     if status is not None:
         filters.append(Conversation.status == status)
-    if client_id is not None:
-        filters.append(Conversation.client_id == client_id)
+    if subscriber_id is not None:
+        filters.append(Conversation.subscriber_id == subscriber_id)
 
     total = db.scalar(select(func.count()).select_from(Conversation).where(*filters)) or 0
     stmt = (
-        select(Conversation, null(), _first_user_message())
+        select(Conversation, Subscriber.full_name, _first_user_message())
+        .outerjoin(Subscriber, Subscriber.id == Conversation.subscriber_id)
         .where(*filters)
         .order_by(Conversation.started_at.desc())
         .limit(limit)

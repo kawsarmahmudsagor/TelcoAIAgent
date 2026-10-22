@@ -134,7 +134,7 @@ def test_detail_hides_tool_rows_and_other_visitors(anon_api):
         (2, "user"),
         (4, "assistant"),
     ]
-    assert "room_name" not in body and "client_id" not in body
+    assert "room_name" not in body and "subscriber_id" not in body
 
     for path in (f"/api/public/conversations/{conversation_id}", "/api/public/conversations/nope"):
         assert anon_api.get(path, headers=_headers(uuid.uuid4())).status_code == 404

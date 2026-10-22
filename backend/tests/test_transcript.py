@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -14,11 +14,12 @@ from app.agent.transcript import TOOL_OUTPUT_MAX_CHARS, TranscriptRecorder
 from app.agent.userdata import Channel, SessionUserdata
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation
+from app.models.telco import PlanType, Subscriber
 from app.repositories import conversation_repo
 from app.scheduler import jobs
 
 ROOM_PREFIX = "pytest-transcript-"
-TEST_EMAIL = "pytest.transcript@example.invalid"
+TEST_MSISDN = "01999000417"
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +28,7 @@ def _cleanup():
     db = SessionLocal()
     try:
         db.execute(text("delete from conversations where room_name like :p"), {"p": ROOM_PREFIX + "%"})
-        db.execute(text("delete from clients where email = :e"), {"e": TEST_EMAIL})
+        db.execute(text("delete from subscribers where msisdn = :m"), {"m": TEST_MSISDN})
         db.commit()
     finally:
         db.close()
@@ -216,9 +217,9 @@ def test_close_drains_queue_before_ending(monkeypatch):
 
     real_finish = transcript._finish
 
-    def _finish(conversation_id, client_id):
+    def _finish(conversation_id, subscriber_id):
         order.append("finish")
-        real_finish(conversation_id, client_id)
+        real_finish(conversation_id, subscriber_id)
 
     monkeypatch.setattr(transcript, "_insert", _slow_insert)
     monkeypatch.setattr(transcript, "_finish", _finish)
@@ -238,6 +239,34 @@ def test_close_drains_queue_before_ending(monkeypatch):
     assert order == ["insert 1", "insert 2", "insert 3", "insert 4", "finish"]
     assert len(_rows(conversation_id)) == 4
     assert _conversation(conversation_id).status == "ended"
+
+
+def test_close_links_the_conversation_to_the_subscriber():
+    db = SessionLocal()
+    try:
+        subscriber = Subscriber(
+            msisdn=TEST_MSISDN,
+            full_name="Pytest Transcript",
+            plan_type=PlanType.prepaid,
+            district="Dhaka",
+            joined_on=date(2024, 1, 1),
+        )
+        db.add(subscriber)
+        db.commit()
+        subscriber_id = subscriber.id
+    finally:
+        db.close()
+
+    async def run():
+        recorder = await TranscriptRecorder.start(
+            _FakeSession(), _userdata(subscriber_id=subscriber_id), _room()
+        )
+        await recorder.close()
+        return recorder.conversation_id
+
+    conversation = _conversation(asyncio.run(run()))
+    assert conversation.status == "ended"
+    assert conversation.subscriber_id == subscriber_id
 
 
 def test_start_records_phone_call_metadata():

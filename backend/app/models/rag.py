@@ -31,7 +31,6 @@ class RagSourceType(str, enum.Enum):
     document = "document"
     link = "link"
     text = "text"
-    properties = "properties"
 
 
 class RagSourceStatus(str, enum.Enum):
@@ -55,7 +54,6 @@ class EmbeddingJobType(str, enum.Enum):
     crawl = "crawl"
     reindex = "reindex"
     delete = "delete"
-    sync_properties = "sync_properties"
     migrate_embedding = "migrate_embedding"
 
 

@@ -65,10 +65,10 @@ def _insert(conversation_id: uuid.UUID, row: dict[str, Any]) -> None:
         db.close()
 
 
-def _finish(conversation_id: uuid.UUID, client_id: uuid.UUID | None) -> None:
+def _finish(conversation_id: uuid.UUID, subscriber_id: uuid.UUID | None) -> None:
     db = SessionLocal()
     try:
-        conversation_repo.end(db, conversation_id, client_id=client_id)
+        conversation_repo.end(db, conversation_id, subscriber_id=subscriber_id)
     finally:
         db.close()
 
@@ -76,12 +76,11 @@ def _finish(conversation_id: uuid.UUID, client_id: uuid.UUID | None) -> None:
 def create_conversation(userdata: SessionUserdata, room_name: str | None) -> uuid.UUID:
     db = SessionLocal()
     try:
-        # TODO(Task 4): the column becomes subscriber_id; pass userdata.subscriber_id then.
         conversation = conversation_repo.create(
             db,
             channel=userdata.channel.value,
             room_name=room_name,
-            client_id=None,
+            subscriber_id=userdata.subscriber_id,
             is_phone_call=userdata.is_phone_call,
             visitor_id=getattr(userdata, "visitor_id", None),
         )
@@ -233,7 +232,7 @@ class TranscriptRecorder:
 
     async def close(self) -> None:
         """Drains every queued item, then marks the conversation ended and links
-        it to the lead found during the session. Safe to call more than once."""
+        it to the session's subscriber. Safe to call more than once."""
         if self._closed:
             return
         self._closed = True
@@ -242,8 +241,7 @@ class TranscriptRecorder:
         if self._writer is not None:
             await self._writer
         userdata = self._userdata
-        # TODO(Task 4): store userdata.subscriber_id once the column is renamed.
         try:
-            await asyncio.to_thread(_finish, self.conversation_id, None)
+            await asyncio.to_thread(_finish, self.conversation_id, userdata.subscriber_id)
         except Exception:
             logger.exception("could not mark conversation %s ended", self.conversation_id)

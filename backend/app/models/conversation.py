@@ -30,7 +30,7 @@ class MessageRole(str, enum.Enum):
 
 
 class Conversation(TimestampedBase):
-    """One agent session (browser chat/voice, browser cold call or phone call).
+    """One agent session (browser chat/voice or phone call).
 
     Written by app.agent.transcript.TranscriptRecorder. updated_at doubles as
     "last activity": every stored message bumps it, and the scheduler's stale
@@ -41,11 +41,12 @@ class Conversation(TimestampedBase):
     # app.agent.userdata.Channel values -- plain string, not a new enum.
     channel: Mapped[str] = mapped_column(String(32), index=True)
     room_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    client_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
-    )
-    call_schedule_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("call_schedule.id", ondelete="SET NULL"), nullable=True
+    # The subscriber the session was about, set when the recorder closes it.
+    subscriber_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("subscribers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     is_phone_call: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # The browser's anonymous visitor id (a UUID it keeps in localStorage), for

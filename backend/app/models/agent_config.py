@@ -1,7 +1,7 @@
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, Float, Integer, String, Text
+from sqlalchemy import Boolean, Enum, Float, Index, Integer, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import TimestampedBase
@@ -40,6 +40,8 @@ class AgentConfig(TimestampedBase):
     """
 
     __tablename__ = "agent_config"
+    # The singleton guard (migration f3c7a2d9e514): a unique index on a constant.
+    __table_args__ = (Index("uq_agent_config_singleton", true(), unique=True),)
 
     # Identity
     assistant_name: Mapped[str | None] = mapped_column(String(100), nullable=True)

@@ -42,3 +42,16 @@ def rag_fakes(monkeypatch):
     yield client
     rag_index.set_client_factory(None)
     rag_index.set_embed_model_factory(None)
+
+
+@pytest.fixture
+def db():
+    """A plain SQLAlchemy session; rolled back and closed afterwards."""
+    from app.db.session import SessionLocal
+
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()

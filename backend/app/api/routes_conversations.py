@@ -38,10 +38,10 @@ def list_items(rows) -> list[ConversationListItem]:
     return [
         ConversationListItem(
             **ConversationOut.model_validate(conversation).model_dump(),
-            client_name=client_name,
+            subscriber_name=subscriber_name,
             preview=_preview(first_message),
         )
-        for conversation, client_name, first_message in rows
+        for conversation, subscriber_name, first_message in rows
     ]
 
 
@@ -50,7 +50,7 @@ def list_conversations(
     db: Session = Depends(get_db),
     channel: ChannelLiteral | None = None,
     conversation_status: ConversationStatus | None = Query(default=None, alias="status"),
-    client_id: uuid.UUID | None = None,
+    subscriber_id: uuid.UUID | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> ConversationPage:
@@ -58,7 +58,7 @@ def list_conversations(
         db,
         channel=channel,
         status=conversation_status.value if conversation_status else None,
-        client_id=client_id,
+        subscriber_id=subscriber_id,
         limit=limit,
         offset=offset,
     )

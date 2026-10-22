@@ -60,7 +60,7 @@ def test_list_filters_and_preview(api):
     assert str(chat_id) in ids and str(call_id) not in ids
     item = next(i for i in body["items"] if i["id"] == str(chat_id))
     assert item["preview"] == "Any flats in Banani?"
-    assert item["client_name"] is None
+    assert item["subscriber_name"] is None
     assert item["message_count"] == 3
 
     page = api.get("/api/conversations", params={"status": "active", "limit": 1}).json()
@@ -73,7 +73,7 @@ def test_detail_has_ordered_transcript(api):
     body = api.get(f"/api/conversations/{conversation_id}").json()
     assert [m["seq"] for m in body["messages"]] == [1, 2, 3]
     assert body["messages"][2]["tool_args"] == {"location": "Banani"}
-    assert body["client_email"] is None
+    assert body["subscriber_id"] is None
     assert api.get(f"/api/conversations/{uuid.uuid4()}").status_code == 404
 
 
