@@ -4,13 +4,15 @@ ever reach the customer)."""
 
 import asyncio
 from collections.abc import Callable
+from enum import Enum
 from typing import TypeVar
 from uuid import UUID
 
+from livekit.agents.llm import ToolError
 from sqlalchemy.orm import Session
 
 from app.agent.userdata import SessionUserdata
-from app.bss.errors import BssError
+from app.bss.errors import BssError, InvalidRequest, SubscriberNotFound
 from app.db.session import SessionLocal
 
 T = TypeVar("T")
@@ -81,3 +83,43 @@ async def run_db(fn: Callable[[Session], T]) -> T:
             session.close()
 
     return await asyncio.to_thread(_run)
+
+
+E = TypeVar("E", bound=Enum)
+
+
+def parse_enum(enum_cls: type[E], value: str | None) -> E | None:
+    """The enum member named by an LLM-supplied string; unknown -> InvalidRequest."""
+    if value is None or value == "":
+        return None
+    try:
+        return enum_cls(value.strip().lower())
+    except ValueError:
+        raise InvalidRequest(f"unknown {enum_cls.__name__}: {value!r}") from None
+
+
+async def run_read(
+    userdata: SessionUserdata, fn: Callable[[Session, UUID], str], *, verify: bool = False
+) -> str:
+    """The shared body of an account read tool: guests (and a subscriber id
+    with no row) get the log-in guidance, any other BssError becomes a
+    ToolError with fixed guidance. `fn(session, subscriber_id)` returns the text.
+    `verify` first checks the subscriber exists, for reads whose bss call
+    would otherwise just return an empty list for an unknown id."""
+    sid = subscriber_id_or_none(userdata)
+    if sid is None:
+        return NOT_LOGGED_IN
+
+    def call(db: Session) -> str:
+        if verify:
+            from app.bss import accounts
+
+            accounts.get_account_summary(db, sid)
+        return fn(db, sid)
+
+    try:
+        return await run_db(call)
+    except SubscriberNotFound:
+        return NOT_LOGGED_IN
+    except BssError as err:
+        raise ToolError(error_text(err)) from err
