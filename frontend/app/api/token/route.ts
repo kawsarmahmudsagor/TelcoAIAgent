@@ -15,7 +15,7 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
 // Must match app.config.Settings.agent_name on the backend — this is how the
 // real estate agent worker gets explicitly dispatched into rooms this route creates.
-const AGENT_NAME = process.env.AGENT_NAME || 'real_estate_agent';
+const AGENT_NAME = process.env.AGENT_NAME || 'telco_agent';
 
 // don't cache the results
 export const revalidate = 0;

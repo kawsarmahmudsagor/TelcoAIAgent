@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.agent import actions
 from app.agent.telco_format import format_amount, format_data
 from app.agent.tools._common import error_text, parse_enum, run_db, run_read, run_write
+from app.agent.topics import PACKAGES, publish
 from app.agent.userdata import SessionUserdata
 from app.bss import accounts, packages
 from app.bss.errors import BssError, InsufficientBalance, InvalidRequest
@@ -18,6 +19,28 @@ from app.bss.types import PackageView, PurchaseRequest
 from app.models.telco import PackageKind, TxnChannel
 
 _DETAIL = 3
+_CARDS = 6
+
+
+def _card(p: PackageView) -> dict:
+    return {
+        "code": p.code,
+        "name": p.name,
+        "kind": p.kind.value,
+        "data_mb": p.data_mb,
+        "minutes": p.minutes,
+        "sms": p.sms,
+        "validity_days": p.validity_days,
+        "price": float(p.price),
+        "tag": p.tag,
+    }
+
+
+async def _publish_cards(userdata: SessionUserdata, title: str, found: list[PackageView]) -> None:
+    if found:
+        await publish(
+            userdata, PACKAGES, {"title": title, "packages": [_card(p) for p in found[:_CARDS]]}
+        )
 
 
 def describe_package(p: PackageView) -> str:
@@ -32,6 +55,32 @@ def describe_package(p: PackageView) -> str:
     return f"{p.name} (code {p.code}): {contents}, {p.validity_days} days, {format_amount(p.price)}"
 
 
+def _search(
+    db: Session,
+    kind: str | None,
+    max_price: float | None,
+    min_data_gb: float | None,
+    validity_days: int | None,
+) -> list[PackageView]:
+    return packages.search(
+        db,
+        kind=parse_enum(PackageKind, kind),
+        max_price=None if max_price is None else Decimal(str(max_price)),
+        min_data_gb=min_data_gb,
+        validity_days=validity_days,
+    )
+
+
+def _search_text(found: list[PackageView]) -> str:
+    if not found:
+        return "No packages match. Offer to widen the search (higher price or fewer filters)."
+    lines = [f"{len(found)} matching packages, cheapest first:"]
+    lines += [f"- {describe_package(p)}." for p in found[:_DETAIL]]
+    if len(found) > _DETAIL:
+        lines.append(f"{len(found) - _DETAIL} more not listed; offer to narrow the search.")
+    return "\n".join(lines)
+
+
 def search_packages_text(
     db: Session,
     kind: str | None = None,
@@ -40,20 +89,7 @@ def search_packages_text(
     validity_days: int | None = None,
 ) -> str:
     """The catalogue search as tool text; raises BssError on a bad `kind`."""
-    found = packages.search(
-        db,
-        kind=parse_enum(PackageKind, kind),
-        max_price=None if max_price is None else Decimal(str(max_price)),
-        min_data_gb=min_data_gb,
-        validity_days=validity_days,
-    )
-    if not found:
-        return "No packages match. Offer to widen the search (higher price or fewer filters)."
-    lines = [f"{len(found)} matching packages, cheapest first:"]
-    lines += [f"- {describe_package(p)}." for p in found[:_DETAIL]]
-    if len(found) > _DETAIL:
-        lines.append(f"{len(found) - _DETAIL} more not listed; offer to narrow the search.")
-    return "\n".join(lines)
+    return _search_text(_search(db, kind, max_price, min_data_gb, validity_days))
 
 
 async def run_search_packages(
@@ -65,23 +101,27 @@ async def run_search_packages(
 ) -> str:
     # The public catalogue: no subscriber needed.
     try:
-        return await run_db(
-            lambda db: search_packages_text(db, kind, max_price, min_data_gb, validity_days)
-        )
+        found = await run_db(lambda db: _search(db, kind, max_price, min_data_gb, validity_days))
     except BssError as err:
         raise ToolError(error_text(err)) from err
+    await _publish_cards(userdata, "Packages", found)
+    return _search_text(found)
 
 
 async def run_recommend_packages(userdata: SessionUserdata) -> str:
+    recs = []
+
     def build(db, sid):
-        recs = packages.recommend(db, sid)
+        recs[:] = packages.recommend(db, sid)
         if not recs:
             return "No packages to recommend right now."
         lines = ["Best fits for their recent usage:"]
         lines += [f"- {describe_package(r.package)}. {r.reason}." for r in recs[:_DETAIL]]
         return "\n".join(lines)
 
-    return await run_read(userdata, build, verify=True)
+    out = await run_read(userdata, build, verify=True)
+    await _publish_cards(userdata, "Recommended for you", [r.package for r in recs])
+    return out
 
 
 def _shortfall(db: Session, sid, package_code: str) -> Decimal:

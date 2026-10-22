@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     livekit_url: str = "ws://127.0.0.1:7880"
     livekit_api_key: str = "devkey"
     livekit_api_secret: str = "secret"
-    agent_name: str = "real_estate_agent"
+    agent_name: str = "telco_agent"
 
     # STT/TTS provider -- selects which service app.agent.entrypoint wires up for
     # speech-to-text and text-to-speech. Swap by changing this one setting; both

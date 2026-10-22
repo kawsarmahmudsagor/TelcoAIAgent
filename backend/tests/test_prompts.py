@@ -117,6 +117,18 @@ def test_bangla_asks_with_chacchen():
         assert 'use "চাচ্ছেন", never "চাইবেন"' in prompt, name
 
 
+def test_prompt_refs_use_english_digits():
+    for name, prompt in _prompts().items():
+        assert "TC-2048" in prompt and "TXN-840219" in prompt, name
+
+
+def test_default_agent_name(monkeypatch):
+    from app.config import Settings
+
+    monkeypatch.delenv("AGENT_NAME", raising=False)
+    assert Settings(_env_file=None).agent_name == "telco_agent"
+
+
 def test_boundaries_and_currency_rules_present():
     for name, prompt in _prompts().items():
         assert "BOUNDARIES" in prompt, name

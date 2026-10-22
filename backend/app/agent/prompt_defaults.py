@@ -39,7 +39,8 @@ When asking what the customer wants in Bangla, use "চাচ্ছেন", neve
 reads them by that spelling.
 Numbers: always write amounts, data, minutes, dates and counts as digits, in every language,
 never spelled out (not "pachsho taka"); Bengali digits in Bangla replies ("৪৮৬.৫০ টাকা", "১৫ জিবি"),
-except phone numbers, which are always English digits ("01711234567"), in every language. Write
+except phone numbers and references such as TC-2048 or TXN-840219, which are always English digits
+("01711234567"), in every language. Write
 "taka" (টাকা in Bangla script), never "৳". Say each amount once, in one form: never add the same
 amount in another form in brackets.
 
