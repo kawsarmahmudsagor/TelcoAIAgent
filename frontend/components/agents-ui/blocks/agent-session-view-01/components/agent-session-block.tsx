@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { type ReactNode, useMemo, useRef, useState } from 'react';
 import { PresenceContext } from 'motion/react';
 import {
+  type ReceivedMessage,
+  useChat,
   useIsSpeaking,
   useLocalParticipant,
   useSessionContext,
   useSessionMessages,
   useVoiceAssistant,
 } from '@livekit/components-react';
-import { ApartmentShortlist, placeShortlistResults } from '@/components/app/apartment-shortlist';
 import { useCallAudio } from '@/components/app/call/call-audio-provider';
 import { type CallActivity, CallAvatar } from '@/components/app/call/call-avatar';
 import { ConversationButton } from '@/components/app/call/call-chat';
@@ -18,14 +19,13 @@ import { CallOverlay } from '@/components/app/call/call-overlay';
 import { CallWaveform } from '@/components/app/call/call-waveform';
 import { ConversationPane } from '@/components/app/call/conversation-pane';
 import { statusLabel } from '@/components/app/call/status';
+import { CaseCard } from '@/components/portal/assistant/cards/case-card';
+import { ConfirmCard } from '@/components/portal/assistant/cards/confirm-card';
+import { PackageCards, buyMessage } from '@/components/portal/assistant/cards/package-cards';
 import { useAgentEndCall } from '@/hooks/useAgentEndCall';
-import {
-  type ShortlistResult,
-  useApartmentShortlist,
-  useBookingForm,
-  useVisibleMessages,
-} from '@/lib/livekit-text-streams';
+import { useVisibleMessages } from '@/lib/livekit-text-streams';
 import { cn } from '@/lib/shadcn/utils';
+import { type TelcoPackage, placeAfterTurn, useTelcoTopics } from '@/lib/telco-topics';
 
 const CONVERSATION_ID = 'call-conversation';
 
@@ -36,7 +36,7 @@ export interface AgentSessionView_01Props {
    * @default true
    */
   supportsChatInput?: boolean;
-  /** The agency's name, for the caption under the avatar ("Your Horizon Realty agent"). */
+  /** The company name, for the caption under the avatar ("Your telco. agent"). */
   companyName?: string;
   /** Optional class name merged onto the outer `<section>` container. */
   className?: string;
@@ -44,7 +44,7 @@ export interface AgentSessionView_01Props {
 
 /**
  * The in-call screen. The Call UI: the agent's avatar with voice animations, Mic / End call /
- * Speaker, and the latest search result or a booking form over the call. Its chat bubble opens
+ * Speaker, and the agent's latest card (packages, a support case, a confirm card) over the call. Its chat bubble opens
  * the Conversation UI, the call's transcript and message box, in a pane on the right. Always
  * dark. Lays itself out by its own width (`@container`).
  */
@@ -68,20 +68,42 @@ export function AgentSessionView_01({
   // allows one handler per topic, and the transcript has to collect turns all along.
   const { messages: sessionMessages } = useSessionMessages(session);
   const messages = useVisibleMessages(sessionMessages);
-  const { results: shortlistResults, dismiss: dismissShortlist } = useApartmentShortlist();
-  const bookingForms = useBookingForm();
+  const { cards, confirm } = useTelcoTopics(session.room, agentState);
+  const { send } = useChat();
+  const onBuy = (pkg: TelcoPackage) =>
+    void send(buyMessage(pkg)).catch((err) => console.error('Failed to send Buy:', err));
 
-  // The conversation shows every search result, each after the turn it belongs to.
-  const placement = useMemo(
-    () => placeShortlistResults(messages, shortlistResults),
-    [messages, shortlistResults]
-  );
-  const renderResults = (results: ShortlistResult[] | undefined) =>
-    results?.length
-      ? results.map((result) => (
-          <ApartmentShortlist key={result.id} result={result} onDismiss={dismissShortlist} />
-        ))
-      : undefined;
+  // The conversation shows every card, each after the turn it belongs to.
+  const placement = useMemo(() => {
+    const items: { key: string; revealedAt: number; node: ReactNode }[] = cards.map((card) => ({
+      key: `card-${card.id}`,
+      revealedAt: card.revealedAt,
+      node:
+        card.kind === 'packages' ? (
+          <PackageCards data={card.data} onBuy={onBuy} />
+        ) : (
+          <CaseCard data={card.data} />
+        ),
+    }));
+    if (confirm) {
+      items.push({
+        key: `confirm-${confirm.action_id}`,
+        revealedAt: confirm.revealedAt,
+        node: <ConfirmCard key={confirm.action_id} confirm={confirm} />,
+      });
+    }
+    return placeAfterTurn(messages, items);
+    // onBuy only closes over the stable send.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, cards, confirm]);
+  const renderCards = (items: { key: string; node: ReactNode }[] | undefined) =>
+    items?.length ? (
+      <div className="flex flex-col gap-3">
+        {items.map((item) => (
+          <div key={item.key}>{item.node}</div>
+        ))}
+      </div>
+    ) : undefined;
 
   const activity: CallActivity =
     agentState === 'speaking'
@@ -108,7 +130,7 @@ export function AgentSessionView_01({
       {/*
         Cut the inside off from the view switcher's AnimatePresence (view-controller.tsx): when
         the call ends, only this section's own fade should gate the Start screen. Otherwise every
-        listing card with an `exit` variant joins in, and a card that re-mounts as the transcript
+        card with an `exit` variant joins in, and a card that re-mounts as the transcript
         resets on disconnect never reports done -- the switch hangs on a blank panel.
       */}
       <PresenceContext.Provider value={null}>
@@ -125,7 +147,7 @@ export function AgentSessionView_01({
             <div
               className={cn(
                 'flex h-full flex-col items-center justify-center px-4 transition-[padding] duration-300 ease-out',
-                // Make room for the result column, so it never covers the agent.
+                // Make room for the card column, so it never covers the agent.
                 overlayVisible && '@5xl:pl-[468px]'
               )}
             >
@@ -159,8 +181,9 @@ export function AgentSessionView_01({
             </div>
 
             <CallOverlay
-              results={shortlistResults}
-              forms={bookingForms}
+              cards={cards}
+              confirm={confirm}
+              onBuy={onBuy}
               onVisibleChange={setOverlayVisible}
             />
           </div>
@@ -192,8 +215,10 @@ export function AgentSessionView_01({
             }}
             agentState={agentState}
             messages={messages}
-            renderAfterMessage={(message) => renderResults(placement.byMessageId.get(message.id))}
-            trailingContent={renderResults(placement.unplaced)}
+            renderAfterMessage={(message: ReceivedMessage) =>
+              renderCards(placement.byMessageId.get(message.id))
+            }
+            trailingContent={renderCards(placement.unplaced)}
           />
         )}
       </PresenceContext.Provider>

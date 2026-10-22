@@ -10,8 +10,12 @@ const STATUS: Record<CaseStatus, { tone: StatusTone; label: string }> = {
   resolved: { tone: 'success', label: 'Resolved' },
 };
 
-function Status({ status }: { status: CaseStatus }) {
-  const { tone, label } = STATUS[status];
+/** A case's status as the reference's chip; an unknown status shows as is. */
+export function CaseStatusChip({ status }: { status: CaseStatus | string }) {
+  const { tone, label }: { tone: StatusTone; label: string } = STATUS[status as CaseStatus] ?? {
+    tone: 'open',
+    label: status,
+  };
   return <StatusChip tone={tone}>{label}</StatusChip>;
 }
 
@@ -63,7 +67,7 @@ export function CaseTable({ cases }: { cases: CaseView[] }) {
               <td className="py-3.5 pr-3 whitespace-nowrap">{formatDay(c.created_at)}</td>
               <td className="py-3.5 pr-3 whitespace-nowrap">{formatDay(c.updated_at)}</td>
               <td className="py-3.5">
-                <Status status={c.status} />
+                <CaseStatusChip status={c.status} />
               </td>
             </tr>
           ))}
@@ -77,7 +81,7 @@ export function CaseTable({ cases }: { cases: CaseView[] }) {
           >
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <p className="text-xs font-bold">{c.ref}</p>
-              <Status status={c.status} />
+              <CaseStatusChip status={c.status} />
             </div>
             <p className="text-xs font-bold">{caseCategoryLabel(c.category)}</p>
             <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[11px]">{c.description}</p>

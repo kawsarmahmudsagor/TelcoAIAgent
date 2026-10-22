@@ -3,18 +3,13 @@
 import { useRef, useState } from 'react';
 import { Loader2Icon, ShieldCheckIcon } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
+import { CodeInput, type CodeInputHandle, emptyCode } from '@/components/portal/actions/code-input';
 import { useCountdown } from '@/components/portal/actions/use-countdown';
 import { usePortalMe } from '@/components/portal/portal-me-context';
 import { PortalButton } from '@/components/portal/ui/link-button';
 import { cn } from '@/lib/shadcn/utils';
 import { formatTaka } from '@/lib/telco-format';
 import type { ActionStart, PlanType } from '@/lib/types/portal';
-
-const LENGTH = 6;
-// ASCII and Bengali digits; the backend normalises Bengali ones, so they are sent as typed.
-const DIGIT = /[0-9০-৯]/g;
-
-const digitsOf = (text: string) => text.match(DIGIT) ?? [];
 
 /** "Main balance" / "Add to bill" / "bKash" ... for the start's `pay_from`. */
 export function payFromLabel(payFrom: string, plan: PlanType): string {
@@ -75,8 +70,8 @@ function OtpContent({
   onCancel,
 }: OtpDialogProps & { start: ActionStart }) {
   const me = usePortalMe();
-  const [digits, setDigits] = useState<string[]>(() => Array(LENGTH).fill(''));
-  const boxes = useRef<(HTMLInputElement | null)[]>([]);
+  const [digits, setDigits] = useState<string[]>(emptyCode);
+  const codeRef = useRef<CodeInputHandle>(null);
   const left = useCountdown(start.otp.expires_at);
 
   const code = digits.join('');
@@ -84,25 +79,12 @@ function OtpContent({
   const spent = attemptsLeft <= 0;
   const canConfirm = complete && !busy && !left.expired && !spent;
 
-  const focus = (i: number) => boxes.current[Math.max(0, Math.min(LENGTH - 1, i))]?.focus();
-
-  /** Writes `chars` from box `from` on, then focuses the box after the last one written. */
-  function fill(from: number, chars: string[]) {
-    if (chars.length === 0) return;
-    setDigits((prev) => {
-      const next = [...prev];
-      chars.slice(0, LENGTH - from).forEach((c, k) => (next[from + k] = c));
-      return next;
-    });
-    focus(from + chars.length);
-  }
-
   async function submit() {
     if (!canConfirm) return;
     const wrong = await onConfirm(code);
     if (wrong) {
-      setDigits(Array(LENGTH).fill(''));
-      focus(0);
+      setDigits(emptyCode());
+      codeRef.current?.focus(0);
     }
   }
 
@@ -119,7 +101,7 @@ function OtpContent({
     <DialogPrimitive.Content
       onOpenAutoFocus={(e) => {
         e.preventDefault();
-        focus(0);
+        codeRef.current?.focus(0);
       }}
       onEscapeKeyDown={(e) => busy && e.preventDefault()}
       onInteractOutside={(e) => e.preventDefault()}
@@ -177,60 +159,14 @@ function OtpContent({
             {left.expired ? 'Code expired' : `Expires in ${left.label}`}
           </p>
         </div>
-        <div
-          role="group"
-          aria-labelledby="otp-label"
-          className="narrow:gap-1.5 grid grid-cols-6 gap-2"
-        >
-          {digits.map((digit, i) => (
-            <input
-              key={i}
-              ref={(el) => {
-                boxes.current[i] = el;
-              }}
-              value={digit}
-              inputMode="numeric"
-              autoComplete={i === 0 ? 'one-time-code' : 'off'}
-              aria-label={`Digit ${i + 1} of ${LENGTH}`}
-              aria-invalid={error ? true : undefined}
-              readOnly={busy}
-              onFocus={(e) => e.currentTarget.select()}
-              onChange={(e) => {
-                const chars = digitsOf(e.target.value);
-                if (chars.length === 0) {
-                  setDigits((prev) => prev.map((d, k) => (k === i ? '' : d)));
-                  return;
-                }
-                // A typed digit replaces the box; an autofilled code spreads from here.
-                fill(i, chars.length > 1 && digit ? chars.slice(1) : chars);
-              }}
-              onPaste={(e) => {
-                const chars = digitsOf(e.clipboardData.getData('text'));
-                if (chars.length === 0) return;
-                e.preventDefault();
-                // A whole pasted code fills every box.
-                fill(chars.length >= LENGTH ? 0 : i, chars);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Backspace' && !digit && i > 0) {
-                  e.preventDefault();
-                  setDigits((prev) => prev.map((d, k) => (k === i - 1 ? '' : d)));
-                  focus(i - 1);
-                } else if (e.key === 'ArrowLeft') {
-                  e.preventDefault();
-                  focus(i - 1);
-                } else if (e.key === 'ArrowRight') {
-                  e.preventDefault();
-                  focus(i + 1);
-                }
-              }}
-              className={cn(
-                'bg-surface2 border-line text-foreground phone:h-12 focus-visible:border-brand focus-visible:ring-ring/40 h-[52px] w-full min-w-0 rounded-xl border text-center text-xl font-extrabold tabular-nums outline-none read-only:opacity-60 focus-visible:ring-[3px]',
-                error && 'border-status-failed-foreground'
-              )}
-            />
-          ))}
-        </div>
+        <CodeInput
+          ref={codeRef}
+          digits={digits}
+          onChange={setDigits}
+          labelledBy="otp-label"
+          readOnly={busy}
+          invalid={Boolean(error)}
+        />
 
         <div aria-live="polite" className="min-h-[18px]">
           {error && (

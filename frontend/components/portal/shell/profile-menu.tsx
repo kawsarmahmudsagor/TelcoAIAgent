@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDownIcon, LogOutIcon, ShieldCheckIcon, UsersRoundIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { useEndSessionOnLogout } from '@/components/portal/assistant/assistant-provider';
 import { usePortalMe } from '@/components/portal/portal-me-context';
 import {
   DropdownMenu,
@@ -20,16 +21,19 @@ import { formatPlan, initials } from '@/lib/telco-format';
 
 /**
  * Ends the portal session and returns to the persona picker. "Switch persona" and "Log out" both
- * use it. The AI assistant (Task 10) extends `logOut` to end its LiveKit session first.
+ * use it. The AI assistant's LiveKit session ends first, so the next persona never talks to an
+ * agent that still knows the last one.
  */
 export function usePortalLogout(): { logOut: () => Promise<void>; loggingOut: boolean } {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const endAssistantSession = useEndSessionOnLogout();
 
   const logOut = useCallback(async () => {
     if (loggingOut) return;
     setLoggingOut(true);
     try {
+      await endAssistantSession();
       await portalApi.logout();
       router.push('/');
     } catch {
@@ -38,7 +42,7 @@ export function usePortalLogout(): { logOut: () => Promise<void>; loggingOut: bo
       });
       setLoggingOut(false);
     }
-  }, [loggingOut, router]);
+  }, [loggingOut, router, endAssistantSession]);
 
   return { logOut, loggingOut };
 }

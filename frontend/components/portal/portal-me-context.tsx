@@ -16,3 +16,8 @@ export function usePortalMe(): PortalMe {
   if (!me) throw new Error('usePortalMe() must be used inside the portal layout');
   return me;
 }
+
+/** The signed-in customer, or null outside the portal (e.g. a card on the standalone /chat page). */
+export function useOptionalPortalMe(): PortalMe | null {
+  return useContext(PortalMeContext);
+}
