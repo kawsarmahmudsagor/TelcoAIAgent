@@ -25,7 +25,6 @@ from app.agent.quick_reply import (
     stream_fast,
 )
 from app.agent.turn_judge import Exchange, Judgement
-from app.agent.userdata import BookingState
 from app.config import Settings
 from app.services.agent_config_service import resolve
 
@@ -45,13 +44,8 @@ def _config(**overrides):
 
 
 @dataclass
-class _Pending:
-    state: BookingState
-
-
-@dataclass
 class _Userdata:
-    pending_booking: _Pending | None = None
+    pass
 
 
 # --- route -----------------------------------------------------------------------------
@@ -83,22 +77,11 @@ def test_route_off_switches():
     assert route(search, _Userdata(), _config(quick_filler=False), s) is None
 
 
-def test_route_never_fast_while_booking():
-    s, none = _settings(), Judgement(0.9, "none", 0.95)
-    booking = _Userdata(_Pending(BookingState.collecting))
-    assert route(none, booking, _config(), s) is None
-    assert route(none, _Userdata(_Pending(BookingState.booked)), _config(), s) == "fast"
-    # A userdata without booking state (tests, phone) counts as none in progress.
-    assert route(none, object(), _config(), s) == "fast"
-
-
 def test_a_goodbye_goes_to_the_small_model_without_jev():
     s = _settings()
     assert route(None, _Userdata(), _config(), s, closing=True) == "fast"
     assert route(None, _Userdata(), _config(quick_fast_answer=False), s, closing=True) is None
     assert route(None, _Userdata(), _config(quick_reply_enabled=False), s, closing=True) is None
-    booking = _Userdata(_Pending(BookingState.collecting))
-    assert route(None, booking, _config(), s, closing=True) is None
 
 
 def test_avoid_keeps_the_utterance_script():

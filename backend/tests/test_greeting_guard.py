@@ -5,8 +5,6 @@ AgentSession and room are fakes; the judge is a stub."""
 
 import asyncio
 import contextlib
-import uuid
-from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from livekit import rtc
@@ -17,11 +15,9 @@ from app.agent.gated_agent import IGNORED_TEXT_TOPIC, USER_TURN_TOPIC
 from app.agent.prompt_defaults import (
     SALAM,
     SALAM_INSTRUCTION,
-    SPOKEN_GREETINGS_COLDCALL,
     SPOKEN_GREETINGS_INBOUND,
-    SPOKEN_GREETINGS_VIEWING_FOLLOWUP,
 )
-from app.agent.userdata import Channel, SessionUserdata, UpcomingViewing
+from app.agent.userdata import Channel, SessionUserdata
 from app.services import agent_config_service
 
 
@@ -269,31 +265,16 @@ class GreetAgent:
         self.greeting_done_calls += 1
 
 
-# 10:00 in Dhaka on Wednesday 14 October 2026.
-_VIEWING_WHEN = datetime(2026, 10, 14, 4, 0, tzinfo=timezone.utc)
-_VIEWING_TIME_BN = "বুধবার, চৌদ্দ অক্টোবর, সকাল দশটায়"
-
-
 async def _greet(
     handle: FakeHandle,
     *,
     room=None,
-    coldcall=False,
     closed=False,
     config=None,
-    viewing=False,
-    property_title=None,
 ):
     session = GreetSession(handle, closed=closed)
     agent = GreetAgent()
     userdata = SessionUserdata(channel=Channel.inbound_chat, room=room)
-    if coldcall:
-        userdata.channel = Channel.outbound_coldcall
-        userdata.client = SimpleNamespace(full_name="Rahim")
-        if viewing:
-            userdata.upcoming_viewing = UpcomingViewing(
-                booking_id=uuid.uuid4(), when=_VIEWING_WHEN, property_title=property_title
-            )
     config = config or agent_config_service.resolve(None)
     entrypoint._greet(session, agent, userdata, config, room=room)
     for _ in range(10):
@@ -303,14 +284,13 @@ async def _greet(
 
 def test_greeting_is_uninterruptible_and_unlocks_the_session():
     async def go():
-        for coldcall in (False, True):
-            room = AttributeRoom()
-            session, agent, userdata = await _greet(FakeHandle(), room=room, coldcall=coldcall)
-            assert [r["allow_interruptions"] for r in session.replies] == [False]
-            assert userdata.greeting_done
-            assert session.cleared == 1
-            assert agent.greeting_done_calls == 1
-            assert room.attributes == {"greeting_done": "1"}
+        room = AttributeRoom()
+        session, agent, userdata = await _greet(FakeHandle(), room=room)
+        assert [r["allow_interruptions"] for r in session.replies] == [False]
+        assert userdata.greeting_done
+        assert session.cleared == 1
+        assert agent.greeting_done_calls == 1
+        assert room.attributes == {"greeting_done": "1"}
 
     asyncio.run(go())
 
@@ -352,7 +332,7 @@ def test_a_failed_greeting_still_unlocks_the_session():
 
 def test_phone_call_greeting_unlocks_without_a_room_and_survives_a_closed_session():
     async def go():
-        session, agent, userdata = await _greet(FakeHandle(), coldcall=True, closed=True)
+        session, agent, userdata = await _greet(FakeHandle(), closed=True)
         assert session.replies[0]["allow_interruptions"] is False
         assert userdata.greeting_done
         assert agent.greeting_done_calls == 1
@@ -371,103 +351,14 @@ def test_a_default_greeting_is_a_canned_line_without_the_llm(monkeypatch):
 
     async def go():
         config = agent_config_service.resolve(None)
-        values = {
-            "agent_name": config.assistant_name,
-            "agency_name": config.agency_name,
-            "client_name": "Rahim",
-        }
-        followup_values = {
-            **values,
-            "property": "Lakeview 3BR",
-            "viewing_time": _VIEWING_TIME_BN,
-        }
-        # A lead with no booked viewing gets only cold-call lines; one with a
-        # viewing gets only follow-up lines.
-        cases = (
-            ({}, SPOKEN_GREETINGS_INBOUND, values),
-            ({"coldcall": True}, SPOKEN_GREETINGS_COLDCALL, values),
-            (
-                {"coldcall": True, "viewing": True, "property_title": "Lakeview 3BR"},
-                SPOKEN_GREETINGS_VIEWING_FOLLOWUP,
-                followup_values,
-            ),
-        )
-        for kwargs, lines, line_values in cases:
-            pools.clear()
-            session, _, _ = await _greet(FakeHandle(), **kwargs)
-            (reply,) = session.replies
-            assert reply["kind"] == "say"
-            assert pools == [lines]
-            assert reply["text"] == lines[-1].format(**line_values)
-
-    asyncio.run(go())
-
-
-def test_a_follow_up_greeting_says_the_viewing_time_in_bangla(monkeypatch):
-    monkeypatch.setattr(entrypoint.random, "choice", lambda lines: lines[0])
-
-    async def go():
-        config = agent_config_service.resolve(None)
-        session, _, _ = await _greet(FakeHandle(), coldcall=True, viewing=True)
-        (reply,) = session.replies
-        assert reply["text"] == (
-            f"{SALAM} Rahim, আমি {config.assistant_name}, {config.agency_name} থেকে বলছি। আপনি "
-            f"{_VIEWING_TIME_BN} যে প্রপার্টিটি দেখার জন্য বুক করেছিলেন, সেটার ব্যাপারে কল করেছি। "
-            "এখন কথা বলার সময় হবে?"
-        )
-
-    asyncio.run(go())
-
-
-def test_a_customised_follow_up_greeting_gets_the_property_and_time():
-    async def go():
-        config = agent_config_service.resolve(None)
-        config.greeting_followup = "Ask {client_name} about {property} on {viewing_time}."
-        session, _, _ = await _greet(
-            FakeHandle(), coldcall=True, viewing=True, config=config, property_title="Lakeview 3BR"
-        )
-        (reply,) = session.replies
-        assert reply["kind"] == "generate_reply"
-        assert reply["instructions"] == (
-            "Ask Rahim about Lakeview 3BR on Wednesday 14 October 2026, 10:00.\n"
-            f"{SALAM_INSTRUCTION}"
-        )
-
-    asyncio.run(go())
-
-
-def test_an_invalid_saved_follow_up_greeting_falls_back_to_the_default():
-    async def go():
-        config = agent_config_service.resolve(None)
-        config.greeting_followup = "Greet {current_date}."
-        session, _, _ = await _greet(FakeHandle(), coldcall=True, viewing=True, config=config)
-        (reply,) = session.replies
-        assert reply["kind"] == "generate_reply"
-        assert "the property on Wednesday 14 October 2026, 10:00" in reply["instructions"]
-
-    asyncio.run(go())
-
-
-def test_a_custom_cold_greeting_is_not_used_for_a_lead_with_a_viewing(monkeypatch):
-    """greeting_coldcall is for cold calls only: with no follow-up greeting
-    saved, a lead with a booked viewing hears a canned follow-up line."""
-    monkeypatch.setattr(entrypoint.random, "choice", lambda lines: lines[0])
-
-    async def go():
-        config = agent_config_service.resolve(None)
-        config.greeting_coldcall = "Say hi to {client_name}."
-        session, _, _ = await _greet(FakeHandle(), coldcall=True, viewing=True, config=config)
+        values = {"agent_name": config.assistant_name, "agency_name": config.agency_name}
+        session, _, _ = await _greet(FakeHandle())
         (reply,) = session.replies
         assert reply["kind"] == "say"
-        assert _VIEWING_TIME_BN in reply["text"]
+        assert pools == [SPOKEN_GREETINGS_INBOUND]
+        assert reply["text"] == SPOKEN_GREETINGS_INBOUND[-1].format(**values)
 
     asyncio.run(go())
-
-
-def test_cold_call_lines_dont_claim_interest_or_a_follow_up():
-    for line in SPOKEN_GREETINGS_COLDCALL:
-        assert "ফলো আপ" not in line
-        assert "আগ্রহ দেখিয়েছিলেন" not in line
 
 
 def test_a_customised_greeting_still_goes_through_the_llm():
@@ -485,5 +376,4 @@ def test_a_customised_greeting_still_goes_through_the_llm():
 
 
 def test_every_canned_greeting_opens_with_the_salam():
-    lines = SPOKEN_GREETINGS_INBOUND + SPOKEN_GREETINGS_COLDCALL + SPOKEN_GREETINGS_VIEWING_FOLLOWUP
-    assert all(line.startswith(SALAM) for line in lines)
+    assert all(line.startswith(SALAM) for line in SPOKEN_GREETINGS_INBOUND)

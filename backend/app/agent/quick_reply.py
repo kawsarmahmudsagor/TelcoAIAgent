@@ -35,7 +35,6 @@ from livekit.agents.voice.generation import INSTRUCTIONS_MESSAGE_ID
 from app.agent import turn_gate
 from app.agent.quick_models import reasoning_for
 from app.agent.turn_judge import Exchange, Judgement
-from app.agent.userdata import BookingState
 from app.config import Settings
 from app.services.agent_config_service import ResolvedAgentConfig
 
@@ -158,11 +157,6 @@ def quick_on(config: ResolvedAgentConfig) -> bool:
     return config.quick_reply_enabled and (config.quick_fast_answer or config.quick_filler)
 
 
-def booking_in_progress(userdata: object) -> bool:
-    pending = getattr(userdata, "pending_booking", None)
-    return pending is not None and pending.state != BookingState.booked
-
-
 def route(
     judgement: Judgement | None,
     userdata: object,
@@ -178,18 +172,14 @@ def route(
     if not config.quick_reply_enabled:
         return None
     if closing:
-        if config.quick_fast_answer and not booking_in_progress(userdata):
+        if config.quick_fast_answer:
             return "fast"
         return None
     if judgement is None or judgement.lookup is None:
         return None
     lookup_p = judgement.lookup_p or 0.0
     if judgement.lookup == "none":
-        if (
-            config.quick_fast_answer
-            and lookup_p >= settings.quick_route_min_p
-            and not booking_in_progress(userdata)
-        ):
+        if config.quick_fast_answer and lookup_p >= settings.quick_route_min_p:
             return "fast"
         return None
     # A weak guess at a search gets no "let me find that": the main model may

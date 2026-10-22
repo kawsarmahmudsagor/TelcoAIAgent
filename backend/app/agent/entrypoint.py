@@ -1,30 +1,25 @@
 import asyncio
 import logging
 import random
-import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 from livekit import rtc
-from livekit.agents import NOT_GIVEN, Agent, AgentSession, JobContext, room_io
+from livekit.agents import NOT_GIVEN, Agent, AgentSession, JobContext
 from livekit.agents import llm as llm_utils
 from livekit.agents import stt as stt_utils
 from livekit.agents import tts as tts_utils
 from livekit.agents import vad as vad_utils
 from livekit.agents.beta.tools.end_call import EndCallTool
-from livekit.agents.voice.events import CloseEvent, CloseReason
 from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 
 from app.agent import (
-    booking,
     browser_end_call,
     elevenlabs_keys,
     gated_agent,
     idle_checkin,
     openrouter_audio,
-    phone_dial,
     prefetch,
     quick_reply,
     run_log,
@@ -35,35 +30,20 @@ from app.agent import (
 from app.agent.persona import build_system_prompt
 from app.agent.prompt_defaults import (
     SALAM_INSTRUCTION,
-    SPOKEN_GREETINGS_COLDCALL,
     SPOKEN_GREETINGS_INBOUND,
-    SPOKEN_GREETINGS_VIEWING_FOLLOWUP,
 )
 from app.agent.speech_numbers import speak_numbers_as_words
 from app.agent.speech_words import respell_words_for_speech
-from app.agent.tools import ALL_TOOLS, INBOUND_TOOLS
-from app.agent.tools._datetime import spoken_local, spoken_local_bn
-from app.agent.tools.reschedule_viewing import reschedule_viewing
 from app.agent.tools.search_knowledge_base import build_search_knowledge_base
 from app.agent.transcript import TranscriptRecorder
-from app.agent.userdata import Channel, SessionUserdata
+from app.agent.userdata import SessionUserdata
 from app.config import Settings, get_settings
-from app.db.session import SessionLocal
-from app.models.call_schedule import CallStatus
-from app.repositories import call_schedule_repo
 from app.services import agent_config_service
 from app.services.agent_config_service import ResolvedAgentConfig, render_template
 
 logger = logging.getLogger("agent.entrypoint")
 
 GREETING_DONE_ATTRIBUTE = "greeting_done"
-
-_TERMINAL_CALL_STATUSES = {
-    CallStatus.completed,
-    CallStatus.failed,
-    CallStatus.cancelled,
-    CallStatus.missed,
-}
 
 # How long the gate's OpenRouter connections (Jev, the router) stay open idle.
 _GATE_KEEPALIVE_S = 300.0
@@ -127,43 +107,6 @@ async def _announce_user_turns(room: rtc.Room) -> None:
         await room.local_participant.set_attributes({gated_agent.GATE_ATTRIBUTE: "1"})
     except Exception:
         logger.exception("could not publish the turn_gate attribute")
-
-
-async def _mark_call_schedule_completed(userdata: SessionUserdata) -> None:
-    """Flips the dispatched call_schedule row to completed once the call actually
-    ends, so the dashboard doesn't show "in_progress" forever. Skips rows a tool
-    (confirm_interest / schedule_followup) already moved to a terminal status."""
-    if userdata.call_schedule_id is None:
-        return
-    db = SessionLocal()
-    try:
-        entry = call_schedule_repo.get(db, userdata.call_schedule_id)
-        if entry is None or entry.status in _TERMINAL_CALL_STATUSES:
-            return
-        call_schedule_repo.update_fields(
-            db,
-            entry,
-            {"status": CallStatus.completed, "completed_at": datetime.now(timezone.utc)},
-        )
-    finally:
-        db.close()
-
-
-def _mark_call_schedule_answered(call_schedule_id: uuid.UUID) -> bool:
-    """Records that someone joined, so any incoming-call screen still ringing for
-    this call (e.g. another dashboard tab) can no longer decline/miss it out from
-    under the live conversation. Returns False (no-op) if it was already
-    declined/missed/hung up."""
-    db = SessionLocal()
-    try:
-        return call_schedule_repo.transition(
-            db,
-            call_schedule_id,
-            from_statuses={CallStatus.dispatched, CallStatus.in_progress},
-            values={"answered_at": datetime.now(timezone.utc)},
-        )
-    finally:
-        db.close()
 
 
 def _load_agent_config() -> ResolvedAgentConfig:
@@ -450,19 +393,14 @@ def _rag_enabled(config: ResolvedAgentConfig | None) -> bool:
 
 
 def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None = None) -> list:
-    """Tools for this session. confirm_interest / schedule_followup only work on
-    a cold call with a loaded lead, reschedule_viewing only on one following up
-    a viewing. end_call is always there: on a phone call the agent has to hang
+    """Tools for this session. end_call is always there: on a phone call the agent has to hang
     up itself (EndCallTool deletes the room), and a browser call ends after the
     goodbye, by the browser (BrowserEndCall). Both keep per-session state, so
     they're built fresh each time.
 
     search_knowledge_base is added only when `config` has the knowledge base
     enabled (see _rag_enabled), bound to that config's top-k/threshold/scope."""
-    is_coldcall = userdata.channel == Channel.outbound_coldcall and userdata.client is not None
-    tools: list = list(ALL_TOOLS if is_coldcall else INBOUND_TOOLS)
-    if is_coldcall and userdata.upcoming_viewing is not None:
-        tools.append(reschedule_viewing)
+    tools: list = []
     if _rag_enabled(config):
         tools.append(build_search_knowledge_base(config))
     if userdata.is_phone_call:
@@ -667,35 +605,12 @@ def _greet(
     takes no input until it has played out (_mark_greeting_done). `room` is the
     browser room to flag the end of the greeting on; None for a phone call.
     `on_done` runs once input has reopened."""
-    # Same condition build_system_prompt uses to pick the cold-call task: a cold
-    # call whose lead couldn't be loaded runs as inbound, tools included.
-    is_coldcall = userdata.channel == Channel.outbound_coldcall and userdata.client is not None
     values = {"agent_name": config.assistant_name, "agency_name": config.agency_name}
-    viewing = userdata.upcoming_viewing if is_coldcall else None
-    if viewing is not None:
-        # Follows up the booked viewing. Both viewing values are always set:
-        # render_template falls back to the default, which uses them, when a
-        # saved template is invalid.
-        field, template = "greeting_followup", config.greeting_followup
-        lines = SPOKEN_GREETINGS_VIEWING_FOLLOWUP
-        values["client_name"] = userdata.client.full_name
-        values["property"] = viewing.property_title or "the property"
-        # A canned line is spoken as written, so it gets the time in Bangla
-        # words; the LLM gets it in English and says it in the call's language.
-        values["viewing_time"] = (
-            spoken_local_bn(viewing.when) if template is None else spoken_local(viewing.when)
-        )
-    elif is_coldcall:
-        # No viewing booked: a cold introduction.
-        field, template = "greeting_coldcall", config.greeting_coldcall
-        lines = SPOKEN_GREETINGS_COLDCALL
-        values["client_name"] = userdata.client.full_name
-    else:
-        field, template, lines = (
-            "greeting_inbound",
-            config.greeting_inbound,
-            SPOKEN_GREETINGS_INBOUND,
-        )
+    field, template, lines = (
+        "greeting_inbound",
+        config.greeting_inbound,
+        SPOKEN_GREETINGS_INBOUND,
+    )
     if template is None:
         # Still the default: speak a canned line, no LLM round trip.
         handle = session.say(random.choice(lines).format(**values), allow_interruptions=False)
@@ -708,157 +623,14 @@ def _greet(
     asyncio.ensure_future(_await_greeting(handle, session, agent, userdata, room, on_done))
 
 
-def _linked_identity(session: AgentSession, caller_identity: str) -> Callable[[], str | None]:
-    """The identity of the browser participant the session talks to."""
-
-    def _identity() -> str | None:
-        # RoomIO links the participant from a background task, so right after
-        # session.start it may not be set yet; it then links the first caller,
-        # the one entrypoint waited for.
-        participant = session.room_io.linked_participant
-        return participant.identity if participant is not None else caller_identity
-
-    return _identity
-
-
-def _serve_booking_form(
-    session: AgentSession,
-    userdata: SessionUserdata,
-    room: rtc.Room,
-    caller_identity: str,
-    recorder: TranscriptRecorder | None,
-) -> None:
-    """Browser sessions only: the booking form card's Submit / Confirm (see
-    app.agent.booking)."""
-    booking.BookingRpc(
-        session=session,
-        userdata=userdata,
-        room=room,
-        linked_identity=_linked_identity(session, caller_identity),
-        recorder=recorder,
-    ).register()
-
-
-async def _run_phone_call(
-    ctx: JobContext, settings: Settings, ringing: phone_dial.RingingCall
-) -> None:
-    """Outbound cold call to a real phone. Everything is built *before* dialing
-    so the callee doesn't hear dead air after picking up."""
-    call_id = ringing.call_schedule_id
-    userdata = session_context.resolve(ctx.job.metadata, ctx.room)
-    if userdata.client is None:
-        # Never ring someone's phone with the anonymous inbound persona.
-        phone_dial.record_call_end(call_id, CallStatus.failed, "lead not found")
-        await ctx.delete_room()
-        ctx.shutdown(reason="lead not found")
-        return
-
-    config = _load_agent_config()
-    el_keys = await _elevenlabs_keys_for_call(settings, config)
-    timing = _open_run_log(settings, ctx.room.name)
-    try:
-        session, agent = _build_session(settings, userdata, config, el_keys, timing=timing)
-    except RuntimeError as e:
-        if timing is not None:
-            timing.close()
-        logger.error("phone call %s can't start: %s", call_id, e)
-        phone_dial.record_call_end(call_id, CallStatus.failed, str(e))
-        await ctx.delete_room()
-        ctx.shutdown(reason=str(e))
-        return
-
-    if not await phone_dial.dial(ctx, call_id, ringing.dial_number, settings):
-        if timing is not None:
-            timing.close()
-        return
-    if not _mark_call_schedule_answered(call_id):
-        if timing is not None:
-            timing.close()
-        # Hung up from the dashboard while it was ringing.
-        await ctx.delete_room()
-        ctx.shutdown(reason="call ended before it was answered")
-        return
-
-    # Only now, so a failed or declined dial leaves no orphan conversation row.
-    recorder = await TranscriptRecorder.start(session, userdata, ctx.room.name)
-
-    async def _on_shutdown() -> None:
-        if recorder is not None:
-            await recorder.close()
-        await _mark_call_schedule_completed(userdata)
-
-    ctx.add_shutdown_callback(_on_shutdown)
-
-    identity = phone_dial.phone_identity(call_id)
-
-    def _on_participant_disconnected(participant: rtc.RemoteParticipant) -> None:
-        # The callee hanging up doesn't always close the session (that depends on
-        # the disconnect reason livekit-sip reports), so end the job directly.
-        if participant.identity == identity:
-            logger.info(
-                "phone call %s hung up (reason=%s)",
-                call_id,
-                getattr(participant, "disconnect_reason", None),
-            )
-            ctx.shutdown(reason="callee hung up")
-
-    def _on_session_close(event: CloseEvent) -> None:
-        if event.reason == CloseReason.ERROR:
-            # Recorded before the shutdown callback runs, which then skips the
-            # now-terminal row instead of calling it completed.
-            phone_dial.record_call_end(call_id, CallStatus.failed, "agent error")
-
-    ctx.room.on("participant_disconnected", _on_participant_disconnected)
-    session.on("close", _on_session_close)
-
-    await session.start(
-        agent=agent,
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            # Only the phone drives this session, never a stray browser joining.
-            participant_identity=identity,
-            # Any session close (errors included) drops the phone leg instead of
-            # leaving it open in silence until max_call_duration.
-            delete_room_on_close=True,
-        ),
-    )
-    _greet(session, agent, userdata, config)
-
-
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
     settings = get_settings()
-    ringing = phone_dial.parse_ringing_call(ctx.job.metadata)
-    if ringing is not None and ringing.dial_number:
-        await _run_phone_call(ctx, settings, ringing)
-        return
 
-    # For outbound cold calls the room (and this job) is created before anyone
-    # actually joins it -- the dashboard/callee only connects afterwards (the
-    # dashboard's ScheduledCallWatcher notices the call went live via polling,
-    # then joins). Speaking immediately after ctx.connect() raced that join:
-    # the greeting's text-stream chunks would already be in flight before the
-    # listener subscribed to them, so the transcript silently dropped the
-    # whole utterance while the tail of the live audio was still audible.
-    # Waiting here guarantees a listener is actually in the room first. For
-    # inbound calls the caller is already connected by the time this job
-    # starts, so this resolves immediately.
-    #
-    # A cold call that nobody answers (incoming-call screen ignored or never
-    # opened) is given up on after coldcall_ring_timeout_s and marked missed.
-    if ringing is None:
-        caller = await ctx.wait_for_participant()
-    else:
-        try:
-            caller = await asyncio.wait_for(
-                ctx.wait_for_participant(), timeout=settings.coldcall_ring_timeout_s
-            )
-        except asyncio.TimeoutError:
-            logger.info("cold call %s was not answered, marking missed", ringing.call_schedule_id)
-            phone_dial.record_call_end(ringing.call_schedule_id, CallStatus.missed, "no answer")
-            ctx.shutdown(reason="cold call not answered")
-            return
-        _mark_call_schedule_answered(ringing.call_schedule_id)
+    # The caller is already connected by the time this job starts, so this
+    # resolves immediately; waiting guarantees a listener is in the room before
+    # the greeting's text-stream chunks go out.
+    await ctx.wait_for_participant()
 
     userdata = session_context.resolve(ctx.job.metadata, ctx.room)
     config = _load_agent_config()
@@ -872,11 +644,7 @@ async def entrypoint(ctx: JobContext) -> None:
     except RuntimeError as e:
         if timing is not None:
             timing.close()
-        # Before the shutdown callback is registered, so the call row ends up
-        # failed rather than completed.
         logger.error("session can't start: %s", e)
-        if userdata.call_schedule_id is not None:
-            phone_dial.record_call_end(userdata.call_schedule_id, CallStatus.failed, str(e))
         ctx.shutdown(reason=str(e))
         return
 
@@ -885,7 +653,6 @@ async def entrypoint(ctx: JobContext) -> None:
     async def _on_shutdown() -> None:
         if recorder is not None:
             await recorder.close()
-        await _mark_call_schedule_completed(userdata)
 
     ctx.add_shutdown_callback(_on_shutdown)
     # Both paths use the gate's text callback: it drops text sent before the
@@ -902,6 +669,5 @@ async def entrypoint(ctx: JobContext) -> None:
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent):
         # A filler is said outside the chat context, so the recorder never sees it.
         agent.gate.on_filler_store = recorder.record_assistant_after
-    _serve_booking_form(session, userdata, ctx.room, caller.identity, recorder)
     idle = _idle_checkin(ctx, settings, session)
     _greet(session, agent, userdata, config, room=ctx.room, on_done=idle.start if idle else None)

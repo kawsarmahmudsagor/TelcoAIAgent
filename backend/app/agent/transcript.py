@@ -76,13 +76,12 @@ def _finish(conversation_id: uuid.UUID, client_id: uuid.UUID | None) -> None:
 def create_conversation(userdata: SessionUserdata, room_name: str | None) -> uuid.UUID:
     db = SessionLocal()
     try:
-        client_id = userdata.client_id or (userdata.client.id if userdata.client else None)
+        # TODO(Task 4): the column becomes subscriber_id; pass userdata.subscriber_id then.
         conversation = conversation_repo.create(
             db,
             channel=userdata.channel.value,
             room_name=room_name,
-            client_id=client_id,
-            call_schedule_id=userdata.call_schedule_id,
+            client_id=None,
             is_phone_call=userdata.is_phone_call,
             visitor_id=getattr(userdata, "visitor_id", None),
         )
@@ -163,9 +162,7 @@ class TranscriptRecorder:
             )
 
     def record_tool(self, name: str, args: dict | None, output: str | None) -> None:
-        """A tool row for work done outside the LLM's tool calls -- e.g. a booking
-        confirmed by clicking the form (app.agent.booking), which client_history
-        must still see as a book_appointment outcome."""
+        """A tool row for work done outside the LLM's tool calls."""
         self._push(
             {
                 "role": MessageRole.tool.value,
@@ -245,10 +242,8 @@ class TranscriptRecorder:
         if self._writer is not None:
             await self._writer
         userdata = self._userdata
-        client_id = userdata.client_id or (
-            userdata.client.id if getattr(userdata, "client", None) is not None else None
-        )
+        # TODO(Task 4): store userdata.subscriber_id once the column is renamed.
         try:
-            await asyncio.to_thread(_finish, self.conversation_id, client_id)
+            await asyncio.to_thread(_finish, self.conversation_id, None)
         except Exception:
             logger.exception("could not mark conversation %s ended", self.conversation_id)

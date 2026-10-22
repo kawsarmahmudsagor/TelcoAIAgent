@@ -15,7 +15,6 @@ from app.agent.prefetch import Lookup
 from app.agent.quick_reply import QuickReplyRuntime
 from app.agent.turn_gate import Thresholds
 from app.agent.turn_judge import Judgement
-from app.agent.userdata import BookingState
 from app.config import Settings
 from app.services.agent_config_service import resolve
 from test_gated_session import FakeRoom, FakeSession, _heard
@@ -36,7 +35,7 @@ class _Handle:
 class QuickSession(FakeSession):
     def __init__(self):
         super().__init__()
-        self.userdata = SimpleNamespace(greeting_done=True, pending_booking=None)
+        self.userdata = SimpleNamespace(greeting_done=True)
         self.current_agent = SimpleNamespace(_chat_ctx=SimpleNamespace(items=[]))
         self.handles: list[_Handle] = []
         self.say_error: Exception | None = None
@@ -511,17 +510,6 @@ def test_a_goodbye_goes_to_the_small_model_without_jev(text):
         assert await _turn(g, message) is True
         assert g.gate.fast_for == message.id
         assert _says(g.session) == []
-
-    asyncio.run(go())
-
-
-def test_no_fast_route_while_booking():
-    async def go():
-        g = _gate(Judgement(0.9, "none", 0.95), prefetcher=None)
-        g.session.userdata.pending_booking = SimpleNamespace(state=BookingState.review)
-        assert await _turn(g, _msg("আপনার নামটা আরেকবার বলবেন?")) is True
-        assert g.judged  # it was judged, so only the booking kept it off the fast path
-        assert g.gate.fast_for is None
 
     asyncio.run(go())
 

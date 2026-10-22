@@ -240,32 +240,10 @@ def test_close_drains_queue_before_ending(monkeypatch):
     assert _conversation(conversation_id).status == "ended"
 
 
-def test_close_links_conversation_to_lead_found_during_session():
-    db = SessionLocal()
-    try:
-        client = client_repo.get_or_create_by_email(
-            db, full_name="Pytest Transcript", email=TEST_EMAIL, phone=None
-        )
-        client_id = client.id
-    finally:
-        db.close()
-
-    async def run():
-        userdata = _userdata()
-        recorder = await TranscriptRecorder.start(_FakeSession(), userdata, _room())
-        assert _conversation(recorder.conversation_id).client_id is None
-        userdata.client_id = client_id  # what book_appointment does
-        await recorder.close()
-        return recorder.conversation_id
-
-    assert _conversation(asyncio.run(run())).client_id == client_id
-
-
-def test_start_records_cold_call_metadata():
+def test_start_records_phone_call_metadata():
     userdata = SessionUserdata(
-        channel=Channel.outbound_coldcall,
+        channel=Channel.inbound_chat,
         room=None,
-        client=SimpleNamespace(id=None),
         is_phone_call=True,
     )
 
@@ -275,7 +253,7 @@ def test_start_records_cold_call_metadata():
         return recorder.conversation_id
 
     conversation = _conversation(asyncio.run(run()))
-    assert conversation.channel == "outbound_coldcall"
+    assert conversation.channel == "inbound_chat"
     assert conversation.is_phone_call is True
 
 

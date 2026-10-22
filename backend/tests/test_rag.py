@@ -239,15 +239,6 @@ def test_search_knowledge_base_only_when_rag_enabled():
     config.rag_enabled = True
     assert _rag_enabled(config)
     assert TOOL_NAME in _tool_names(_session_tools(_inbound_userdata(), config))
-    cold = SessionUserdata(
-        channel=Channel.outbound_coldcall,
-        room=MagicMock(),
-        client=SimpleNamespace(
-            id=uuid.uuid4(), full_name="Rahim", email=None, preferred_property_type=None,
-            preferred_location=None, budget_min=None, budget_max=None, rent_or_buy=None,
-        ),  # fmt: skip
-    )
-    assert TOOL_NAME in _tool_names(_session_tools(cold, config))
 
 
 def test_prompt_mentions_the_tool_only_when_registered():

@@ -58,7 +58,7 @@ How to read this file
   Quick reply       the small model: asked for a filler line or a fast answer,
                     what it wrote or said, or why it was dropped or timed out
   AI model          the LLM writing the reply (a tool call needs a second call)
-  Tool              the agent looking something up or booking (database / API)
+  Tool              the agent looking something up (database / API)
   Text-to-speech    turns the reply into voice
   Total response    caller stops talking -> agent starts speaking
 """

@@ -158,7 +158,7 @@ def test_limit_is_capped(anon_api):
 # --- the agent side: dispatch metadata -> SessionUserdata -> conversation row ----
 
 
-def test_session_context_takes_a_valid_visitor_id_for_browser_chats_only():
+def test_session_context_takes_a_valid_visitor_id_only():
     visitor = uuid.uuid4()
     chat = session_context.resolve(
         json.dumps({"channel": "inbound_chat", "visitor_id": str(visitor)}), None
@@ -168,8 +168,6 @@ def test_session_context_takes_a_valid_visitor_id_for_browser_chats_only():
         {"channel": "inbound_chat", "visitor_id": "not-a-uuid"},
         {"channel": "inbound_chat", "visitor_id": 42},
         {"channel": "inbound_chat"},
-        {"channel": "inbound_chat", "visitor_id": str(visitor), "dial_number": "+8801700000000"},
-        {"channel": "outbound_coldcall", "visitor_id": str(visitor)},
     ):
         assert session_context.resolve(json.dumps(meta), None).visitor_id is None, meta
 
