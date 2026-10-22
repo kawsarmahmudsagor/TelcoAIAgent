@@ -1,3 +1,5 @@
+pytest_plugins = ["bss_helpers"]
+
 import pytest
 from fastapi.testclient import TestClient
 
