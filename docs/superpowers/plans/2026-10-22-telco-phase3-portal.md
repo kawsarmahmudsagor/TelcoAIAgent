@@ -41,11 +41,15 @@
 - Every frontend task invokes the `frontend-design` and `ui-ux-pro-max` skills before editing, and ends with `pnpm typecheck` and `pnpm lint` passing.
 - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
+## Out of scope (Phase 4)
+
+Notification bell and nudges (spec 7), admin pages, conversations API subscriber fields, `request_human_agent` idempotency, `pending_case` clearing, ActionRpc double-speak, R7 test isolation. Portal-side writes do not refresh an open agent session's snapshot; the agent's success text and tools re-read `bss`, so only the system-prompt snapshot is stale (accepted for the demo).
+
 ## Review Focus
 
 1. **Forged identity to the agent.** A browser posts a `room_config` whose agent dispatch already carries `{"subscriber_id": "<someone else>"}`, or calls `/api/token` with no cookie. The agent must get the cookie's subscriber in the first case and a guest session (no `subscriber_id`) in the second. → Task 5 Step 6 manual check (curl + agent log) and Task 5 `buildDispatchMetadata` overwriting unconditionally.
 2. **Request changed between start and confirm.** The client starts a ৳100 recharge, then confirms with `amount: 1000` and the right code. Expected: `400 otp_invalid` and no transaction. → Task 3 test `test_confirm_with_changed_request_is_rejected`.
-3. **Cross-role cookies.** A customer cookie on `/api/conversations` gets 401, and an admin cookie on `/api/me/summary` gets 401. → Task 1 tests `test_customer_token_refused_on_admin_route`, `test_admin_token_refused_on_me`.
+3. **Cross-role cookies.** A customer cookie on `/api/conversations` gets 401, and an admin cookie on `/api/me` gets 401. → Task 1 tests `test_customer_token_refused_on_admin_route`, `test_admin_token_refused_on_me`.
 4. **Double-click Confirm, or portal and agent confirming together.** The same `action_id` is confirmed twice. Expected: one transaction, and both responses carry the same `ref`. → Task 3 test `test_double_confirm_returns_same_ref`.
 5. **Persona switch or logout during a live assistant call.** The LiveKit session is ended before the cookie changes, so the agent never keeps acting for the previous subscriber. → Task 10 Step 5 (`useEndSessionOnLogout`) and the Task 11 checklist line.
 
@@ -111,7 +115,7 @@ def test_login_unknown_or_non_persona_msisdn_404(anon_api, bss_world): ...
 def test_customer_token_refused_on_admin_route(anon_api): ...
     # log in as persona, then GET /api/conversations -> 401 (cookie "session" set to the customer token too)
 def test_admin_token_refused_on_me(anon_api): ...
-    # client.cookies.set("portal_session", create_access_token("ceo")) -> GET /api/me/summary 401
+    # client.cookies.set("portal_session", create_access_token("ceo")) -> GET /api/me 401
 def test_role_less_token_is_admin(): ...
     # jose-encode {"sub":"ceo","exp":...} -> decode_access_token(...).role == "admin"
 def test_logout_clears_cookie(anon_api): ...
@@ -183,7 +187,7 @@ Carry-over (phase 1): "throttle OTP issue at portal endpoints".
     - `{kind: "recharge", amount: Decimal, channel: TxnChannel, target_msisdn: str | None}`
     - `{kind: "redeem", offer_id: UUID}`
   - `POST /api/me/actions/start` body `PortalAction` → `ActionStart{action_id, kind, title, amount: float|None, pay_from: str|None, target: str|None, points_cost: int|None, expires_at, otp: {code, to (masked msisdn), expires_at}}`.
-    - It runs the matching `bss.preview_*`, then `otp.issue(purpose=kind, payload=<request>.model_dump(mode="json"))` with `actor`-free audit as `bss` already does.
+    - It runs the matching `bss.preview_*`, then `otp.issue(purpose=kind, payload=<request>.model_dump(mode="json"))`, the same purpose/payload the `execute_*` functions check.
     - `title`: package name (purchase), `"Recharge ৳<amount>"` (recharge) or the offer title (redeem).
     - Throttle: if `issued_since(now − 15 min) >= 5` → `429 {code: "too_many_codes"}` before issuing.
     - The code in the response is the simulated SMS (demo only, same as the agent's `telco.otp_sms`).
@@ -367,7 +371,7 @@ Content mapping (reference sections "Overview" and "Balance & usage"; numbers co
   - Buttons: "Recharge now" → `/portal/recharge`, "View details" → `/portal/balance`.
 - **Allowances.**
   - Lines for data, minutes and SMS: left vs total of active subscriptions.
-  - Totals are the sum of package `data_mb`/`minutes`/`sms` of the active subscriptions. The bar shows the left/total ratio.
+  - Totals: `SubscriptionView` has only `package_code` and amounts left, so join each `package_code` against `portalApi.packages()` for `data_mb`/`minutes`/`sms`. The bar shows left/total; an unknown code shows the amount left with no bar.
   - With no active pack, show "No active pack" with a "Buy a pack" link.
 - **Metrics row.**
   - Data used (usage 30d data total).
@@ -384,8 +388,7 @@ Content mapping (reference sections "Overview" and "Balance & usage"; numbers co
 - **Balance page.**
   - Detail cards: main balance, internet left, talk-time left, each with expiry.
   - "Usage breakdown" from `usage(30).totals` (data, voice, sms, vas, with charge).
-  - "Keep your pack active" for the nearest-expiring subscription, with "Renew pack" → `/portal/packages?highlight=<code>` and the auto-renew state shown read-only.
-  - `SubscriptionView` has the package code? If not, link by name to `/portal/packages`.
+  - "Keep your pack active" for the nearest-expiring subscription, with "Renew pack" → `/portal/packages?highlight=<package_code>` and the auto-renew state shown read-only.
 - **States.** Loading skeletons, an error panel with retry, and empty states for zero transactions or zero subscriptions.
 
 - [ ] **Step 1:** Invoke `frontend-design` and `ui-ux-pro-max`.
@@ -438,7 +441,7 @@ Pages:
 - **Packages.**
   - Filters All / Internet (data) / Minutes (voice) / Bundles (bundle) / SMS.
   - 3-column card grid (2 at ≤1100px, 1 at ≤760px). Each card: tag, name, contents, validity, price, "Buy pack".
-  - Buy opens a small chooser for pay-from (Main balance / bKash / Nagad / Card; postpaid: Bill / bKash / Nagad / Card mapped to the `TxnChannel` values the backend accepts — read `bss.packages.preview_purchase` for allowed channels), then `start`.
+  - Buy opens a small chooser for pay-from (`balance` labelled "Main balance" for prepaid and "Add to bill" for postpaid, `bkash`, `nagad`, `card` — the backend's `_PAY_CHANNELS`), then `start`.
   - `?highlight=<code>` scrolls to and rings that card.
 - **Offers.**
   - Metrics: points, offer count, points to the cheapest points offer ("N points to your next reward", or "Enough for a reward").
