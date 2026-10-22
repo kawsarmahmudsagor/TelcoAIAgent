@@ -90,7 +90,10 @@ def _check(
     if today_total + req.amount > DAILY_CAP:
         raise LimitExceeded(f"Daily recharge limit of {DAILY_CAP} reached")
     own = target == sub.msisdn
-    cashback = _cashback(db, sub, req.amount, now) if own else Decimal("0.00")
+    # Cashback is credited to the caller's own balance, so only prepaid callers
+    # recharging their own number get it.
+    prepaid_own = own and sub.plan_type == PlanType.prepaid
+    cashback = _cashback(db, sub, req.amount, now) if prepaid_own else Decimal("0.00")
     return sub, target, own, cashback
 
 
@@ -134,23 +137,30 @@ def execute_recharge(
         purpose="recharge",
         payload=req.model_dump(mode="json"),
     )
-    # Lock the caller's balance row first so concurrent recharges by the same
-    # subscriber serialise before the daily-cap check.
-    own_bal = db.scalar(
-        select(Balance).where(Balance.subscriber_id == subscriber_id).with_for_update()
-    )
+    # Lock the caller's (and a known target's) balance rows in a deterministic
+    # order so crossing recharges cannot deadlock, and so the daily-cap check
+    # below is serialised per subscriber.
+    caller = db.get(Subscriber, subscriber_id)
+    if caller is None:
+        raise SubscriberNotFound()
+    target = _normalise(req.target_msisdn) if req.target_msisdn else caller.msisdn
+    target_sub = db.scalar(select(Subscriber).where(Subscriber.msisdn == target))
+    ids = sorted({subscriber_id} | ({target_sub.id} if target_sub else set()), key=str)
+    locked = {
+        b.subscriber_id: b
+        for b in db.scalars(
+            select(Balance)
+            .where(Balance.subscriber_id.in_(ids))
+            .order_by(Balance.subscriber_id)
+            .with_for_update()
+        )
+    }
+    own_bal = locked.get(subscriber_id)
     if own_bal is None:
         raise SubscriberNotFound()
     _, target, own, cashback = _check(db, subscriber_id, req, now)
-    target_sub = db.scalar(select(Subscriber).where(Subscriber.msisdn == target))
     if target_sub is not None:
-        tbal = (
-            own_bal
-            if target_sub.id == subscriber_id
-            else db.scalar(
-                select(Balance).where(Balance.subscriber_id == target_sub.id).with_for_update()
-            )
-        )
+        tbal = locked.get(target_sub.id)
         if tbal is not None:
             if target_sub.plan_type == PlanType.prepaid:
                 tbal.main_balance = tbal.main_balance + req.amount + (cashback if own else 0)

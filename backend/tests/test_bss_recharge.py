@@ -103,13 +103,14 @@ def test_cashback_respects_min_recharge_audience_and_dates(bss_world, db):
     s = bss_world.subscriber()
     today = datetime.now(timezone.utc).date()
     kw = dict(cashback_percent=Decimal("100"), cashback_cap=Decimal("500"))
+    baseline = recharge.preview_recharge(db, s.id, _req(100)).cashback
     bss_world.offer(min_recharge=Decimal("900"), **kw)
     bss_world.offer(audience=OfferAudience.postpaid, **kw)
     bss_world.offer(is_active=False, **kw)
     bss_world.offer(starts_on=today + timedelta(days=2), **kw)
     bss_world.offer(ends_on=today - timedelta(days=2), **kw)
-    # None of the PYTEST offers apply, so only seeded offers (<= 10%) can contribute.
-    assert recharge.preview_recharge(db, s.id, _req(100)).cashback <= Decimal("10.00")
+    # None of the PYTEST offers apply, so cashback is unchanged from the baseline.
+    assert recharge.preview_recharge(db, s.id, _req(100)).cashback == baseline
     bss_world.offer(min_recharge=Decimal("100"), audience=OfferAudience.prepaid, **kw)
     assert recharge.preview_recharge(db, s.id, _req(100)).cashback == Decimal("100.00")
 
@@ -198,3 +199,30 @@ def test_lookup_days_window_and_ref_ignores_it(bss_world, db):
     assert transactions.lookup(db, a.id, now=later) == []
     assert len(transactions.lookup(db, a.id, ref=out.transaction_ref, now=later)) == 1
     assert len(transactions.lookup(db, a.id, days=60, now=later)) == 1
+
+
+def test_postpaid_own_recharge_gets_no_cashback(bss_world, db):
+    s = bss_world.subscriber(plan_type=PlanType.postpaid, postpaid_due=Decimal("150"))
+    bss_world.offer(
+        audience=OfferAudience.all,
+        cashback_percent=Decimal("100"),
+        cashback_cap=Decimal("30"),
+        min_recharge=Decimal("50"),
+    )
+    req = _req(100)
+    assert recharge.preview_recharge(db, s.id, req).cashback == Decimal("0")
+    out = _do(db, s, req)
+    assert out.cashback == Decimal("0")
+    assert out.postpaid_due == Decimal("50")
+    txn = db.scalars(select(Transaction).where(Transaction.subscriber_id == s.id)).one()
+    assert txn.cashback == Decimal("0")
+
+
+def test_recharge_crossing_known_subscribers_both_credited(bss_world, db):
+    a = bss_world.subscriber(main_balance=Decimal("0"))
+    b = bss_world.subscriber(main_balance=Decimal("0"))
+    _do(db, a, _req(100, b.msisdn))
+    _do(db, b, _req(50, a.msisdn))
+    db.expire_all()
+    assert db.get(Balance, a.id).main_balance == Decimal("50")
+    assert db.get(Balance, b.id).main_balance == Decimal("100")
