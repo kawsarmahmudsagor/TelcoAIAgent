@@ -1,9 +1,9 @@
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.models.telco import (
     CasePriority,
@@ -119,6 +119,12 @@ class RechargeRequest(_Base):
     amount: Decimal
     channel: TxnChannel
     target_msisdn: str | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def _two_places(cls, v: Decimal) -> Decimal:
+        # "100" and "100.00" must hash (OTP binding) and store identically.
+        return v.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class RechargeQuote(_Base):

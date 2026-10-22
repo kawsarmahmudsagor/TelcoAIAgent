@@ -60,7 +60,7 @@ def _eligible(db: Session, sub: Subscriber, now: datetime) -> list[Offer]:
 def _subscriber(db: Session, subscriber_id: uuid.UUID, *, lock: bool = False) -> Subscriber:
     q = select(Subscriber).where(Subscriber.id == subscriber_id)
     if lock:
-        q = q.with_for_update()
+        q = q.with_for_update().execution_options(populate_existing=True)
     sub = db.scalar(q)
     if sub is None:
         raise SubscriberNotFound()
@@ -117,7 +117,7 @@ def execute_redeem(
     now: datetime | None = None,
 ) -> RedeemResult:
     now = now or utc_now()
-    existing = _txn.existing(db, subscriber_id, action_id)
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.redeem)
     if existing is not None:
         return _result_from(db, existing)
     otp.require_verified(
@@ -128,6 +128,12 @@ def execute_redeem(
         payload={"offer_id": str(offer_id)},
     )
     sub = _subscriber(db, subscriber_id, lock=True)
+    # A concurrent confirmer of the same action may have committed while we
+    # waited for the lock: hand back its result rather than re-checking points.
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.redeem)
+    if existing is not None:
+        db.rollback()
+        return _result_from(db, existing)
     offer = _check(db, sub, offer_id, now)
     sub.reward_points = sub.reward_points - offer.points_cost
     pkg = db.get(Package, offer.package_id) if offer.package_id else None
@@ -159,7 +165,7 @@ def execute_redeem(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = _txn.existing(db, subscriber_id, action_id)
+        existing = _txn.existing(db, subscriber_id, action_id, TxnType.redeem)
         if existing is None:
             raise
         return _result_from(db, existing)

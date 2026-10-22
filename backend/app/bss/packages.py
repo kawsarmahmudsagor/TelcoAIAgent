@@ -115,8 +115,18 @@ def recommend(
     ]
 
 
+def _lock_balance(db: Session, subscriber_id: uuid.UUID) -> Balance | None:
+    """SELECT ... FOR UPDATE on the balance row, refreshing any stale copy."""
+    return db.scalar(
+        select(Balance)
+        .where(Balance.subscriber_id == subscriber_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
 def _check(
-    db: Session, subscriber_id: uuid.UUID, req: PurchaseRequest, *, lock: bool = False
+    db: Session, subscriber_id: uuid.UUID, req: PurchaseRequest
 ) -> tuple[Package, Subscriber, Balance, Decimal | None]:
     pkg = db.scalar(
         select(Package).where(Package.code == req.package_code, Package.is_active.is_(True))
@@ -128,10 +138,7 @@ def _check(
     sub = db.get(Subscriber, subscriber_id)
     if sub is None:
         raise SubscriberNotFound()
-    bal_q = select(Balance).where(Balance.subscriber_id == subscriber_id)
-    if lock:
-        bal_q = bal_q.with_for_update()
-    bal = db.scalar(bal_q)
+    bal = db.scalar(select(Balance).where(Balance.subscriber_id == subscriber_id))
     if bal is None:
         raise SubscriberNotFound()
     balance_after: Decimal | None = None
@@ -196,7 +203,7 @@ def execute_purchase(
     now: datetime | None = None,
 ) -> PurchaseResult:
     now = now or utc_now()
-    existing = _txn.existing(db, subscriber_id, action_id)
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.purchase)
     if existing is not None:
         return _result_from(db, existing)
     otp.require_verified(
@@ -206,7 +213,14 @@ def execute_purchase(
         purpose="purchase",
         payload=req.model_dump(mode="json"),
     )
-    pkg, sub, bal, _ = _check(db, subscriber_id, req, lock=True)
+    _lock_balance(db, subscriber_id)
+    # A concurrent confirmer of the same action may have committed while we
+    # waited for the lock: hand back its result rather than re-checking.
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.purchase)
+    if existing is not None:
+        db.rollback()
+        return _result_from(db, existing)
+    pkg, sub, bal, _ = _check(db, subscriber_id, req)
     if req.pay_from == TxnChannel.balance:
         if sub.plan_type == PlanType.prepaid:
             bal.main_balance = bal.main_balance - pkg.price
@@ -239,7 +253,7 @@ def execute_purchase(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = _txn.existing(db, subscriber_id, action_id)
+        existing = _txn.existing(db, subscriber_id, action_id, TxnType.purchase)
         if existing is None:
             raise
         return _result_from(db, existing)

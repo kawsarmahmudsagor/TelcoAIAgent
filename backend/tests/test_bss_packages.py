@@ -180,3 +180,48 @@ def test_purchase_replay_from_other_subscriber_rejected(bss_world, db):
         packages.execute_purchase(db, b.id, req, action_id=aid, actor=Actor.agent)
     db.expire_all()
     assert db.get(Balance, b.id).main_balance == Decimal("500")
+
+
+def _stale_first_lookup(monkeypatch):
+    """Simulate a second confirmer that passed the pre-lock replay check before
+    the first confirmer committed: the first `_txn.existing` call sees nothing."""
+    from app.bss import _txn
+
+    real = _txn.existing
+    calls = {"n": 0}
+
+    def fake(*args, **kwargs):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(*args, **kwargs)
+
+    monkeypatch.setattr(_txn, "existing", fake)
+
+
+def test_purchase_concurrent_confirm_replays_after_lock(bss_world, db, monkeypatch):
+    from app.db.session import SessionLocal
+    from app.models.telco import Balance
+
+    s = bss_world.subscriber(main_balance=Decimal("69"))
+    p = bss_world.package(price=Decimal("69"))
+    req = _req(p)
+    aid = _confirm(db, s, req)
+    first = packages.execute_purchase(db, s.id, req, action_id=aid, actor=Actor.agent)
+    other = SessionLocal()
+    try:
+        _stale_first_lookup(monkeypatch)
+        second = packages.execute_purchase(other, s.id, req, action_id=aid, actor=Actor.portal)
+    finally:
+        other.rollback()
+        other.close()
+    assert second.transaction_ref == first.transaction_ref
+    assert second.main_balance == Decimal("0")
+    db.expire_all()
+    assert db.get(Balance, s.id).main_balance == Decimal("0")
+    where = Transaction.subscriber_id == s.id
+    assert db.scalar(select(func.count()).select_from(Transaction).where(where)) == 1
+    assert db.scalar(
+        select(func.count()).select_from(Subscription).where(Subscription.subscriber_id == s.id)
+    ) == 1
+    assert db.scalar(
+        select(func.count()).select_from(AuditEvent).where(AuditEvent.subscriber_id == s.id)
+    ) == 1

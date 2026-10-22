@@ -127,7 +127,7 @@ def execute_recharge(
     now: datetime | None = None,
 ) -> RechargeResult:
     now = now or utc_now()
-    existing = _txn.existing(db, subscriber_id, action_id)
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.recharge)
     if existing is not None:
         return _result_from(db, existing)
     otp.require_verified(
@@ -153,8 +153,15 @@ def execute_recharge(
             .where(Balance.subscriber_id.in_(ids))
             .order_by(Balance.subscriber_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
     }
+    # A concurrent confirmer of the same action may have committed while we
+    # waited for the locks: hand back its result rather than re-checking limits.
+    existing = _txn.existing(db, subscriber_id, action_id, TxnType.recharge)
+    if existing is not None:
+        db.rollback()
+        return _result_from(db, existing)
     own_bal = locked.get(subscriber_id)
     if own_bal is None:
         raise SubscriberNotFound()
@@ -199,7 +206,7 @@ def execute_recharge(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = _txn.existing(db, subscriber_id, action_id)
+        existing = _txn.existing(db, subscriber_id, action_id, TxnType.recharge)
         if existing is None:
             raise
         return _result_from(db, existing)

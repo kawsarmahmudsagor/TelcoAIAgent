@@ -226,3 +226,76 @@ def test_recharge_crossing_known_subscribers_both_credited(bss_world, db):
     db.expire_all()
     assert db.get(Balance, a.id).main_balance == Decimal("50")
     assert db.get(Balance, b.id).main_balance == Decimal("100")
+
+
+def test_recharge_concurrent_confirm_replays_after_lock(bss_world, db, monkeypatch):
+    from app.bss import _txn
+    from app.db.session import SessionLocal
+    from app.models.telco import AuditEvent
+
+    # Postpaid: no cashback offers apply, so the arithmetic is exact.
+    s = bss_world.subscriber(plan_type=PlanType.postpaid, postpaid_due=Decimal("6000"))
+    for _ in range(4):
+        _do(db, s, _req(1000))
+    req = _req(1000)  # brings the day to exactly the 5000 cap
+    aid = _confirm(db, s, req)
+    first = recharge.execute_recharge(db, s.id, req, action_id=aid, actor=Actor.agent)
+    real, calls = _txn.existing, {"n": 0}
+
+    def stale_first(*args, **kwargs):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(*args, **kwargs)
+
+    monkeypatch.setattr(_txn, "existing", stale_first)
+    other = SessionLocal()
+    try:
+        second = recharge.execute_recharge(other, s.id, req, action_id=aid, actor=Actor.portal)
+    finally:
+        other.rollback()
+        other.close()
+    assert second.transaction_ref == first.transaction_ref
+    assert second.postpaid_due == first.postpaid_due == Decimal("1000")
+    db.expire_all()
+    assert db.get(Balance, s.id).postpaid_due == Decimal("1000")
+    for model in (Transaction, AuditEvent):
+        n = db.scalar(
+            select(func.count()).select_from(model).where(model.subscriber_id == s.id)
+        )
+        assert n == 5, model.__name__
+
+
+def test_recharge_replay_ignores_other_txn_type_with_same_action(bss_world, db):
+    from app.bss import packages
+    from app.bss.types import PurchaseRequest
+
+    s = bss_world.subscriber(main_balance=Decimal("500"))
+    p = bss_world.package(price=Decimal("69"))
+    preq = PurchaseRequest(package_code=p.code, pay_from=TxnChannel.balance)
+    payload = preq.model_dump(mode="json")
+    aid = uuid4()
+    code = otp.issue(db, subscriber_id=s.id, action_id=aid, purpose="purchase", payload=payload)
+    otp.verify(
+        db, subscriber_id=s.id, action_id=aid, purpose="purchase", payload=payload, code=code
+    )
+    packages.execute_purchase(db, s.id, preq, action_id=aid, actor=Actor.agent)
+    with pytest.raises(OtpInvalid):
+        recharge.execute_recharge(db, s.id, _req(100), action_id=aid, actor=Actor.agent)
+
+
+def test_recharge_amount_quantized_to_two_places():
+    a = RechargeRequest(amount=Decimal("100"), channel=TxnChannel.bkash)
+    b = RechargeRequest(amount=Decimal("100.00"), channel=TxnChannel.bkash)
+    assert a.amount == b.amount and str(a.amount) == "100.00"
+    assert otp.request_hash("recharge", a.model_dump(mode="json")) == otp.request_hash(
+        "recharge", b.model_dump(mode="json")
+    )
+    assert str(RechargeRequest(amount="99.995", channel=TxnChannel.bkash).amount) == "100.00"
+    assert str(RechargeRequest(amount="99.994", channel=TxnChannel.bkash).amount) == "99.99"
+
+
+def test_recharge_confirmed_as_100_executes_as_100_00(bss_world, db):
+    s = bss_world.subscriber(main_balance=Decimal("0"))
+    aid = _confirm(db, s, _req("100"))
+    out = recharge.execute_recharge(db, s.id, _req("100.00"), action_id=aid, actor=Actor.agent)
+    assert out.amount == Decimal("100.00") and str(out.amount) == "100.00"
+    assert out.main_balance == Decimal("100") + out.cashback

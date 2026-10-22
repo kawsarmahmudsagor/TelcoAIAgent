@@ -1,5 +1,6 @@
 """Support cases: create (no OTP), human hand-off and status lookup."""
 
+import re
 import uuid
 
 from sqlalchemy import case, select
@@ -23,6 +24,15 @@ _ACTOR = {
     CaseSource.portal: Actor.portal,
     CaseSource.admin: Actor.admin,
 }
+
+
+CATEGORY_MAX = 60  # support_cases.category is String(60)
+
+
+def _normalise_ref(raw: str) -> str:
+    """'tc 2048', ' TC-2048 ' and 'TC2048' all mean 'TC-2048'."""
+    s = re.sub(r"[\s-]", "", raw).upper()
+    return f"TC-{s[2:]}" if s.startswith("TC") else s
 
 
 def _view(c: SupportCase) -> CaseView:
@@ -49,6 +59,8 @@ def create_case(
     source: CaseSource,
     action_id: uuid.UUID,
 ) -> CaseView:
+    if len(category) > CATEGORY_MAX:
+        raise ValueError(f"category must be at most {CATEGORY_MAX} characters")
     found = _existing(db, subscriber_id, action_id)
     if found is not None:
         return found
@@ -107,7 +119,7 @@ def get_case_status(
 ) -> list[CaseView]:
     q = select(SupportCase).where(SupportCase.subscriber_id == subscriber_id)
     if ref is not None:
-        row = db.scalar(q.where(SupportCase.ref == ref))
+        row = db.scalar(q.where(SupportCase.ref == _normalise_ref(ref)))
         if row is None:
             raise CaseNotFound()
         return [_view(row)]

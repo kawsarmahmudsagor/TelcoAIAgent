@@ -109,3 +109,25 @@ def test_network_status_includes_maintenance_within_a_day(bss_world, db):
         starts_at=now + timedelta(days=2),
     )
     assert _areas(network.check_network_status(db, "Sylhet", now=now)) == {"PYTEST tomorrow"}
+
+
+def test_case_status_ref_is_case_and_space_tolerant(bss_world, db):
+    s = bss_world.subscriber()
+    c = _mk(db, s)
+    num = c.ref.removeprefix("TC-")
+    for raw in (f"tc {num}", f" TC-{num} ", f"tc-{num}", f"TC{num}", f"T C - {num}"):
+        assert [v.ref for v in cases.get_case_status(db, s.id, ref=raw)] == [c.ref], raw
+
+
+def test_create_case_rejects_long_category(bss_world, db):
+    s = bss_world.subscriber()
+    ok = cases.create_case(
+        db, s.id, category="x" * 60, description="PYTEST", source=CaseSource.agent,
+        action_id=uuid4(),
+    )
+    assert ok.category == "x" * 60
+    with pytest.raises(ValueError):
+        cases.create_case(
+            db, s.id, category="x" * 61, description="PYTEST", source=CaseSource.agent,
+            action_id=uuid4(),
+        )

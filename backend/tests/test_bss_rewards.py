@@ -126,3 +126,34 @@ def test_redeem_same_action_twice_is_noop(bss_world, db):
         .select_from(AuditEvent)
         .where(AuditEvent.action_id == aid, AuditEvent.action == "redeem")
     ) == 1
+
+
+def test_redeem_concurrent_confirm_replays_after_lock(bss_world, db, monkeypatch):
+    from app.bss import _txn
+    from app.db.session import SessionLocal
+
+    pkg = bss_world.package(data_mb=1024, validity_days=3, price=0)
+    o = bss_world.offer(points_cost=700, package_id=pkg.id)
+    s = bss_world.subscriber(reward_points=700)
+    aid = _confirm(db, s, o)
+    first = _redeem(db, s, o, aid)
+    real, calls = _txn.existing, {"n": 0}
+
+    def stale_first(*args, **kwargs):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real(*args, **kwargs)
+
+    monkeypatch.setattr(_txn, "existing", stale_first)
+    other = SessionLocal()
+    try:
+        second = rewards.execute_redeem(other, s.id, o.id, action_id=aid, actor=Actor.portal)
+    finally:
+        other.rollback()
+        other.close()
+    assert second.transaction_ref == first.transaction_ref
+    assert second.reward_points == 0 and _points(db, s) == 0
+    for model in (Transaction, Subscription, AuditEvent):
+        n = db.scalar(
+            select(func.count()).select_from(model).where(model.subscriber_id == s.id)
+        )
+        assert n == 1, model.__name__
