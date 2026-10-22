@@ -33,7 +33,7 @@ from app.models.telco import (
 )
 
 
-def _mask(msisdn: str) -> str:
+def mask_msisdn(msisdn: str) -> str:
     return f"{msisdn[:3]}••••{msisdn[-4:]}"
 
 
@@ -89,7 +89,7 @@ def get_account_summary(
     return AccountSummary(
         subscriber_id=sub.id,
         full_name=sub.full_name,
-        masked_msisdn=_mask(sub.msisdn),
+        masked_msisdn=mask_msisdn(sub.msisdn),
         plan_type=sub.plan_type,
         district=sub.district,
         main_balance=bal.main_balance if bal else Decimal("0"),
