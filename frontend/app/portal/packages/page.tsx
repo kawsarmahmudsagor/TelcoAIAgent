@@ -1,20 +1,25 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
+import { PackageGrid } from '@/components/portal/packages/package-grid';
 import { portalNavItemFor } from '@/components/portal/shell/nav-items';
-import { Panel } from '@/components/portal/ui/panel';
 
-const { label } = portalNavItemFor('/portal/packages');
+export const metadata: Metadata = { title: portalNavItemFor('/portal/packages').label };
 
-export const metadata: Metadata = { title: label };
-
-/** Placeholder until a later Phase 3 task builds this page. */
 export default function PortalPackagesPage() {
   return (
     <>
-      <h1 className="phone:text-[23px] mb-5 text-[25px] font-bold tracking-[-0.8px]">{label}</h1>
-      <Panel>
-        <p className="font-semibold">Coming soon</p>
-        <p className="text-muted-foreground mt-1 text-sm">This page is on its way.</p>
-      </Panel>
+      <div className="mb-5">
+        <h1 className="phone:text-[23px] mb-[5px] text-[25px] font-bold tracking-[-0.8px]">
+          Packages for your lifestyle
+        </h1>
+        <p className="text-muted-foreground text-xs">
+          Pick the right mix of data, minutes and validity. Demo packs are not live carrier offers.
+        </p>
+      </div>
+      {/* PackageGrid reads ?highlight= (useSearchParams needs a Suspense boundary). */}
+      <Suspense>
+        <PackageGrid />
+      </Suspense>
     </>
   );
 }
