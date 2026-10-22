@@ -237,3 +237,26 @@ def test_second_confirm_of_done_action_replays_result(bss_world):
         assert _txns(bss_world, sub) == 1
 
     asyncio.run(go())
+
+
+def test_failed_execute_drops_action_so_no_code_can_run_it(bss_world, monkeypatch):
+    sub, pkg = _buyer(bss_world)
+    ud = _ud(sub)
+
+    def boom(*a, **k):
+        raise RuntimeError("db down")
+
+    async def go():
+        await actions.start_action(ud, "purchase", _purchase(pkg))
+        code = _code(ud)
+        monkeypatch.setattr(actions, "_execute", boom)
+        with pytest.raises(RuntimeError):
+            await actions.confirm_action(ud, code)
+        monkeypatch.undo()
+        assert ud.pending_action is None
+        assert _sent(ud)[-1][1]["state"] == "cancelled"
+        with pytest.raises(NoPendingAction):
+            await actions.confirm_action(ud, _wrong(code))
+        assert _txns(bss_world, sub) == 0
+
+    asyncio.run(go())

@@ -22,7 +22,6 @@ from app.agent.userdata import SessionUserdata
 from app.bss import accounts, otp, packages, recharge, rewards
 from app.bss.clock import utc_now
 from app.bss.errors import (
-    BssError,
     LimitExceeded,
     NoPendingAction,
     OtpAttemptsExceeded,
@@ -276,8 +275,10 @@ async def confirm_action(
 
         try:
             ref, text = await run_db(lambda db: _execute(db, sid, a, now))
-        except BssError:
-            # e.g. the balance changed since the quote: this action cannot go through.
+        except Exception:
+            # The code is consumed now, and verify passes a consumed challenge
+            # with any code, so the action must go whatever failed (e.g. the
+            # balance changed since the quote, or the DB errored).
             await _drop(userdata, "cancelled")
             raise
         userdata.pending_action = None
