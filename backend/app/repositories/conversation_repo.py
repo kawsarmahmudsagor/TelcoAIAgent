@@ -1,10 +1,9 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import Date, cast, delete, func, select, update
+from sqlalchemy import Date, cast, delete, func, null, select, update
 from sqlalchemy.orm import Session
 
-from app.models.client import Client
 from app.models.conversation import (
     Conversation,
     ConversationMessage,
@@ -81,13 +80,6 @@ def end(db: Session, conversation_id: uuid.UUID, *, client_id: uuid.UUID | None 
     db.commit()
 
 
-def link_client(db: Session, conversation_id: uuid.UUID, client_id: uuid.UUID) -> None:
-    db.execute(
-        update(Conversation).where(Conversation.id == conversation_id).values(client_id=client_id)
-    )
-    db.commit()
-
-
 def end_stale(db: Session, *, idle_for: timedelta, now: datetime | None = None) -> int:
     """Ends conversations still `active` with no activity for `idle_for` -- their
     agent worker crashed before closing them. ended_at = their last activity."""
@@ -127,7 +119,8 @@ def list_page(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[tuple[Conversation, str | None, str | None]], int]:
-    """Newest first. Rows are (conversation, client full name, first user message)."""
+    """Newest first. Rows are (conversation, None, first user message): the client
+    slot is kept for the row shape but is no longer populated."""
     filters = []
     if channel is not None:
         filters.append(Conversation.channel == channel)
@@ -138,8 +131,7 @@ def list_page(
 
     total = db.scalar(select(func.count()).select_from(Conversation).where(*filters)) or 0
     stmt = (
-        select(Conversation, Client.full_name, _first_user_message())
-        .outerjoin(Client, Client.id == Conversation.client_id)
+        select(Conversation, null(), _first_user_message())
         .where(*filters)
         .order_by(Conversation.started_at.desc())
         .limit(limit)
@@ -155,28 +147,6 @@ def list_messages(db: Session, conversation_id: uuid.UUID) -> list[ConversationM
         .order_by(ConversationMessage.seq)
     )
     return list(db.scalars(stmt))
-
-
-def recent_for_client(
-    db: Session, client_id: uuid.UUID, *, limit: int = 3
-) -> list[tuple[Conversation, list[ConversationMessage]]]:
-    """The client's latest conversations that got at least one customer message,
-    newest first, each with its messages in order."""
-    has_user_message = (
-        select(ConversationMessage.id)
-        .where(
-            ConversationMessage.conversation_id == Conversation.id,
-            ConversationMessage.role == MessageRole.user.value,
-        )
-        .exists()
-    )
-    stmt = (
-        select(Conversation)
-        .where(Conversation.client_id == client_id, has_user_message)
-        .order_by(Conversation.started_at.desc())
-        .limit(limit)
-    )
-    return [(c, list_messages(db, c.id)) for c in db.scalars(stmt)]
 
 
 def delete_many(db: Session, ids: list[uuid.UUID]) -> int:

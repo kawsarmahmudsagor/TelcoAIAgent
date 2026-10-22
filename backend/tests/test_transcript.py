@@ -14,7 +14,7 @@ from app.agent.transcript import TOOL_OUTPUT_MAX_CHARS, TranscriptRecorder
 from app.agent.userdata import Channel, SessionUserdata
 from app.db.session import SessionLocal
 from app.models.conversation import Conversation
-from app.repositories import client_repo, conversation_repo
+from app.repositories import conversation_repo
 from app.scheduler import jobs
 
 ROOM_PREFIX = "pytest-transcript-"

@@ -119,13 +119,6 @@ def create_text_source(payload: TextSourceCreate, db: Session = Depends(get_db))
     return _created(source, job)
 
 
-@router.post("/sources/properties/sync", response_model=CreateSourceResponse)
-def sync_properties_source(db: Session = Depends(get_db)) -> CreateSourceResponse:
-    """Creates the property-listings source on first use and queues a sync."""
-    source, job = rag_service.sync_properties(db)
-    return _created(source, job)
-
-
 @router.get("/sources/{source_id}", response_model=RagSourceDetail)
 def get_source(source_id: uuid.UUID, db: Session = Depends(get_db)) -> RagSourceDetail:
     try:

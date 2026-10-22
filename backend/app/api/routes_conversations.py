@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_db
 from app.models.conversation import ConversationStatus
-from app.repositories import client_repo, conversation_repo
+from app.repositories import conversation_repo
 from app.schemas.conversation import (
     BulkDeleteRequest,
     BulkDeleteResult,
@@ -70,13 +70,9 @@ def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)) 
     conversation = conversation_repo.get(db, conversation_id)
     if conversation is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
-    client = client_repo.get(db, conversation.client_id) if conversation.client_id else None
     messages = conversation_repo.list_messages(db, conversation_id)
     return ConversationDetail(
         **ConversationOut.model_validate(conversation).model_dump(),
-        client_name=client.full_name if client else None,
-        client_email=client.email if client else None,
-        client_phone=client.phone if client else None,
         messages=[ConversationMessageOut.model_validate(message) for message in messages],
     )
 

@@ -6,10 +6,8 @@ from livekit.agents.llm import ToolError
 
 from app.agent.speech_numbers import numbers_to_bangla_words
 from app.agent.tools._datetime import (
-    check_viewing_hours,
     parse_future_local,
     spoken_local_bn,
-    viewing_hours_text,
 )
 
 _DHAKA = ZoneInfo("Asia/Dhaka")
@@ -55,31 +53,3 @@ def test_past_or_garbage_rejected(value):
         parse_future_local(value, "when")
 
 
-def _local(hour: int, minute: int = 0) -> datetime:
-    day = datetime.now() + timedelta(days=2)
-    return parse_future_local(day.replace(hour=hour, minute=minute, second=0, microsecond=0).isoformat(), "when")
-
-
-@pytest.mark.parametrize(("hour", "minute"), [(8, 0), (11, 30), (17, 59), (18, 0)])
-def test_viewing_hours_accept_8am_to_6pm(hour, minute):
-    check_viewing_hours(_local(hour, minute), "proposed_datetime")
-
-
-@pytest.mark.parametrize(("hour", "minute"), [(7, 59), (6, 0), (18, 1), (19, 0), (22, 30), (0, 0)])
-def test_viewing_hours_reject_outside_8am_to_6pm(hour, minute):
-    with pytest.raises(ToolError) as exc:
-        check_viewing_hours(_local(hour, minute), "proposed_datetime")
-    message = exc.value.message
-    assert "8 AM to 6 PM" in message
-    assert "another date" in message
-    assert _local(hour, minute).strftime("%A %d %B") in message
-
-
-def test_viewing_hours_use_agency_time():
-    # 03:00 UTC is 09:00 in Dhaka: inside hours.
-    day = (datetime.now(timezone.utc) + timedelta(days=2)).replace(hour=3, minute=0, second=0, microsecond=0)
-    check_viewing_hours(day, "when")
-
-
-def test_viewing_hours_text():
-    assert viewing_hours_text() == "8 AM to 6 PM"

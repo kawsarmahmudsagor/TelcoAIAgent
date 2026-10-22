@@ -3,21 +3,17 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin, get_db
 from app.api.routes_conversations import list_items
 from app.config import get_settings
-from app.models.call_schedule import CallScheduleEntry, CallStatus
-from app.models.property import Property
 from app.rag import index as rag_index
-from app.repositories import agent_config_repo, booking_repo, client_repo, conversation_repo
+from app.repositories import agent_config_repo, conversation_repo
 from app.schemas.conversation import ConversationListItem
 from app.schemas.dashboard import (
     ConversationSeries,
     DashboardSummary,
-    RecentBooking,
     SeriesPoint,
 )
 from app.schemas.rag import RagSourceCounts, RagStatus
@@ -80,28 +76,9 @@ def summary(db: Session = Depends(get_db)) -> DashboardSummary:
     tz = _agency_tz()
     today_start, today_end = today_bounds(tz)
 
-    pending_today_stmt = (
-        select(func.count())
-        .select_from(CallScheduleEntry)
-        .where(
-            CallScheduleEntry.status == CallStatus.pending,
-            CallScheduleEntry.scheduled_at >= today_start,
-            CallScheduleEntry.scheduled_at < today_end,
-        )
-    )
-    pending_calls_today = db.scalar(pending_today_stmt) or 0
-
-    active_listings_stmt = (
-        select(func.count()).select_from(Property).where(Property.is_active.is_(True))
-    )
-    active_listings = db.scalar(active_listings_stmt) or 0
     kb_counts = rag_service.status_counts(db)
 
     return DashboardSummary(
-        total_leads=client_repo.count(db),
-        pending_calls_today=pending_calls_today,
-        bookings_this_week=booking_repo.count_created_since(db, week_start(tz)),
-        active_listings=active_listings,
         conversations_today=conversation_repo.count_started_between(db, today_start, today_end),
         kb_sources_ready=sum(kb_counts[name] for name in rag_service.SEARCHABLE_STATUSES),
         kb_sources_total=sum(kb_counts.values()),
@@ -148,23 +125,3 @@ def recent_conversations(
 ) -> list[ConversationListItem]:
     rows, _total = conversation_repo.list_page(db, limit=limit)
     return list_items(rows)
-
-
-@router.get("/recent-bookings", response_model=list[RecentBooking])
-def recent_bookings(
-    db: Session = Depends(get_db), limit: int = Query(default=5, ge=1, le=20)
-) -> list[RecentBooking]:
-    return [
-        RecentBooking(
-            id=booking.id,
-            client_id=booking.client_id,
-            client_name=client_name,
-            property_id=booking.property_id,
-            property_title=property_title,
-            channel=booking.channel,
-            status=booking.status,
-            proposed_datetime=booking.proposed_datetime,
-            created_at=booking.created_at,
-        )
-        for booking, client_name, property_title in booking_repo.list_recent(db, limit=limit)
-    ]

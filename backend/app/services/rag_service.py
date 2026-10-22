@@ -40,7 +40,6 @@ from app.repositories import agent_config_repo
 
 logger = logging.getLogger("rag.service")
 
-PROPERTIES_SOURCE_NAME = "Property listings"
 _UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 _OPEN_JOB_STATUSES = (EmbeddingJobStatus.pending.value, EmbeddingJobStatus.processing.value)
 # Sources whose vectors are served (stale = old chunking, still valid vectors).
@@ -135,8 +134,6 @@ def open_job(db: Session, rag_source_id: uuid.UUID) -> EmbeddingJob | None:
 def job_type_for(source: RagSource) -> EmbeddingJobType:
     if source.source_type == RagSourceType.link.value:
         return EmbeddingJobType.crawl
-    if source.source_type == RagSourceType.properties.value:
-        return EmbeddingJobType.sync_properties
     return EmbeddingJobType.ingest
 
 
@@ -252,51 +249,6 @@ def create_text_source(db: Session, *, name: str, text: str) -> tuple[RagSource,
     job = enqueue_job(db, EmbeddingJobType.ingest, rag_source_id=source.id)
     db.commit()
     return source, job
-
-
-def properties_source(db: Session) -> RagSource | None:
-    return db.scalar(
-        select(RagSource)
-        .where(RagSource.source_type == RagSourceType.properties.value)
-        .order_by(RagSource.created_at)
-        .limit(1)
-    )
-
-
-def sync_properties(db: Session) -> tuple[RagSource, EmbeddingJob]:
-    """Creates the properties source on first use and queues a sync (or returns
-    the sync already queued)."""
-    source = properties_source(db)
-    if source is None:
-        source = _new_source(
-            db,
-            uuid.uuid4(),
-            name=PROPERTIES_SOURCE_NAME,
-            source_type=RagSourceType.properties.value,
-        )
-    job = open_job(db, source.id)
-    if job is None or job.status != EmbeddingJobStatus.pending.value:
-        if source.status != RagSourceStatus.processing.value:
-            source.status = RagSourceStatus.pending.value
-            source.error = None
-        job = enqueue_job(db, EmbeddingJobType.sync_properties, rag_source_id=source.id)
-    db.commit()
-    return source, job
-
-
-def enqueue_properties_sync_if_present(db: Session) -> EmbeddingJob | None:
-    """Called after a property is created/updated/deactivated: re-syncs the
-    properties source, if one exists and isn't disabled. A sync already
-    waiting covers this change too, so none is added then."""
-    source = properties_source(db)
-    if source is None or source.status == RagSourceStatus.disabled.value:
-        return None
-    job = open_job(db, source.id)
-    if job is not None and job.status == EmbeddingJobStatus.pending.value:
-        return job
-    job = enqueue_job(db, EmbeddingJobType.sync_properties, rag_source_id=source.id)
-    db.commit()
-    return job
 
 
 # --------------------------------------------------------------------------- #

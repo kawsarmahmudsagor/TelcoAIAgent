@@ -11,47 +11,6 @@ def agency_tz() -> ZoneInfo:
     return ZoneInfo(get_settings().agency_timezone)
 
 
-def _hour_label(hour: int) -> str:
-    """8 -> "8 AM", 18 -> "6 PM", 12 -> "12 PM", 0 and 24 -> "12 AM"."""
-    suffix = "AM" if hour % 24 < 12 else "PM"
-    return f"{hour % 12 or 12} {suffix}"
-
-
-def viewing_hours_text(joiner: str = "to") -> str:
-    """"8 AM to 6 PM" (or "8 AM and 6 PM" after "between"), from the settings."""
-    settings = get_settings()
-    start, end = _hour_label(settings.viewing_start_hour), _hour_label(settings.viewing_end_hour)
-    return f"{start} {joiner} {end}"
-
-
-def within_viewing_hours(when: datetime) -> bool:
-    """Whether `when` (read in agency local time) is inside live viewing hours.
-    Any day of the week is fine."""
-    settings = get_settings()
-    local = when.astimezone(agency_tz())
-    minutes = local.hour * 60 + local.minute
-    return settings.viewing_start_hour * 60 <= minutes <= settings.viewing_end_hour * 60
-
-
-def check_viewing_hours(when: datetime, field: str) -> None:
-    """Raises ToolError, telling the LLM what to say, when `when` (agency local
-    time) is outside live viewing hours. Any day of the week is fine."""
-    if within_viewing_hours(when):
-        return
-    local = when.astimezone(agency_tz())
-    hours, between = viewing_hours_text(), viewing_hours_text("and")
-    day = local.strftime("%A %d %B")
-    raise ToolError(
-        f"{field} {local.strftime('%H:%M')} is outside live viewing hours ({hours}, any day); "
-        f"the time was not saved. Politely tell the customer that live viewings run from {hours}, "
-        f"then ask whether any time between {between} on {day} would suit them, or whether they "
-        f"would rather choose another date when they are free between {between}. If they have "
-        f"already said they aren't free between {between} on {day}, don't ask about {day} "
-        "again: acknowledge it and ask only about another day. Don't suggest a time outside "
-        "those hours. Keep replying in the customer's language."
-    )
-
-
 def spoken_local(when: datetime) -> str:
     """A stored time as the agency reads it: "Wednesday 14 October 2026, 10:00"."""
     return when.astimezone(agency_tz()).strftime("%A %d %B %Y, %H:%M")

@@ -140,7 +140,6 @@ def test_retry_unknown_job_is_404(api):
         ("post", "/api/rag/sources/documents"),
         ("post", "/api/rag/sources/links"),
         ("post", "/api/rag/sources/text"),
-        ("post", "/api/rag/sources/properties/sync"),
         ("get", f"/api/rag/sources/{uuid.uuid4()}"),
         ("delete", f"/api/rag/sources/{uuid.uuid4()}"),
         ("post", f"/api/rag/sources/{uuid.uuid4()}/reindex"),

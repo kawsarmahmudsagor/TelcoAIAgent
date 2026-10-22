@@ -103,10 +103,6 @@ def test_recent_endpoints(api):
     recent = api.get("/api/dashboard/recent-conversations", params={"limit": 3}).json()
     assert 1 <= len(recent) <= 3
     assert recent[0]["room_name"].startswith(ROOM_PREFIX)
-    bookings = api.get("/api/dashboard/recent-bookings").json()
-    assert isinstance(bookings, list)
-    for booking in bookings:
-        assert {"client_name", "property_title", "proposed_datetime"} <= booking.keys()
 
 
 @pytest.mark.parametrize(
@@ -115,8 +111,12 @@ def test_recent_endpoints(api):
         "/api/dashboard/summary",
         "/api/dashboard/conversation-series",
         "/api/dashboard/recent-conversations",
-        "/api/dashboard/recent-bookings",
     ],
 )
 def test_dashboard_routes_need_auth(anon_api, path):
     assert anon_api.get(path).status_code == 401
+
+
+def test_summary_has_no_real_estate_fields(api):
+    body = api.get("/api/dashboard/summary").json()
+    assert "active_listings" not in body and "pending_calls_today" not in body

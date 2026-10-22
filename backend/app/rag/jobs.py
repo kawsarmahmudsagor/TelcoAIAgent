@@ -51,7 +51,6 @@ from app.rag import index as rag_index
 from app.rag.config import RAG_SOURCE_ID_KEY, RAG_SOURCE_PAGE_ID_KEY, collection_for
 from app.rag.crawler import CrawlConfig, CrawlError, crawl
 from app.rag.ingestion import EmbedTarget, ingest_file, ingest_text, ingest_texts
-from app.rag.properties_source import property_docs
 from app.repositories import agent_config_repo
 from app.services import agent_config_service, rag_service
 from app.services.agent_config_service import ResolvedAgentConfig
@@ -332,13 +331,6 @@ def embed_source(db: Session, source: RagSource, target: EmbedTarget) -> tuple[i
         chunks = ingest_text(source.content, source.chroma_doc_id, target, metadata=metadata)
         return chunks, {"chunks": chunks}
 
-    if source.source_type == RagSourceType.properties.value:
-        docs = property_docs(db, str(source.id))
-        for doc in docs:
-            doc.metadata = {**metadata, **doc.metadata}
-        chunks = ingest_texts(docs, target)
-        return chunks, {"chunks": chunks, "properties": len(docs)}
-
     if source.source_type == RagSourceType.link.value:
         chunks, stats = _crawl_and_embed(db, source, target)
         return chunks, {**stats, "chunks": chunks}
@@ -358,7 +350,7 @@ def _mark_ready(source: RagSource, chunks: int, target: EmbedTarget) -> None:
 def handle_source_job(
     db: Session, source: RagSource, config: ResolvedAgentConfig, api_key: str
 ) -> dict[str, Any]:
-    """ingest / crawl / reindex / sync_properties: purge the source's vectors
+    """ingest / crawl / reindex: purge the source's vectors
     everywhere, then embed it with the current model and chunk settings."""
     target = _target(config, config.embedding_model, api_key)
     removed = rag_index.delete_where({RAG_SOURCE_ID_KEY: str(source.id)})
@@ -457,7 +449,6 @@ def dispatch(db: Session, job: EmbeddingJob, source: RagSource | None) -> dict[s
         EmbeddingJobType.ingest.value,
         EmbeddingJobType.crawl.value,
         EmbeddingJobType.reindex.value,
-        EmbeddingJobType.sync_properties.value,
     }:
         raise JobError(f"Unknown job type {job_type!r}")
     if source is None:

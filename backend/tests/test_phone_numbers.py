@@ -1,10 +1,8 @@
 import pytest
-from reserved_phone import delete_clients, unused_test_phone
 from sqlalchemy import text
 
 from app.config import get_settings
 from app.db.session import SessionLocal
-from app.repositories import client_repo
 from app.services.phone_numbers import (
     bd_mobile_local,
     dial_allowlist,
@@ -148,64 +146,3 @@ def test_non_bd_mobiles_rejected(raw):
 
 def test_local_form():
     assert bd_mobile_local("+8801711234567") == "01711234567"
-
-
-def _stored_variants(local: str) -> list[str]:
-    """`local` ("0139999xxxx") the ways a phone ends up stored."""
-    tail = local[1:]
-    return [f"{local[:5]}-{local[5:]}", f"(+880) {tail[:4]} {tail[4:]}", f"880{tail}"]
-
-
-@pytest.mark.parametrize("variant", range(3))
-def test_find_by_phone_matches_raw_stored_formats(variant):
-    local = unused_test_phone()
-    stored = _stored_variants(local)[variant]
-    db = SessionLocal()
-    created = []
-    try:
-        client = client_repo.create(db, {"full_name": "Pytest Phone", "phone": stored})
-        created.append(client.id)
-        found = client_repo.find_by_phone(db, normalize_bd_mobile(local))
-        assert found is not None and found.id == client.id
-    finally:
-        db.close()
-        delete_clients(created)
-
-
-def test_find_by_phone_prefers_the_latest_duplicate_and_keeps_its_name():
-    local = unused_test_phone()
-    e164 = normalize_bd_mobile(local)
-    db = SessionLocal()
-    created = []
-    try:
-        older = client_repo.create(db, {"full_name": "Pytest Old", "phone": local})
-        created.append(older.id)
-        newer = client_repo.create(db, {"full_name": "Pytest New", "phone": e164})
-        created.append(newer.id)
-        db.execute(
-            text("update clients set updated_at = now() - interval '1 day' where id = :id"),
-            {"id": older.id},
-        )
-        db.commit()
-        assert client_repo.find_by_phone(db, e164).id == newer.id
-
-        same = client_repo.get_or_create_by_phone(db, full_name="Someone Else", phone=e164)
-        assert same.id == newer.id
-        assert same.full_name == "Pytest New"
-    finally:
-        db.close()
-        delete_clients(created)
-
-
-def test_get_or_create_by_phone_creates_with_e164():
-    e164 = normalize_bd_mobile(unused_test_phone())
-    db = SessionLocal()
-    created = []
-    try:
-        client = client_repo.get_or_create_by_phone(db, full_name="Pytest Phone", phone=e164)
-        created.append(client.id)
-        assert client.phone == e164
-        assert client.email is None
-    finally:
-        db.close()
-        delete_clients(created)

@@ -247,3 +247,7 @@ def test_prompt_mentions_the_tool_only_when_registered():
     config.rag_enabled = True
     prompt = build_system_prompt(_inbound_userdata(), config, rag_tool_available=_rag_enabled(config))
     assert TOOL_NAME in prompt
+
+
+def test_properties_sync_route_is_gone(api):
+    assert api.post("/api/rag/sources/properties/sync").status_code == 404
