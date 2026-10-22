@@ -1,7 +1,7 @@
 # Horizon Realty — dashboard design system
 
-The source of truth for the staff dashboard (`/dashboard/**`), `/login` and the landing page
-(`/home`). Tokens live in `styles/globals.css`; this file explains them and the patterns built on
+The source of truth for the staff dashboard (`/dashboard/**`), `/login` and the public entry
+(`/` persona picker, then the customer portal at `/portal`). Tokens live in `styles/globals.css`; this file explains them and the patterns built on
 them. The voice/chat widget (the public site's chat bubble and the standalone chat page at
 `/chat`, which also hosts answered scheduled calls) deliberately keeps the original LiveKit starter look (see "Widget
 isolation").
