@@ -126,6 +126,7 @@ def execute_redeem(
         action_id=action_id,
         purpose="redeem",
         payload={"offer_id": str(offer_id)},
+        now=now,
     )
     sub = _subscriber(db, subscriber_id, lock=True)
     # A concurrent confirmer of the same action may have committed while we

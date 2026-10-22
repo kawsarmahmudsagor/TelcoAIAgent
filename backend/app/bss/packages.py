@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.bss import _txn, audit, otp
 from app.bss.clock import utc_now
-from app.bss.errors import InsufficientBalance, PackageNotFound, SubscriberNotFound
+from app.bss.errors import (
+    InsufficientBalance,
+    InvalidRequest,
+    PackageNotFound,
+    SubscriberNotFound,
+)
 from app.bss.types import (
     PackageView,
     PurchaseQuote,
@@ -134,7 +139,7 @@ def _check(
     if pkg is None:
         raise PackageNotFound()
     if req.pay_from not in _PAY_CHANNELS:
-        raise ValueError(f"Cannot pay for a package from {req.pay_from.value}")
+        raise InvalidRequest(f"Cannot pay for a package from {req.pay_from.value}")
     sub = db.get(Subscriber, subscriber_id)
     if sub is None:
         raise SubscriberNotFound()
@@ -212,6 +217,7 @@ def execute_purchase(
         action_id=action_id,
         purpose="purchase",
         payload=req.model_dump(mode="json"),
+        now=now,
     )
     _lock_balance(db, subscriber_id)
     # A concurrent confirmer of the same action may have committed while we

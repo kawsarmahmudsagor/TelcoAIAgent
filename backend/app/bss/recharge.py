@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.bss import _txn, audit, otp
 from app.bss.clock import local_day_bounds, local_tz, utc_now
-from app.bss.errors import InvalidMsisdn, LimitExceeded, SubscriberNotFound
+from app.bss.errors import InvalidMsisdn, InvalidRequest, LimitExceeded, SubscriberNotFound
 from app.bss.types import RechargeQuote, RechargeRequest, RechargeResult
 from app.models.telco import (
     Actor,
@@ -70,7 +70,7 @@ def _check(
     db: Session, subscriber_id: uuid.UUID, req: RechargeRequest, now: datetime
 ) -> tuple[Subscriber, str, bool, Decimal]:
     if req.channel not in _CHANNELS:
-        raise ValueError(f"Cannot recharge from {req.channel.value}")
+        raise InvalidRequest(f"Cannot recharge from {req.channel.value}")
     sub = db.get(Subscriber, subscriber_id)
     if sub is None:
         raise SubscriberNotFound()
@@ -136,6 +136,7 @@ def execute_recharge(
         action_id=action_id,
         purpose="recharge",
         payload=req.model_dump(mode="json"),
+        now=now,
     )
     # Lock the caller's (and a known target's) balance rows in a deterministic
     # order so crossing recharges cannot deadlock, and so the daily-cap check

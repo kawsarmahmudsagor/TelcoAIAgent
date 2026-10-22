@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.bss import otp, recharge, transactions
-from app.bss.errors import InvalidMsisdn, LimitExceeded, OtpInvalid
+from app.bss.errors import InvalidMsisdn, InvalidRequest, LimitExceeded, OtpInvalid
 from app.bss.types import RechargeRequest
 from app.models.telco import (
     Actor,
@@ -52,7 +52,7 @@ def test_recharge_limits_inclusive(bss_world, db):
 
 def test_recharge_rejects_non_payment_channel(bss_world, db):
     s = bss_world.subscriber()
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidRequest):
         recharge.preview_recharge(db, s.id, _req(100, channel=TxnChannel.balance))
 
 

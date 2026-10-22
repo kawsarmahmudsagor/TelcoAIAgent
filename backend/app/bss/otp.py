@@ -51,6 +51,8 @@ def issue(
     row = _get(db, subscriber_id, action_id)
     if row is not None and row.consumed_at is not None:
         raise OtpInvalid("Action already confirmed")
+    if row is not None and row.attempts >= MAX_ATTEMPTS:
+        raise OtpAttemptsExceeded()
     if row is None:
         row = OtpChallenge(subscriber_id=subscriber_id, action_id=action_id)
         db.add(row)
@@ -58,7 +60,6 @@ def issue(
     row.request_hash = request_hash(purpose, payload)
     row.code_hash = _code_hash(action_id, code)
     row.expires_at = now + OTP_TTL
-    row.attempts = 0
     row.consumed_at = None
     db.commit()
     return code
@@ -102,7 +103,9 @@ def require_verified(
     action_id: uuid.UUID,
     purpose: str,
     payload: dict,
+    now: datetime | None = None,
 ) -> None:
+    now = now or utc_now()
     row = _get(db, subscriber_id, action_id)
     if (
         row is None
@@ -111,3 +114,5 @@ def require_verified(
         or row.request_hash != request_hash(purpose, payload)
     ):
         raise OtpInvalid("Action has not been confirmed with a valid code")
+    if row.consumed_at + OTP_TTL < now:
+        raise OtpExpired()

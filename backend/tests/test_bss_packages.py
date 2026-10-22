@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.bss import otp, packages
-from app.bss.errors import InsufficientBalance, OtpInvalid
+from app.bss.errors import InsufficientBalance, InvalidRequest, OtpInvalid
 from app.bss.types import PurchaseRequest
 from app.models.telco import (
     Actor,
@@ -91,7 +91,7 @@ def test_preview_insufficient_balance(bss_world, db):
         packages.preview_purchase(db, s.id, _req(p))
     q = packages.preview_purchase(db, s.id, _req(p, TxnChannel.bkash))
     assert q.balance_after is None
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidRequest):
         packages.preview_purchase(db, s.id, _req(p, TxnChannel.points))
 
 

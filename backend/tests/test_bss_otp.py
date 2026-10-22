@@ -69,3 +69,45 @@ def test_verify_unknown_action(bss_world, db):
         otp.verify(
             db, subscriber_id=s.id, action_id=uuid4(), purpose="purchase", payload=PAYLOAD, code="123456"
         )
+
+
+def test_verify_other_subscribers_action_is_no_pending(bss_world, db):
+    kw, code = _issue(bss_world, db)
+    other = bss_world.subscriber()
+    kw["subscriber_id"] = other.id
+    with pytest.raises(NoPendingAction):
+        otp.verify(db, code=code, **kw)
+
+
+def test_purpose_mismatch_counts_attempt(bss_world, db):
+    kw, code = _issue(bss_world, db)
+    kw["purpose"] = "recharge"
+    with pytest.raises(OtpInvalid):
+        otp.verify(db, code=code, **kw)
+    row = db.scalar(select(OtpChallenge).where(OtpChallenge.action_id == kw["action_id"]))
+    assert row.attempts == 1
+
+
+def test_reissue_keeps_attempt_count(bss_world, db):
+    kw, code = _issue(bss_world, db)
+    wrong = "000000" if code != "000000" else "111111"
+    for _ in range(2):
+        with pytest.raises(OtpInvalid):
+            otp.verify(db, code=wrong, **kw)
+    new_code = otp.issue(db, **kw)
+    row = db.scalar(select(OtpChallenge).where(OtpChallenge.action_id == kw["action_id"]))
+    assert row.attempts == 2
+    wrong = "000000" if new_code != "000000" else "111111"
+    with pytest.raises(OtpInvalid):
+        otp.verify(db, code=wrong, **kw)
+    with pytest.raises(OtpAttemptsExceeded):
+        otp.verify(db, code=new_code, **kw)
+
+
+def test_require_verified_expires_three_minutes_after_consumption(bss_world, db):
+    kw, code = _issue(bss_world, db)
+    t0 = utc_now()
+    otp.verify(db, code=code, now=t0, **kw)
+    otp.require_verified(db, now=t0 + timedelta(minutes=2, seconds=59), **kw)
+    with pytest.raises(OtpExpired):
+        otp.require_verified(db, now=t0 + timedelta(minutes=3, seconds=1), **kw)

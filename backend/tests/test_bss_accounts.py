@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 
 from app.bss import accounts
-from app.bss.errors import SubscriberNotFound
+from app.bss.errors import InvalidRequest, SubscriberNotFound
 from app.bss.types import Allowance
 from app.models.telco import UsageKind
 
@@ -51,7 +51,7 @@ def test_usage_breakdown_7_days_daily_series(bss_world, db):
 
 def test_usage_breakdown_rejects_other_periods(bss_world, db):
     s = bss_world.subscriber()
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidRequest):
         accounts.get_usage_breakdown(db, s.id, period_days=14)
 
 

@@ -69,3 +69,8 @@ class InsufficientPoints(BssError):
 class CaseNotFound(BssError):
     code = "case_not_found"
     default_message = "Support case not found"
+
+
+class InvalidRequest(BssError):
+    code = "invalid_request"
+    default_message = "Invalid request"

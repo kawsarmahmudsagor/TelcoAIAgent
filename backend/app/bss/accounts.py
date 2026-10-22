@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.bss import network
 from app.bss.clock import local_day_start, local_tz, utc_now
-from app.bss.errors import SubscriberNotFound
+from app.bss.errors import InvalidRequest, SubscriberNotFound
 from app.bss.types import (
     AccountSummary,
     Allowance,
@@ -112,7 +112,7 @@ def get_usage_breakdown(
     now: datetime | None = None,
 ) -> UsageBreakdown:
     if period_days not in (7, 30):
-        raise ValueError("period_days must be 7 or 30")
+        raise InvalidRequest("period_days must be 7 or 30")
     now = now or utc_now()
     if db.get(Subscriber, subscriber_id) is None:
         raise SubscriberNotFound()

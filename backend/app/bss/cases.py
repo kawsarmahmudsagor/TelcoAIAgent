@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.bss import audit
-from app.bss.errors import CaseNotFound
+from app.bss.errors import CaseNotFound, InvalidRequest
 from app.bss.types import CaseView
 from app.models.telco import (
     Actor,
@@ -60,7 +60,7 @@ def create_case(
     action_id: uuid.UUID,
 ) -> CaseView:
     if len(category) > CATEGORY_MAX:
-        raise ValueError(f"category must be at most {CATEGORY_MAX} characters")
+        raise InvalidRequest(f"category must be at most {CATEGORY_MAX} characters")
     found = _existing(db, subscriber_id, action_id)
     if found is not None:
         return found

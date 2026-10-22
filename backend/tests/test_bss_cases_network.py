@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.bss import cases, network
-from app.bss.errors import CaseNotFound
+from app.bss.errors import CaseNotFound, InvalidRequest
 from app.models.telco import (
     CasePriority,
     CaseSource,
@@ -126,7 +126,7 @@ def test_create_case_rejects_long_category(bss_world, db):
         action_id=uuid4(),
     )
     assert ok.category == "x" * 60
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidRequest):
         cases.create_case(
             db, s.id, category="x" * 61, description="PYTEST", source=CaseSource.agent,
             action_id=uuid4(),
