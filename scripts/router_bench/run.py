@@ -79,6 +79,7 @@ async def _run(models: list[str], cases_path: Path, judge_model: str) -> None:
                 "listening",
                 address_form(case["utterance"]),
                 lookup=True,
+                knowledge_base=True,
             )
             ext_payloads = [
                 turn_router.build_request(
@@ -97,17 +98,17 @@ async def _run(models: list[str], cases_path: Path, judge_model: str) -> None:
                 ),
             )
             (judgement, jev_ms), ext_results = results[0], results[1:]
-            lookup_ok = judgement.lookup in case["lookup"]
+            lookup_ok = judgement.lookup == case["lookup"]
             jev_rows.append({"case": case, "j": judgement, "ms": jev_ms, "ok": lookup_ok})
             lp = "?" if judgement.lookup_p is None else f"{judgement.lookup_p:.2f}"
             print(f"{case['id']} jev {'ok' if lookup_ok else 'XX'} {judgement.lookup}({lp}) "
-                  f"{jev_ms:5.0f}ms  {case['utterance']}")
+                  f"{jev_ms:5.0f}ms  {case['utterance']}  [expected tool: {case['expected_tool']}]")
 
             for model, (args, ms) in zip(models, ext_results):
                 row = {"case": case, "ms": ms, "error": args is None, "ok": None, "why": ""}
-                if args is not None and "search" in case:
+                if args is not None and "packages" in case:
                     row["ok"], row["why"] = _args_ok(
-                        case["search"], args.packages, case.get("allow_extra", [])
+                        case["packages"], args.packages, case.get("allow_extra", [])
                     )
                 ext_rows[model].append(row)
                 if row["ok"] is not None or row["error"]:
@@ -133,8 +134,8 @@ def _pct(n: int, d: int) -> str:
 def _report(jev_rows: list[dict], ext_rows: dict[str, list[dict]], timeout_ms: int) -> None:
     print("\n== Jev lookup choice ==")
     print("Correct:", _pct(sum(r["ok"] for r in jev_rows), len(jev_rows)))
-    search_cases = [r for r in jev_rows if r["case"]["lookup"][0] != "none"]
-    none_cases = [r for r in jev_rows if r["case"]["lookup"] == ["none"]]
+    search_cases = [r for r in jev_rows if r["case"]["lookup"] != "none"]
+    none_cases = [r for r in jev_rows if r["case"]["lookup"] == "none"]
     prefetch = [
         r for r in search_cases
         if r["ok"] and r["j"].lookup != "none" and (r["j"].lookup_p or 0) >= MIN_P

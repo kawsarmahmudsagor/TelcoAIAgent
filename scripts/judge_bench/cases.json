@@ -1,160 +1,1035 @@
 {
-  "histories": {
-    "greet_bn": [
-      {"role": "assistant", "text": "আসসালামু আলাইকুম! আমি রিয়া, ড্রিম হোমস থেকে বলছি। আপনি কোন ধরনের বাসা খুঁজছেন?"}
-    ],
-    "budget_en": [
-      {"role": "user", "text": "I'm looking for a 3 bedroom flat in Gulshan."},
-      {"role": "assistant", "text": "We have 4 options in Gulshan. What's your budget?"}
-    ],
-    "budget_bn": [
-      {"role": "user", "text": "বনানীতে দুই বেডরুমের ফ্ল্যাট লাগবে।"},
-      {"role": "assistant", "text": "আমাদের কাছে বনানীতে কয়েকটা অপশন আছে। আপনার বাজেট কত?"}
-    ],
-    "bedrooms_en": [
-      {"role": "user", "text": "I want to buy a flat in Dhanmondi."},
-      {"role": "assistant", "text": "Sure. How many bedrooms do you need?"}
-    ],
-    "name_en": [
-      {"role": "user", "text": "I'd like to see the Banani flat."},
-      {"role": "assistant", "text": "Great, may I have your name for the booking?"}
-    ],
-    "name_bn": [
-      {"role": "user", "text": "গুলশানের ফ্ল্যাটটা দেখতে চাই।"},
-      {"role": "assistant", "text": "অবশ্যই। বুকিংয়ের জন্য আপনার নামটা জানাবেন?"}
-    ],
-    "email_en": [
-      {"role": "user", "text": "My name is Rahim Uddin."},
-      {"role": "assistant", "text": "Thanks Rahim. Could you share your email so we can send the details?"}
-    ],
-    "date_bn": [
-      {"role": "user", "text": "আমার নাম করিম।"},
-      {"role": "assistant", "text": "ধন্যবাদ করিম সাহেব। কবে দেখতে আসতে চান?"}
-    ],
-    "date_en": [
-      {"role": "user", "text": "Yes, I'd like to visit."},
-      {"role": "assistant", "text": "When would you like to come for the viewing?"}
-    ],
-    "speaking_bn": [
-      {"role": "user", "text": "গুলশানে কি আছে দেখান।"},
-      {"role": "assistant", "text": "গুলশানের ফ্ল্যাটটা ১৮০০ বর্গফুট, দাম ২ কোটি ৫০ লাখ টাকা, তিনটা বেডরুম আর দুইটা পার্কিং..."}
-    ],
-    "speaking_en": [
-      {"role": "user", "text": "What do you have in Banani?"},
-      {"role": "assistant", "text": "The Banani flat is 1,400 sqft with two bedrooms, priced at 85 lakh taka, and it has a lift and parking..."}
-    ],
-    "thinking_en": [
-      {"role": "user", "text": "Show me flats under 1 crore in Uttara."},
-      {"role": "assistant", "text": "Let me check what we have in Uttara."}
-    ],
-    "thinking_bn": [
-      {"role": "user", "text": "মিরপুরে ভাড়ার বাসা দেখান, ৩০ হাজারের মধ্যে।"},
-      {"role": "assistant", "text": "একটু দেখছি মিরপুরে আমাদের কী আছে।"}
-    ],
-    "confirm_bn": [
-      {"role": "assistant", "text": "শুক্রবার বিকেল ৪টায় বনানীর ফ্ল্যাটটা দেখার জন্য বুক করে দেব?"}
-    ],
-    "results_en": [
-      {"role": "user", "text": "Anything in Bashundhara?"},
-      {"role": "assistant", "text": "We have 3 options in Bashundhara between 70 lakh and 1.2 crore. Would you like details on any of them?"}
-    ]
-  },
-  "cases": [
-    {"id": "en01", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_en", "utterance": "My budget is around 1.5 crore.", "stt_confidence": 0.92, "expected": "addressed"},
-    {"id": "en02", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Yes.", "stt_confidence": 0.95, "expected": "addressed"},
-    {"id": "en03", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "name_en", "utterance": "Rahim Uddin.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "en04", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "email_en", "utterance": "rahim.uddin@gmail.com", "stt_confidence": 0.85, "expected": "addressed"},
-    {"id": "en05", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "date_en", "utterance": "Next Tuesday at 3 pm.", "stt_confidence": 0.93, "expected": "addressed"},
-    {"id": "en06", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "Do you have anything in Dhanmondi?", "stt_confidence": 0.94, "expected": "addressed"},
-    {"id": "en07", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Is parking included?", "stt_confidence": 0.91, "expected": "addressed"},
-    {"id": "en08", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_en", "utterance": "No, I need at least three bedrooms.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "en09", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Okay thanks, that's all for today.", "stt_confidence": 0.93, "expected": "addressed"},
-    {"id": "en10", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "Hello?", "stt_confidence": 0.88, "expected": "addressed"},
-    {"id": "en11", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Sorry, can you repeat the price?", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "en12", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "What are your office hours?", "stt_confidence": 0.92, "expected": "addressed"},
-    {"id": "en13", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Can I visit the second one this Friday?", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "en14", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "bedrooms_en", "utterance": "Three.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "en15", "lang": "en", "stt": "openrouter", "bot_state": "listening", "h": "budget_en", "utterance": "Somewhere between 80 lakh and 1 crore.", "stt_confidence": 0.0, "expected": "addressed"},
-    {"id": "en16", "lang": "en", "stt": "openrouter", "bot_state": "listening", "h": "results_en", "utterance": "Tell me about the cheapest one.", "stt_confidence": 0.0, "expected": "addressed"},
-
-    {"id": "bn01", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "confirm_bn", "utterance": "হ্যাঁ।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn02", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "আমার বাজেট ৫০ লাখ।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn03", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "ধানমন্ডিতে কিছু আছে?", "stt_confidence": 0.88, "expected": "addressed"},
-    {"id": "bn04", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "date_bn", "utterance": "শুক্রবার বিকেলে আসতে পারব।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn05", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "name_bn", "utterance": "আমার নাম করিম।", "stt_confidence": 0.92, "expected": "addressed"},
-    {"id": "bn06", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "না, আমি ভাড়া খুঁজছি।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn07", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "পার্কিং আছে কি?", "stt_confidence": 0.87, "expected": "addressed"},
-    {"id": "bn08", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "দামটা একটু কমানো যাবে?", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn09", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "confirm_bn", "utterance": "ধন্যবাদ, আজকে এটুকুই।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn10", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "আপনারা কি সাভারেও কাজ করেন?", "stt_confidence": 0.89, "expected": "addressed"},
-    {"id": "bn11", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "লিফট আছে?", "stt_confidence": 0.85, "expected": "addressed"},
-    {"id": "bn12", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "confirm_bn", "utterance": "আচ্ছা ঠিক আছে।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bn13", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "এক কোটির মধ্যে হলে ভালো হয়।", "stt_confidence": 0.88, "expected": "addressed"},
-    {"id": "bn14", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "উত্তরায় তিন বেডরুমের ফ্ল্যাট কিনতে চাই।", "stt_confidence": 0.91, "expected": "addressed"},
-    {"id": "bn15", "lang": "bn", "stt": "openrouter", "bot_state": "listening", "h": "date_bn", "utterance": "পরশু সকাল ১১টায়।", "stt_confidence": 0.0, "expected": "addressed"},
-    {"id": "bn16", "lang": "bn", "stt": "openrouter", "bot_state": "listening", "h": "greet_bn", "utterance": "আপনাদের অফিস কোথায়?", "stt_confidence": 0.0, "expected": "addressed"},
-
-    {"id": "bi01", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Wait.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bi02", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "No no, not Banani, I said Bashundhara.", "stt_confidence": 0.88, "expected": "addressed"},
-    {"id": "bi03", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Hold on, what was the price again?", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bi04", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Stop, that's too expensive for me.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bi05", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "না না, বনানী।", "stt_confidence": 0.88, "expected": "addressed"},
-    {"id": "bi06", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "এক মিনিট শুনুন।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bi07", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "থামুন, দামটা আবার বলবেন?", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "bi08", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "আমার বাজেট এর চেয়ে কম।", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "th01", "lang": "en", "stt": "elevenlabs", "bot_state": "thinking", "h": "thinking_en", "utterance": "And with parking please.", "stt_confidence": 0.9, "expected": "addressed"},
-    {"id": "th02", "lang": "bn", "stt": "elevenlabs", "bot_state": "thinking", "h": "thinking_bn", "utterance": "দুই বেডরুম হলেই চলবে।", "stt_confidence": 0.9, "expected": "addressed"},
-
-    {"id": "dg01", "lang": "bn", "stt": "deepgram", "bot_state": "listening", "h": "budget_bn", "utterance": "amar budget pochish lakh", "stt_confidence": 0.6, "expected": "addressed"},
-    {"id": "dg02", "lang": "bn", "stt": "deepgram", "bot_state": "listening", "h": "greet_bn", "utterance": "dhanmondi te flat ache", "stt_confidence": 0.55, "expected": "addressed"},
-    {"id": "dg03", "lang": "bn", "stt": "deepgram", "bot_state": "listening", "h": "budget_bn", "utterance": "आमार बाजेट पचास लाख", "stt_confidence": 0.5, "expected": "addressed"},
-    {"id": "dg04", "lang": "bn", "stt": "deepgram", "bot_state": "listening", "h": "date_bn", "utterance": "shukrobar bikele", "stt_confidence": 0.5, "expected": "addressed"},
-
-    {"id": "sb01", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "আম্মু, এটা তো অনেক দামি।", "stt_confidence": 0.8, "expected": "not_addressed", "hard": true},
-    {"id": "sb02", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "তুমি কি চা খাবে?", "stt_confidence": 0.8, "expected": "not_addressed"},
-    {"id": "sb03", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "এই, দরজাটা খোল তো।", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "sb04", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "তুই কখন আসবি?", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "sb05", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "ভাইয়া, তোমার অফিস কয়টায়?", "stt_confidence": 0.75, "expected": "not_addressed", "hard": true},
-    {"id": "sb06", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "রান্না কি হয়েছে?", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "sb07", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "date_bn", "utterance": "ফোনটা দাও তো।", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "sb08", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "বাচ্চারা, চুপ করো।", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "sb09", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "confirm_bn", "utterance": "কালকে বাজারে যেতে হবে মনে রেখো।", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "sb10", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "আব্বু বলছে গুলশানে না নিতে, তুমি কী বলো?", "stt_confidence": 0.8, "expected": "not_addressed", "hard": true},
-    {"id": "sb11", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "খেলা কয়টায় শুরু হবে রে?", "stt_confidence": 0.7, "expected": "not_addressed"},
-
-    {"id": "se01", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Honey, did you lock the car?", "stt_confidence": 0.8, "expected": "not_addressed"},
-    {"id": "se02", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Can you pass me the remote?", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "se03", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "I'll call you back in five minutes, I'm on another call.", "stt_confidence": 0.8, "expected": "not_addressed", "hard": true},
-    {"id": "se04", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_en", "utterance": "Mom, where are my keys?", "stt_confidence": 0.8, "expected": "not_addressed"},
-    {"id": "se05", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Did you watch the match last night?", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "se06", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "Tell him I'm busy right now.", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "se07", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "date_en", "utterance": "The meeting got moved to Thursday, did you see the email?", "stt_confidence": 0.8, "expected": "not_addressed", "hard": true},
-    {"id": "se08", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "I think it's way too expensive, what do you think, dear?", "stt_confidence": 0.8, "expected": "not_addressed", "hard": true},
-
-    {"id": "tv01", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "And now the weather forecast for tomorrow, expect light rain in the evening.", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "tv02", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "এইমাত্র পাওয়া খবরে জানা গেছে, রাজধানীতে আজ ভারী বৃষ্টি হতে পারে।", "stt_confidence": 0.7, "expected": "not_addressed"},
-    {"id": "tv03", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Buy one get one free, only at Shwapno, offer valid till Friday.", "stt_confidence": 0.7, "expected": "not_addressed"},
-
-    {"id": "ol01", "lang": "hi", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "तुम मेरे साथ ऐसा कैसे कर सकते हो?", "stt_confidence": 0.8, "expected": "not_addressed"},
-    {"id": "ol02", "lang": "hi", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "कल सुबह हम बाज़ार चलेंगे।", "stt_confidence": 0.8, "expected": "not_addressed"},
-    {"id": "ol03", "lang": "ur", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "آپ کہاں جا رہے ہیں؟", "stt_confidence": 0.75, "expected": "not_addressed"},
-    {"id": "ol04", "lang": "hi", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "মুঝে নেহি পাতা ইয়ার, তুম বাতাও।", "stt_confidence": 0.6, "expected": "not_addressed"},
-    {"id": "ol05", "lang": "hi", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "बेटा, खाना ठंडा हो रहा है।", "stt_confidence": 0.8, "expected": "not_addressed"},
-
-    {"id": "gb01", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "uh the the", "stt_confidence": 0.3, "expected": "not_addressed"},
-    {"id": "gb02", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "হুম", "stt_confidence": 0.4, "expected": "not_addressed"},
-    {"id": "gb03", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "mm-hmm", "stt_confidence": 0.5, "expected": "not_addressed"},
-    {"id": "gb04", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "আ... ও... এ", "stt_confidence": 0.2, "expected": "not_addressed"},
-    {"id": "gb05", "lang": "en", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_en", "utterance": "so so so and", "stt_confidence": 0.25, "expected": "not_addressed"},
-    {"id": "gb06", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "date_bn", "utterance": "টা টা কি না", "stt_confidence": 0.3, "expected": "not_addressed"},
-    {"id": "gb07", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_en", "utterance": "the of and it", "stt_confidence": 0.2, "expected": "not_addressed"},
-    {"id": "gb08", "lang": "bn", "stt": "openrouter", "bot_state": "listening", "h": "greet_bn", "utterance": "ওই যে ওটা না", "stt_confidence": 0.0, "expected": "not_addressed", "hard": true},
-
-    {"id": "ot01", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_bn", "utterance": "বাংলাদেশের ক্রিকেট টিম সম্পর্কে বলুন", "stt_confidence": 0.9, "expected": "not_addressed"},
-    {"id": "ot02", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "results_en", "utterance": "Tell me about the Bangladesh cricket team.", "stt_confidence": 0.9, "expected": "not_addressed"},
-    {"id": "ot03", "lang": "bn", "stt": "elevenlabs", "bot_state": "listening", "h": "date_bn", "utterance": "আজকে আবহাওয়া কেমন থাকবে বলবেন?", "stt_confidence": 0.9, "expected": "not_addressed"},
-    {"id": "ot04", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "budget_en", "utterance": "Who won the election?", "stt_confidence": 0.9, "expected": "not_addressed"},
-    {"id": "ot05", "lang": "bn", "stt": "elevenlabs", "bot_state": "speaking", "h": "speaking_bn", "utterance": "আপনি কি একটা গান শোনাতে পারবেন?", "stt_confidence": 0.9, "expected": "not_addressed"},
-    {"id": "ot06", "lang": "en", "stt": "elevenlabs", "bot_state": "listening", "h": "greet_bn", "utterance": "Can you help me with my math homework?", "stt_confidence": 0.9, "expected": "not_addressed"}
+ "histories": {
+  "greet_bn": [
+   {
+    "role": "assistant",
+    "text": "আসসালামু আলাইকুম! আমি অনিকা, টেলকো থেকে বলছি। আপনাকে কীভাবে সাহায্য করতে পারি?"
+   }
+  ],
+  "budget_en": [
+   {
+    "role": "user",
+    "text": "I need a data pack."
+   },
+   {
+    "role": "assistant",
+    "text": "Sure, we have several data packs. What's your budget?"
+   }
+  ],
+  "budget_bn": [
+   {
+    "role": "user",
+    "text": "আমার একটা ইন্টারনেট প্যাক লাগবে।"
+   },
+   {
+    "role": "assistant",
+    "text": "আমাদের কাছে কয়েকটা ডাটা প্যাক আছে। আপনার বাজেট কত?"
+   }
+  ],
+  "data_en": [
+   {
+    "role": "user",
+    "text": "I want a data pack for the month."
+   },
+   {
+    "role": "assistant",
+    "text": "Sure. How much data do you need?"
+   }
+  ],
+  "number_en": [
+   {
+    "role": "user",
+    "text": "I'd like to recharge."
+   },
+   {
+    "role": "assistant",
+    "text": "Of course. Which number should I recharge?"
+   }
+  ],
+  "number_bn": [
+   {
+    "role": "user",
+    "text": "আমি রিচার্জ করতে চাই।"
+   },
+   {
+    "role": "assistant",
+    "text": "অবশ্যই। কোন নম্বরে রিচার্জ করব?"
+   }
+  ],
+  "amount_en": [
+   {
+    "role": "user",
+    "text": "Recharge 01812347392."
+   },
+   {
+    "role": "assistant",
+    "text": "Got it. How much would you like to add?"
+   }
+  ],
+  "amount_bn": [
+   {
+    "role": "user",
+    "text": "০১৭১২৩৪২৮৪১ নম্বরে রিচার্জ করুন।"
+   },
+   {
+    "role": "assistant",
+    "text": "ঠিক আছে। কত টাকা রিচার্জ করব?"
+   }
+  ],
+  "otp_bn": [
+   {
+    "role": "user",
+    "text": "হ্যাঁ, রিচার্জটা করে দিন।"
+   },
+   {
+    "role": "assistant",
+    "text": "আপনার ফোনে একটা ছয় সংখ্যার কোড পাঠিয়েছি। কোডটা বলবেন?"
+   }
+  ],
+  "otp_en": [
+   {
+    "role": "user",
+    "text": "Yes, go ahead and buy it."
+   },
+   {
+    "role": "assistant",
+    "text": "I've sent a six digit code to your phone. Could you read it out?"
+   }
+  ],
+  "speaking_bn": [
+   {
+    "role": "user",
+    "text": "১৫ জিবির প্যাকগুলো দেখান।"
+   },
+   {
+    "role": "assistant",
+    "text": "১৫ জিবি মাসিক প্যাকটা ৩৪৯ টাকা, মেয়াদ ৩০ দিন। আর ৩০ জিবির প্যাকটা ৫৪৯ টাকা, এতে..."
+   }
+  ],
+  "speaking_en": [
+   {
+    "role": "user",
+    "text": "What data packs do you have?"
+   },
+   {
+    "role": "assistant",
+    "text": "The 8 GB weekly pack is 149 taka and lasts 7 days. The 15 GB monthly pack is 349 taka, and it..."
+   }
+  ],
+  "thinking_en": [
+   {
+    "role": "user",
+    "text": "Show me data packs under 500 taka."
+   },
+   {
+    "role": "assistant",
+    "text": "Let me check which packs we have."
+   }
+  ],
+  "thinking_bn": [
+   {
+    "role": "user",
+    "text": "৩০০ টাকার মধ্যে ডাটা প্যাক দেখান।"
+   },
+   {
+    "role": "assistant",
+    "text": "একটু দেখছি কোন প্যাকগুলো আছে।"
+   }
+  ],
+  "confirm_bn": [
+   {
+    "role": "assistant",
+    "text": "৩৪৯ টাকার ১৫ জিবি মাসিক প্যাকটা কিনে দেব?"
+   }
+  ],
+  "results_en": [
+   {
+    "role": "user",
+    "text": "Any data packs under 400 taka?"
+   },
+   {
+    "role": "assistant",
+    "text": "We have 3: 8 GB weekly for 149 taka, 15 GB monthly for 349 taka, and 1 GB daily for 29 taka. Want details on any of them?"
+   }
   ]
+ },
+ "cases": [
+  {
+   "id": "en01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "My budget is around 300 taka.",
+   "stt_confidence": 0.92,
+   "expected": "addressed"
+  },
+  {
+   "id": "en02",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Yes.",
+   "stt_confidence": 0.95,
+   "expected": "addressed"
+  },
+  {
+   "id": "en03",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "number_en",
+   "utterance": "01812347392.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "en04",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "amount_en",
+   "utterance": "Make it 200 taka.",
+   "stt_confidence": 0.85,
+   "expected": "addressed"
+  },
+  {
+   "id": "en05",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_en",
+   "utterance": "The code is 482917.",
+   "stt_confidence": 0.93,
+   "expected": "addressed"
+  },
+  {
+   "id": "en06",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "Do you have any 10 GB data packs?",
+   "stt_confidence": 0.94,
+   "expected": "addressed"
+  },
+  {
+   "id": "en07",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Is the validity 30 days?",
+   "stt_confidence": 0.91,
+   "expected": "addressed"
+  },
+  {
+   "id": "en08",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "No, I need at least 15 GB.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "en09",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Okay thanks, that's all for today.",
+   "stt_confidence": 0.93,
+   "expected": "addressed"
+  },
+  {
+   "id": "en10",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "Hello?",
+   "stt_confidence": 0.88,
+   "expected": "addressed"
+  },
+  {
+   "id": "en11",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Sorry, can you repeat the price?",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "en12",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "What are your customer care hours?",
+   "stt_confidence": 0.92,
+   "expected": "addressed"
+  },
+  {
+   "id": "en13",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Can I buy the second one right now?",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "en14",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "data_en",
+   "utterance": "Ten.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "en15",
+   "lang": "en",
+   "stt": "openrouter",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "Somewhere between 300 and 500 taka.",
+   "stt_confidence": 0.0,
+   "expected": "addressed"
+  },
+  {
+   "id": "en16",
+   "lang": "en",
+   "stt": "openrouter",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Tell me about the cheapest one.",
+   "stt_confidence": 0.0,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn01",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "confirm_bn",
+   "utterance": "হ্যাঁ।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn02",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "আমার বাজেট ৩০০ টাকা।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn03",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "ডাটা প্যাক কী কী আছে?",
+   "stt_confidence": 0.88,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn04",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_bn",
+   "utterance": "কোডটা হলো ৪৮২ ৯১৭।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn05",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "number_bn",
+   "utterance": "০১৭১২৩৪২৮৪১।",
+   "stt_confidence": 0.92,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn06",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "না, আমি রিচার্জ করতে চাই।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn07",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "ভ্যালিডিটি কত দিন?",
+   "stt_confidence": 0.87,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn08",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "দামটা একটু কমানো যাবে?",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn09",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "confirm_bn",
+   "utterance": "ধন্যবাদ, আজকে এটুকুই।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn10",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "আপনারা কি রোমিং সার্ভিস দেন?",
+   "stt_confidence": 0.89,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn11",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "এতে কি মিনিট আছে?",
+   "stt_confidence": 0.85,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn12",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "confirm_bn",
+   "utterance": "আচ্ছা ঠিক আছে।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn13",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "তিনশো টাকার মধ্যে হলে ভালো হয়।",
+   "stt_confidence": 0.88,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn14",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "১০ জিবির একটা প্যাক কিনতে চাই।",
+   "stt_confidence": 0.91,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn15",
+   "lang": "bn",
+   "stt": "openrouter",
+   "bot_state": "listening",
+   "h": "amount_bn",
+   "utterance": "দুইশো টাকা।",
+   "stt_confidence": 0.0,
+   "expected": "addressed"
+  },
+  {
+   "id": "bn16",
+   "lang": "bn",
+   "stt": "openrouter",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "আপনাদের কাস্টমার কেয়ার নম্বর কত?",
+   "stt_confidence": 0.0,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Wait.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi02",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "No no, not the 8 GB, I said 15 GB.",
+   "stt_confidence": 0.88,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi03",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Hold on, what was the price again?",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi04",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Stop, that's too expensive for me.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi05",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "না না, ১৫ জিবি।",
+   "stt_confidence": 0.88,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi06",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "এক মিনিট শুনুন।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi07",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "থামুন, দামটা আবার বলবেন?",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "bi08",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "আমার বাজেট এর চেয়ে কম।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "th01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "thinking",
+   "h": "thinking_en",
+   "utterance": "And with some minutes please.",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "th02",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "thinking",
+   "h": "thinking_bn",
+   "utterance": "১০ জিবি হলেই চলবে।",
+   "stt_confidence": 0.9,
+   "expected": "addressed"
+  },
+  {
+   "id": "dg01",
+   "lang": "bn",
+   "stt": "deepgram",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "amar budget teen sho taka",
+   "stt_confidence": 0.6,
+   "expected": "addressed"
+  },
+  {
+   "id": "dg02",
+   "lang": "bn",
+   "stt": "deepgram",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "data pack ache",
+   "stt_confidence": 0.55,
+   "expected": "addressed"
+  },
+  {
+   "id": "dg03",
+   "lang": "bn",
+   "stt": "deepgram",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "आमार बाजेट तिन सौ टाका",
+   "stt_confidence": 0.5,
+   "expected": "addressed"
+  },
+  {
+   "id": "dg04",
+   "lang": "bn",
+   "stt": "deepgram",
+   "bot_state": "listening",
+   "h": "amount_bn",
+   "utterance": "dui sho taka",
+   "stt_confidence": 0.5,
+   "expected": "addressed"
+  },
+  {
+   "id": "sb01",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "আম্মু, এটা তো অনেক দামি।",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "sb02",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "তুমি কি চা খাবে?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb03",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "এই, দরজাটা খোল তো।",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb04",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "তুই কখন আসবি?",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb05",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "ভাইয়া, তোমার অফিস কয়টায়?",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "sb06",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "রান্না কি হয়েছে?",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb07",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_bn",
+   "utterance": "ফোনটা দাও তো।",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb08",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "বাচ্চারা, চুপ করো।",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb09",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "confirm_bn",
+   "utterance": "কালকে বাজারে যেতে হবে মনে রেখো।",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "sb10",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "আব্বু বলছে এই প্যাকটা না নিতে, তুমি কী বলো?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "sb11",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "খেলা কয়টায় শুরু হবে রে?",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Honey, did you lock the car?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se02",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Can you pass me the remote?",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se03",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "I'll call you back in five minutes, I'm on another call.",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "se04",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "Mom, where are my keys?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se05",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Did you watch the match last night?",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se06",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "Tell him I'm busy right now.",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "se07",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_en",
+   "utterance": "The meeting got moved to Thursday, did you see the email?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "se08",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "I think it's way too expensive, what do you think, dear?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "tv01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "And now the weather forecast for tomorrow, expect light rain in the evening.",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "tv02",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "এইমাত্র পাওয়া খবরে জানা গেছে, রাজধানীতে আজ ভারী বৃষ্টি হতে পারে।",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "tv03",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Buy one get one free, only at Shwapno, offer valid till Friday.",
+   "stt_confidence": 0.7,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ol01",
+   "lang": "hi",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "तुम मेरे साथ ऐसा कैसे कर सकते हो?",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ol02",
+   "lang": "hi",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "कल सुबह हम बाज़ार चलेंगे।",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ol03",
+   "lang": "ur",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "آپ کہاں جا رہے ہیں؟",
+   "stt_confidence": 0.75,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ol04",
+   "lang": "hi",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "মুঝে নেহি পাতা ইয়ার, তুম বাতাও।",
+   "stt_confidence": 0.6,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ol05",
+   "lang": "hi",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "बेटा, खाना ठंडा हो रहा है।",
+   "stt_confidence": 0.8,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb01",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "uh the the",
+   "stt_confidence": 0.3,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb02",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "হুম",
+   "stt_confidence": 0.4,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb03",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "mm-hmm",
+   "stt_confidence": 0.5,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb04",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "আ... ও... এ",
+   "stt_confidence": 0.2,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb05",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_en",
+   "utterance": "so so so and",
+   "stt_confidence": 0.25,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb06",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_bn",
+   "utterance": "টা টা কি না",
+   "stt_confidence": 0.3,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb07",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "the of and it",
+   "stt_confidence": 0.2,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "gb08",
+   "lang": "bn",
+   "stt": "openrouter",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "ওই যে ওটা না",
+   "stt_confidence": 0.0,
+   "expected": "not_addressed",
+   "hard": true
+  },
+  {
+   "id": "ot01",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_bn",
+   "utterance": "বাংলাদেশের ক্রিকেট টিম সম্পর্কে বলুন",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ot02",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "results_en",
+   "utterance": "Tell me about the Bangladesh cricket team.",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ot03",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "otp_bn",
+   "utterance": "আজকে আবহাওয়া কেমন থাকবে বলবেন?",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ot04",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "budget_en",
+   "utterance": "Who won the election?",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ot05",
+   "lang": "bn",
+   "stt": "elevenlabs",
+   "bot_state": "speaking",
+   "h": "speaking_bn",
+   "utterance": "আপনি কি একটা গান শোনাতে পারবেন?",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  },
+  {
+   "id": "ot06",
+   "lang": "en",
+   "stt": "elevenlabs",
+   "bot_state": "listening",
+   "h": "greet_bn",
+   "utterance": "Can you help me with my math homework?",
+   "stt_confidence": 0.9,
+   "expected": "not_addressed"
+  }
+ ]
 }
