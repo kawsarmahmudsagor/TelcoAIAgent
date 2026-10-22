@@ -43,16 +43,19 @@ function daysLeftText(days: number): string {
 export function MetricsRow({
   summary,
   usage,
+  usageFailed = false,
   now,
 }: {
   summary: AccountSummary;
   /** `usage(30)`; undefined while it loads (or if it failed). */
   usage: UsageBreakdown | undefined;
+  /** `usage(30)` errored: show a dash instead of a skeleton that never resolves. */
+  usageFailed?: boolean;
   now: Date;
 }) {
   const used = (kind: 'data' | 'voice') => usage?.totals.find((t) => t.kind === kind)?.amount ?? 0;
   const [dataValue, dataUnit] = formatData(used('data')).split(' ');
-  const pending = <Bone className="mt-1 h-7 w-20" />;
+  const pending = usageFailed ? <Figure value="—" /> : <Bone className="mt-1 h-7 w-20" />;
 
   const nearest = nearestExpiring(summary.subscriptions);
   const expiry = summary.nearest_expiry;

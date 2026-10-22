@@ -145,6 +145,7 @@ export function useTelcoTopics(room: Room | undefined, agentState: AgentState): 
     const reset = () => {
       clearTimer();
       heldRef.current = [];
+      for (const id of smsToasts.values()) toast.dismiss(id);
       smsToasts.clear();
       setCards([]);
       setConfirm(null);

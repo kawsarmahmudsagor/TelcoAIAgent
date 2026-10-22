@@ -55,7 +55,12 @@ export function Overview() {
               <BalanceHero summary={summary.data} />
               <AllowancesCard summary={summary.data} packages={packages.data} />
             </div>
-            <MetricsRow summary={summary.data} usage={usage30.data} now={now} />
+            <MetricsRow
+              summary={summary.data}
+              usage={usage30.data}
+              usageFailed={usage30.error !== undefined}
+              now={now}
+            />
           </>
         ) : summary.error && !summary.loading ? (
           <Panel className="mb-5">

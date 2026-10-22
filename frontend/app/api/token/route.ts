@@ -81,9 +81,8 @@ export async function POST(req: NextRequest) {
 
     // Generate participant token
     const participantName = 'user';
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
-    const roomName =
-      existingRoomName ?? `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+    const participantIdentity = `voice_assistant_user_${crypto.randomUUID()}`;
+    const roomName = existingRoomName ?? `voice_assistant_room_${crypto.randomUUID()}`;
 
     const participantToken = await createParticipantToken(
       { identity: participantIdentity, name: participantName },

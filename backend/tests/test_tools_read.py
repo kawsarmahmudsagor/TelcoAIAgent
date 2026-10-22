@@ -126,7 +126,7 @@ def test_recommend_publishes_cards(bss_world, monkeypatch):
     bss_world.usage(sub, UsageKind.data, 1000)
     asyncio.run(packages.run_recommend_packages(_ud(sub)))
     assert sent[0][0] == "telco.packages" and sent[0][1]["title"] == "Recommended for you"
-    assert len(sent[0][1]["packages"]) <= 6
+    assert 1 <= len(sent[0][1]["packages"]) <= 6
 
 
 def test_search_packages_bad_kind_maps_invalid_request():
