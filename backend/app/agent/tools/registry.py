@@ -2,10 +2,12 @@
 
 from app.agent.tools.account import explain_deductions, get_account_summary, get_usage_breakdown
 from app.agent.tools.network import check_network_status
-from app.agent.tools.packages import recommend_packages, search_packages
-from app.agent.tools.rewards import get_offers_and_points
-from app.agent.tools.support import get_case_status
+from app.agent.tools.packages import purchase_package, recommend_packages, search_packages
+from app.agent.tools.recharge import start_recharge
+from app.agent.tools.rewards import get_offers_and_points, redeem_reward
+from app.agent.tools.support import create_support_case, get_case_status, request_human_agent
 from app.agent.tools.transactions import lookup_transactions
+from app.agent.tools.verify import cancel_pending_action, verify_otp
 
 
 def telco_tools() -> list:
@@ -19,4 +21,11 @@ def telco_tools() -> list:
         get_offers_and_points,
         get_case_status,
         check_network_status,
+        purchase_package,
+        start_recharge,
+        redeem_reward,
+        verify_otp,
+        cancel_pending_action,
+        create_support_case,
+        request_human_agent,
     ]

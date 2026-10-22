@@ -1,4 +1,4 @@
-"""Package tools. Read half: search the catalogue, recommend by usage."""
+"""Package tools: search the catalogue, recommend by usage, buy (OTP-gated)."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ from livekit.agents import RunContext, function_tool
 from livekit.agents.llm import ToolError
 from sqlalchemy.orm import Session
 
+from app.agent import actions
 from app.agent.telco_format import format_amount, format_data
-from app.agent.tools._common import error_text, parse_enum, run_db, run_read
+from app.agent.tools._common import error_text, parse_enum, run_db, run_read, run_write
 from app.agent.userdata import SessionUserdata
-from app.bss import packages
-from app.bss.errors import BssError
-from app.bss.types import PackageView
-from app.models.telco import PackageKind
+from app.bss import accounts, packages
+from app.bss.errors import BssError, InsufficientBalance, InvalidRequest
+from app.bss.types import PackageView, PurchaseRequest
+from app.models.telco import PackageKind, TxnChannel
 
 _DETAIL = 3
 
@@ -83,6 +84,31 @@ async def run_recommend_packages(userdata: SessionUserdata) -> str:
     return await run_read(userdata, build, verify=True)
 
 
+def _shortfall(db: Session, sid, package_code: str) -> Decimal:
+    price = next(p.price for p in packages.search(db) if p.code == package_code)
+    return price - accounts.get_account_summary(db, sid).main_balance
+
+
+async def run_purchase_package(
+    userdata: SessionUserdata, package_code: str, pay_from: str = "balance"
+) -> str:
+    async def call() -> str:
+        channel = parse_enum(TxnChannel, pay_from)
+        if channel is None:
+            raise InvalidRequest("pay_from is required")
+        req = PurchaseRequest(package_code=package_code.strip(), pay_from=channel)
+        try:
+            return await actions.start_action(userdata, "purchase", req)
+        except InsufficientBalance as err:
+            short = await run_db(lambda db: _shortfall(db, userdata.subscriber_id, req.package_code))
+            raise ToolError(
+                f"{error_text(err)} They are {format_amount(short)} short. "
+                "Offer a recharge first (start_recharge)."
+            ) from err
+
+    return await run_write(userdata, call)
+
+
 @function_tool(name="search_packages")
 async def search_packages(
     ctx: RunContext[SessionUserdata],
@@ -107,3 +133,18 @@ async def search_packages(
 async def recommend_packages(ctx: RunContext[SessionUserdata]) -> str:
     """Recommend up to three packages that fit the customer's last 30 days of use."""
     return await run_recommend_packages(ctx.userdata)
+
+
+@function_tool(name="purchase_package")
+async def purchase_package(
+    ctx: RunContext[SessionUserdata], package_code: str, pay_from: str = "balance"
+) -> str:
+    """Start buying a package for the customer. Nothing is charged yet: this
+    quotes the price and sends a 6-digit code to their screen; the purchase
+    happens only after verify_otp (or the Confirm button) succeeds.
+
+    Args:
+        package_code: The package code from search_packages or recommend_packages.
+        pay_from: "balance" (default), "bkash", "nagad" or "card".
+    """
+    return await run_purchase_package(ctx.userdata, package_code, pay_from)

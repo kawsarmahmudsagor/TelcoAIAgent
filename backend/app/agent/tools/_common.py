@@ -3,7 +3,7 @@ loop, and fixed guidance text for every BssError (no codes or exception text
 ever reach the customer)."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from enum import Enum
 from typing import TypeVar
 from uuid import UUID
@@ -119,6 +119,20 @@ async def run_read(
 
     try:
         return await run_db(call)
+    except SubscriberNotFound:
+        return NOT_LOGGED_IN
+    except BssError as err:
+        raise ToolError(error_text(err)) from err
+
+
+async def run_write(userdata: SessionUserdata, call: Callable[[], Awaitable[str]]) -> str:
+    """The shared body of a write tool: guests (and a subscriber id with no
+    row) get the log-in guidance, any other BssError becomes a ToolError with
+    fixed guidance."""
+    if subscriber_id_or_none(userdata) is None:
+        return NOT_LOGGED_IN
+    try:
+        return await call()
     except SubscriberNotFound:
         return NOT_LOGGED_IN
     except BssError as err:

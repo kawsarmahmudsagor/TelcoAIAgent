@@ -45,6 +45,9 @@ class SessionUserdata:
     # drafted (types from app.agent.actions).
     pending_action: "PendingAction | None" = None
     pending_case: "CaseDraft | None" = None
+    # The last write confirmed: (action_id, code, result text), so a second
+    # confirmer of it (voice and card at once) gets the same answer.
+    done_action: tuple[UUID, str, str] | None = None
     # Offers shown by the last list, in order, so "the second one" resolves.
     offer_ids: list[UUID] = field(default_factory=list)
     # When each OTP was issued this session (throttle).

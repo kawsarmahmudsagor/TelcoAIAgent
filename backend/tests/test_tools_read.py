@@ -208,8 +208,9 @@ def test_transactions_cap_detail(bss_world):
 
 
 def test_registry_lists_read_tools():
-    names = {t.info.name for t in registry.telco_tools()}
-    assert {
+    names = [t.info.name for t in registry.telco_tools()]
+    assert len(names) == 16
+    assert set(names) == {
         "get_account_summary",
         "get_usage_breakdown",
         "explain_deductions",
@@ -219,4 +220,11 @@ def test_registry_lists_read_tools():
         "get_offers_and_points",
         "get_case_status",
         "check_network_status",
-    } <= names
+        "purchase_package",
+        "start_recharge",
+        "redeem_reward",
+        "verify_otp",
+        "cancel_pending_action",
+        "create_support_case",
+        "request_human_agent",
+    }
