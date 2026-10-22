@@ -62,3 +62,44 @@ def test_explain_deductions_only_charged_items(bss_world, db):
     out = accounts.explain_deductions(db, s.id)
     assert len(out) == 1
     assert out[0].amount == Decimal("2.50") and out[0].source == "usage"
+
+
+def _incidents(db, district):
+    from app.bss import network
+
+    return db.scalars(network.active_incidents_query(district, datetime.now(timezone.utc))).all()
+
+
+def test_active_incidents_rule(bss_world, db):
+    from app.models.telco import IncidentStatus
+
+    now = datetime.now(timezone.utc)
+    d = "PYTESTVILLE"
+    bss_world.incident(district=d, area="PYTEST resolved", status=IncidentStatus.resolved)
+    bss_world.incident(district=d, area="PYTEST ended", ends_at=now - timedelta(minutes=1))
+    bss_world.incident(
+        district=d, area="PYTEST tomorrow", status=IncidentStatus.scheduled,
+        starts_at=now + timedelta(hours=20),
+    )
+    bss_world.incident(
+        district=d, area="PYTEST later", status=IncidentStatus.scheduled,
+        starts_at=now + timedelta(days=2),
+    )
+    bss_world.incident(district=d, area="PYTEST ongoing")
+    areas = {i.area for i in _incidents(db, "pytestville")}
+    assert areas == {"PYTEST tomorrow", "PYTEST ongoing"}
+
+
+def test_summary_district_incidents_uses_same_rule(bss_world, db):
+    from app.models.telco import IncidentStatus
+
+    s = bss_world.subscriber(district="PYTESTVILLE")
+    bss_world.incident(
+        district="pytestville", status=IncidentStatus.scheduled,
+        starts_at=datetime.now(timezone.utc) + timedelta(hours=20),
+    )
+    bss_world.incident(
+        district="PYTESTVILLE", area="PYTEST later",
+        starts_at=datetime.now(timezone.utc) + timedelta(days=3),
+    )
+    assert accounts.get_account_summary(db, s.id).district_incidents == 1
