@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.agent.prompt_defaults import KNOWLEDGE_SCOPE_DEFAULT, KNOWLEDGE_SCOPE_RAG
+from app.agent.snapshot import GUEST_SNAPSHOT
 from app.agent.tools._datetime import agency_tz
 from app.agent.userdata import SessionUserdata
 from app.services import agent_config_service
@@ -64,4 +65,6 @@ def build_system_prompt(
         # A custom prompt without {knowledge_scope} still gets the scope rules.
         identity = f"{identity.rstrip()}\n\n{knowledge_scope}\n"
 
-    return f"{identity}\n{_INBOUND_TASK}\n{_BROWSER_END_NOTE}"
+    # The session's account snapshot (app.agent.snapshot), never editable.
+    snapshot = userdata.snapshot_text or GUEST_SNAPSHOT
+    return f"{identity}\n{snapshot}\n\n{_INBOUND_TASK}\n{_BROWSER_END_NOTE}"

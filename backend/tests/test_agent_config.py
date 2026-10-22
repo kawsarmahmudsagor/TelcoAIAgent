@@ -380,7 +380,7 @@ def test_invalid_stored_template_falls_back_to_default():
     prompt = build_system_prompt(_inbound(), config)
     assert "Hi {secret" not in prompt
     assert "SCOPE" in prompt
-    values = {"agent_name": "A", "operator_name": "B"}
+    values = {"agent_name": "A", "operator_name": "B", "customer_name": ""}
     assert render_template("greeting_inbound", config.greeting_inbound, values) == (
         DEFAULT_GREETING_INBOUND.format(**values)
     )

@@ -30,9 +30,12 @@ from app.agent import (
 )
 from app.agent.persona import build_system_prompt
 from app.agent.prompt_defaults import (
+    DEFAULT_GREETING_NUDGE,
     SALAM_INSTRUCTION,
+    SPOKEN_GREETINGS_GUEST,
     SPOKEN_GREETINGS_INBOUND,
 )
+from app.agent.snapshot import load_session_context
 from app.agent.speech_numbers import speak_numbers_as_words
 from app.agent.speech_words import respell_words_for_speech
 from app.agent.tools.search_knowledge_base import build_search_knowledge_base
@@ -619,27 +622,54 @@ def _greet(
     re-introduces itself), not the turn gate, not typed text -- and the session
     takes no input until it has played out (_mark_greeting_done). `room` is the
     browser room to flag the end of the greeting on; None for a phone call.
-    `on_done` runs once input has reopened."""
+    `on_done` runs once input has reopened.
+
+    A session opened from a notification (userdata.nudge_text) greets through
+    the LLM with greeting_nudge; otherwise the default inbound greeting is a
+    canned line, named or guest, and a customised one goes through the LLM."""
     values = {
         "agent_name": config.assistant_name,
         "operator_name": config.operator_name,
-        "customer_name": "",
+        "customer_name": userdata.customer_name or "",
     }
-    field, template, lines = (
-        "greeting_inbound",
-        config.greeting_inbound,
-        SPOKEN_GREETINGS_INBOUND,
-    )
-    if template is None:
+    if userdata.nudge_text:
+        instructions = render_template(
+            "greeting_nudge",
+            config.greeting_nudge or DEFAULT_GREETING_NUDGE,
+            {**values, "nudge_text": userdata.nudge_text},
+        )
+    elif config.greeting_inbound is None:
         # Still the default: speak a canned line, no LLM round trip.
+        lines = SPOKEN_GREETINGS_INBOUND if userdata.customer_name else SPOKEN_GREETINGS_GUEST
+        instructions = None
         handle = session.say(random.choice(lines).format(**values), allow_interruptions=False)
     else:
-        # A dashboard greeting still opens with the Salam.
-        instructions = f"{render_template(field, template, values)}\n{SALAM_INSTRUCTION}"
-        handle = session.generate_reply(instructions=instructions, allow_interruptions=False)
+        instructions = render_template("greeting_inbound", config.greeting_inbound, values)
+    if instructions is not None:
+        # An LLM greeting still opens with the Salam.
+        handle = session.generate_reply(
+            instructions=f"{instructions}\n{SALAM_INSTRUCTION}", allow_interruptions=False
+        )
     # generate_reply()'s SpeechHandle silently swallows failures unless awaited and
     # checked (per its own docstring) -- log any greeting failure instead of losing it.
     asyncio.ensure_future(_await_greeting(handle, session, agent, userdata, room, on_done))
+
+
+async def _load_customer(userdata: SessionUserdata) -> None:
+    """Fills in the account snapshot, first name and nudge wording. An unknown
+    subscriber, or any failure loading them, leaves a guest session."""
+    try:
+        ctx = await asyncio.to_thread(
+            load_session_context, userdata.subscriber_id, userdata.nudge_id
+        )
+    except Exception:
+        logger.exception("could not load the session context; continuing as a guest")
+        userdata.subscriber_id = None
+        return
+    userdata.subscriber_id = ctx.subscriber_id
+    userdata.customer_name = ctx.customer_name
+    userdata.snapshot_text = ctx.snapshot
+    userdata.nudge_text = ctx.nudge_text
 
 
 async def entrypoint(ctx: JobContext) -> None:
@@ -652,6 +682,7 @@ async def entrypoint(ctx: JobContext) -> None:
     caller = await ctx.wait_for_participant()
 
     userdata = session_context.resolve(ctx.job.metadata, ctx.room)
+    await _load_customer(userdata)
     config = _load_agent_config()
     el_keys = await _elevenlabs_keys_for_call(settings, config)
     gate_key = _gate_api_key(settings, config)

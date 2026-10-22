@@ -13,8 +13,10 @@ from test_gated_session import FakeRoom, FakeSession, _complete, _controller, _h
 from app.agent import entrypoint, gated_agent
 from app.agent.gated_agent import IGNORED_TEXT_TOPIC, USER_TURN_TOPIC
 from app.agent.prompt_defaults import (
+    DEFAULT_GREETING_NUDGE,
     SALAM,
     SALAM_INSTRUCTION,
+    SPOKEN_GREETINGS_GUEST,
     SPOKEN_GREETINGS_INBOUND,
 )
 from app.agent.userdata import Channel, SessionUserdata
@@ -271,10 +273,14 @@ async def _greet(
     room=None,
     closed=False,
     config=None,
+    customer_name=None,
+    nudge_text=None,
 ):
     session = GreetSession(handle, closed=closed)
     agent = GreetAgent()
-    userdata = SessionUserdata(channel=Channel.inbound_chat, room=room)
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat, room=room, customer_name=customer_name, nudge_text=nudge_text
+    )
     config = config or agent_config_service.resolve(None)
     entrypoint._greet(session, agent, userdata, config, room=room)
     for _ in range(10):
@@ -340,7 +346,7 @@ def test_phone_call_greeting_unlocks_without_a_room_and_survives_a_closed_sessio
     asyncio.run(go())
 
 
-def test_a_default_greeting_is_a_canned_line_without_the_llm(monkeypatch):
+def _pick_last(monkeypatch) -> list[tuple]:
     pools: list[tuple] = []
 
     def choice(lines):
@@ -348,15 +354,71 @@ def test_a_default_greeting_is_a_canned_line_without_the_llm(monkeypatch):
         return lines[-1]
 
     monkeypatch.setattr(entrypoint.random, "choice", choice)
+    return pools
+
+
+def _values(customer_name: str = "") -> dict[str, str]:
+    config = agent_config_service.resolve(None)
+    return {
+        "agent_name": config.assistant_name,
+        "operator_name": config.operator_name,
+        "customer_name": customer_name,
+    }
+
+
+def test_a_default_greeting_is_a_canned_line_without_the_llm(monkeypatch):
+    pools = _pick_last(monkeypatch)
 
     async def go():
-        config = agent_config_service.resolve(None)
-        values = {"agent_name": config.assistant_name, "operator_name": config.operator_name, "customer_name": ""}
-        session, _, _ = await _greet(FakeHandle())
+        session, _, _ = await _greet(FakeHandle(), customer_name="Samiha")
         (reply,) = session.replies
         assert reply["kind"] == "say"
         assert pools == [SPOKEN_GREETINGS_INBOUND]
-        assert reply["text"] == SPOKEN_GREETINGS_INBOUND[-1].format(**values)
+        assert reply["text"] == SPOKEN_GREETINGS_INBOUND[-1].format(**_values("Samiha"))
+        assert "Samiha" in reply["text"]
+
+    asyncio.run(go())
+
+
+def test_guest_greeting_is_canned_without_name(monkeypatch):
+    pools = _pick_last(monkeypatch)
+
+    async def go():
+        session, _, _ = await _greet(FakeHandle())
+        (reply,) = session.replies
+        assert reply["kind"] == "say"
+        assert pools == [SPOKEN_GREETINGS_GUEST]
+        assert reply["text"] == SPOKEN_GREETINGS_GUEST[-1].format(**_values())
+        assert "{" not in reply["text"]
+
+    asyncio.run(go())
+
+
+def test_greeting_uses_nudge_when_present():
+    async def go():
+        nudge = "their PYTEST Net 15 pack expires on Friday 24 October"
+        session, _, _ = await _greet(FakeHandle(), customer_name="Samiha", nudge_text=nudge)
+        (reply,) = session.replies
+        assert reply["kind"] == "generate_reply"
+        assert reply["allow_interruptions"] is False
+        assert nudge in reply["instructions"]
+        assert "Samiha" in reply["instructions"]
+        assert reply["instructions"].endswith(SALAM_INSTRUCTION)
+        expected = DEFAULT_GREETING_NUDGE.format(**_values("Samiha"), nudge_text=nudge)
+        assert reply["instructions"].startswith(expected)
+
+    asyncio.run(go())
+
+
+def test_a_customised_nudge_greeting_is_used():
+    async def go():
+        config = agent_config_service.resolve(None)
+        config.greeting_nudge = "Tell {customer_name}: {nudge_text}"
+        session, _, _ = await _greet(
+            FakeHandle(), config=config, customer_name="Rafi", nudge_text="low balance"
+        )
+        (reply,) = session.replies
+        assert reply["instructions"] == f"Tell Rafi: low balance\n{SALAM_INSTRUCTION}"
 
     asyncio.run(go())
 
@@ -376,4 +438,5 @@ def test_a_customised_greeting_still_goes_through_the_llm():
 
 
 def test_every_canned_greeting_opens_with_the_salam():
-    assert all(line.startswith(SALAM) for line in SPOKEN_GREETINGS_INBOUND)
+    for line in (*SPOKEN_GREETINGS_INBOUND, *SPOKEN_GREETINGS_GUEST):
+        assert line.startswith(SALAM)

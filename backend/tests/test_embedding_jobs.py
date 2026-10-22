@@ -140,7 +140,7 @@ def test_text_source_becomes_ready_and_searchable(rag_fakes):
     config.rag_source_ids = [str(source_id)]
     answer = search_text("what are the office hours", config)
     assert "Saturday to Thursday" in answer and "<untrusted_context" in answer
-    assert "head office" in answer
+    assert "hotline" in answer
 
     # Deleting the source removes its vectors and it's no longer searchable.
     db = SessionLocal()

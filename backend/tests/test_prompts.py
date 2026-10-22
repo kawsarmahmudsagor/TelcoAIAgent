@@ -1,8 +1,19 @@
 import inspect
 
+import re
+
 from app.agent import entrypoint
 from app.agent.persona import build_system_prompt, knowledge_scope_text
-from app.agent.prompt_defaults import DEFAULT_IDENTITY_AND_RULES
+from app.agent.prompt_defaults import (
+    DEFAULT_GREETING_INBOUND,
+    DEFAULT_GREETING_NUDGE,
+    DEFAULT_IDENTITY_AND_RULES,
+    IDLE_CHECKIN_LINES,
+    IDLE_GOODBYE_LINES,
+    SPOKEN_GREETINGS_GUEST,
+    SPOKEN_GREETINGS_INBOUND,
+)
+from app.agent.snapshot import GUEST_SNAPSHOT
 from app.agent.tools.search_knowledge_base import (
     NOTHING_FOUND,
     UNAVAILABLE,
@@ -10,6 +21,7 @@ from app.agent.tools.search_knowledge_base import (
 )
 from app.agent.userdata import Channel, SessionUserdata
 from app.services import agent_config_service
+from word_checks import real_estate_words
 
 
 def _prompts(*, rag: bool = False) -> dict[str, str]:
@@ -70,7 +82,7 @@ def test_rag_scope_replaces_default_scope():
         assert knowledge_scope_text(config, True) in prompt
 
 
-def test_unknown_details_point_to_the_agency_contact():
+def test_unknown_details_point_to_the_operator_hotline():
     config = agent_config_service.resolve(None)
     for rag in (False, True):
         for name, prompt in _prompts(rag=rag).items():
@@ -80,21 +92,17 @@ def test_unknown_details_point_to_the_agency_contact():
             assert "never say you don't have the information" in flat, (name, rag)
             assert "আমাদের কাছে নেই" in flat, (name, rag)
             assert "নিশ্চিত করে বলতে পারছি না" in flat, (name, rag)
-            assert "fixed or negotiable" in flat, (name, rag)
-            # Citing the listing is allowed; only commercial questions reach the head office.
-            assert "Questions on schools, transport" not in flat, (name, rag)
-            assert "{agency_" not in prompt, (name, rag)
+            assert "hotline" in flat, (name, rag)
+            assert "{operator_" not in prompt, (name, rag)
             assert "say you don't have that detail" not in flat, (name, rag)
-            assert "no data on" not in flat, (name, rag)
 
 
 def test_knowledge_base_tool_points_to_the_team_not_a_shrug():
     tool = build_search_knowledge_base(agent_config_service.resolve(None))
     description = _description(tool)
     assert "don't have that detail" not in description
-    assert "head office" in description
-    assert "head office" in NOTHING_FOUND
-    assert "head office" in UNAVAILABLE
+    for text in (description, NOTHING_FOUND, UNAVAILABLE):
+        assert "hotline" in text
 
 
 def test_polite_examples_drop_janaben():
@@ -123,3 +131,71 @@ def _description(tool) -> str:
 
 def _flat(prompt: str) -> str:
     return " ".join(prompt.split())
+
+
+# ---- telco copy ----
+
+
+def _kb_description() -> str:
+    return _description(build_search_knowledge_base(agent_config_service.resolve(None)))
+
+
+def test_prompts_have_no_real_estate_words():
+    texts = {
+        "identity": DEFAULT_IDENTITY_AND_RULES,
+        "greeting_inbound": DEFAULT_GREETING_INBOUND,
+        "greeting_nudge": DEFAULT_GREETING_NUDGE,
+        "kb_tool": _kb_description(),
+        "kb_nothing": NOTHING_FOUND,
+        "kb_unavailable": UNAVAILABLE,
+        **{f"spoken_{i}": line for i, line in enumerate(SPOKEN_GREETINGS_INBOUND)},
+        **{f"guest_{i}": line for i, line in enumerate(SPOKEN_GREETINGS_GUEST)},
+        **{f"idle_{k}": v for k, v in {**IDLE_CHECKIN_LINES, **IDLE_GOODBYE_LINES}.items()},
+    }
+    for rag in (False, True):
+        for name, prompt in _prompts(rag=rag).items():
+            texts[f"{name}_rag_{rag}"] = prompt
+    for name, text in texts.items():
+        assert real_estate_words(text) == [], name
+
+
+def test_prompt_mentions_only_registered_tools():
+    for rag in (False, True):
+        config = agent_config_service.resolve(None)
+        config.rag_enabled = rag
+        userdata = SessionUserdata(channel=Channel.inbound_chat, room=None)
+        registered = {
+            getattr(t, "id", None) or getattr(t, "__name__", "")
+            for t in entrypoint._session_tools(userdata, config)
+        }
+        prompt = build_system_prompt(userdata, config, rag_tool_available=rag)
+        # Every snake_case word in the prompt is a tool name.
+        mentioned = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", prompt))
+        assert mentioned <= registered, (rag, mentioned - registered)
+        assert {"request_human_agent", "verify_otp", "end_call"} <= mentioned, rag
+
+
+def test_prompt_rules_present():
+    userdata = SessionUserdata(channel=Channel.inbound_chat, room=None)
+    userdata.snapshot_text = "ACCOUNT SNAPSHOT pytest-marker"
+    config = agent_config_service.resolve(None)
+    prompt = build_system_prompt(userdata, config)
+    flat = _flat(prompt)
+    assert "never repeat" in flat.lower()
+    assert "PIN" in prompt
+    assert "request_human_agent" in prompt
+    assert "ACCOUNT SNAPSHOT pytest-marker" in prompt
+    # After the identity block, before the task and closing notes.
+    assert prompt.index("pytest-marker") > prompt.index("CONFIDENTIALITY")
+    assert prompt.index("pytest-marker") < prompt.index("ENDING THE CALL")
+    # A session without a snapshot is a guest.
+    guest = build_system_prompt(SessionUserdata(channel=Channel.inbound_chat, room=None), config)
+    assert GUEST_SNAPSHOT in guest
+
+
+def test_greeting_defaults_fit_the_operator():
+    assert "{nudge_text}" in DEFAULT_GREETING_NUDGE
+    assert len(SPOKEN_GREETINGS_INBOUND) == 3
+    assert all("{customer_name}" in line for line in SPOKEN_GREETINGS_INBOUND)
+    assert len(SPOKEN_GREETINGS_GUEST) == 2
+    assert not any("{customer_name}" in line for line in SPOKEN_GREETINGS_GUEST)

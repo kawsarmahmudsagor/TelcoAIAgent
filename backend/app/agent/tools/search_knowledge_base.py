@@ -1,10 +1,11 @@
 """search_knowledge_base: the agent's lookup into the knowledge base (FAQ
-documents, crawled pages, text notes, the property listings source).
+documents, crawled pages, text notes): the operator's policies, terms, data
+rollover, SIM replacement, roaming and coverage notes.
 
 Built per session from the resolved agent config (top-k, threshold, model,
 source scope), and only registered when the knowledge base is enabled -- see
-app.agent.entrypoint._session_tools. Listing searches stay with
-search_apartments, which queries the database directly.
+app.agent.entrypoint._session_tools. Account facts come from the telco tools,
+which read the BSS directly.
 """
 
 from __future__ import annotations
@@ -25,12 +26,12 @@ from app.services.agent_config_service import ResolvedAgentConfig
 logger = logging.getLogger("agent.tools.search_knowledge_base")
 
 TOOL_NAME = "search_knowledge_base"
-# Never "we don't have that" (see _CONTACT_FALLBACK): agency matters go to the
-# team, a property detail gets the listing-doesn't-mention-it exit instead.
+# Never "we don't have that" (see _CONTACT_FALLBACK): an unanswered policy
+# question goes to the operator's hotline; their own account goes to the tools.
 _POINT_TO_TEAM = (
-    "Don't tell the customer you don't have it or can't say. For an agency matter (policies, "
-    "fees, documents, legal steps) point them to the team's phone and head office; for a "
-    "detail about a property, follow WHEN YOU DON'T HAVE A DETAIL instead."
+    "Don't tell the customer you don't have it or can't say. For a policy, terms, charge or "
+    "procedure question, point them to the hotline number or the experience centre address; "
+    "for anything about their own account, use the account tools instead."
 )
 NOTHING_FOUND = "No relevant information was found in the knowledge base. " + _POINT_TO_TEAM
 UNAVAILABLE = "The knowledge base isn't available right now. " + _POINT_TO_TEAM
@@ -79,15 +80,15 @@ def build_search_knowledge_base(config: ResolvedAgentConfig):
 
     @function_tool(name=TOOL_NAME)
     async def search_knowledge_base(ctx: RunContext[SessionUserdata], query: str) -> str:
-        """Look up facts about the agency in its knowledge base: policies, fees,
-        processes, documents, FAQs and areas covered. Use it before answering any
-        question about the agency itself, not for details of a property. Only the
-        facts it returns may be stated; if it finds nothing, don't say you lack
-        it: point the customer to the team's phone and head office.
+        """Look up the operator's policies and FAQs in its knowledge base: terms,
+        charges, data rollover, SIM replacement, roaming and coverage. Use it
+        before answering any such question, not for the customer's own account.
+        Only the facts it returns may be stated; if it finds nothing, don't say
+        you lack it: point the customer to the hotline.
 
         Args:
             query: The customer's question, rephrased as a short standalone search
-                query (e.g. "service charge for rentals").
+                query (e.g. "data rollover rules").
         """
         try:
             return await asyncio.to_thread(search_text, query, config)
