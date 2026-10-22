@@ -332,7 +332,7 @@ def _build_llm(settings: Settings, config: ResolvedAgentConfig) -> llm_utils.LLM
     # thinking_budget here is silently ignored with a warning on every LLM call.
     # "low" keeps latency down for a voice agent that has no use for deep
     # reasoning, while still keeping the thought_signature bookkeeping
-    # (livekit/agents#4767) intact for function-call turns like search_apartments.
+    # (livekit/agents#4767) intact for function-call turns like the account and usage tools.
     return google.LLM(
         api_key=config.api_key,
         model=config.llm_model,

@@ -1,15 +1,15 @@
-# Real Estate Voice Agent
+# Telco Voice Agent
 
-One AI real-estate-agent persona, two channels, sharing the same backend/tools:
+A Bangla-first voice/chat assistant for a fictional Bangladesh mobile operator, one agent
+persona sharing the same backend/tools across channels:
 
-1. **Inbound**: a customer talks/chats with the agent via the web frontend to shortlist
-   apartments and book a viewing.
-2. **Outbound**: a scheduler dispatches the agent to "cold call" a client from the dummy CRM
-   at a scheduled time — either ringing the dashboard's browser, or ringing a real phone
-   through Twilio when the call has a dial number (see "Real phone calls" below).
+1. **Inbound**: a customer talks/chats with the agent via the web frontend to check their
+   account, buy packages, recharge, redeem rewards and raise support cases.
+2. **Outbound**: a scheduler dispatches the agent to call a subscriber at a scheduled time —
+   either ringing the dashboard's browser, or ringing a real phone through Twilio when the
+   call has a dial number (see "Real phone calls" below).
 
-All CRM/property data is dummy data. Bookings and meeting invites are logged to Postgres
-via a mock email service, not sent for real yet.
+All subscriber/BSS data is dummy data. Nothing is sent to real subscribers.
 
 ## Stack
 
@@ -18,6 +18,31 @@ via a mock email service, not sent for real yet.
   (`STT_TTS_PROVIDER` in `.env`), Gemini LLM, Silero VAD
 - Scheduler: APScheduler, polling a `call_schedule` table
 - Frontend: Next.js/TypeScript, based on LiveKit's `agent-starter-react`
+
+## Agent
+
+The agent has 16 tools (`backend/app/agent/tools/`), acting on the verified demo subscriber:
+
+- **Account and usage**: `get_account_summary`, `get_usage_breakdown`, `explain_deductions`,
+  `lookup_transactions`
+- **Packages**: `search_packages`, `recommend_packages`, `purchase_package`
+- **Recharge and rewards**: `start_recharge`, `get_offers_and_points`, `redeem_reward`
+- **Support and network**: `create_support_case`, `get_case_status`, `check_network_status`,
+  `request_human_agent`
+- **OTP**: `verify_otp`, `cancel_pending_action`
+
+A 17th tool, `search_knowledge_base`, is added only when the knowledge base has content.
+
+**Demo OTP flow** (purchase, recharge and redeem): the tool returns a preview and an
+on-screen confirm card appears; a 6-digit code is shown in an on-screen SMS toast; the
+customer says or types the code, or enters it on the confirm card; the action then executes.
+The code expires after 3 minutes and allows 3 attempts.
+
+**Operator identity** comes from `OPERATOR_NAME`, `OPERATOR_PHONE` and `OPERATOR_ADDRESS`
+in `.env` (defaults in `.env.example`); the prompts and greetings use them.
+
+**Knowledge base**: `uv run python -m app.data.seed_all` seeds six telco docs for
+`search_knowledge_base`; embedding them needs an OpenRouter key (`OPENROUTER_API_KEY`).
 
 ## Local dev setup
 
