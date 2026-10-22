@@ -165,3 +165,18 @@ def test_postpaid_balance_purchase_adds_to_bill(bss_world, db):
     )
     assert out.postpaid_due == Decimal("169")
     assert out.main_balance == Decimal("0")
+
+
+def test_purchase_replay_from_other_subscriber_rejected(bss_world, db):
+    from app.models.telco import Balance
+
+    a = bss_world.subscriber(main_balance=Decimal("500"))
+    b = bss_world.subscriber(main_balance=Decimal("500"))
+    p = bss_world.package(price=Decimal("69"))
+    req = _req(p)
+    aid = _confirm(db, a, req)
+    packages.execute_purchase(db, a.id, req, action_id=aid, actor=Actor.agent)
+    with pytest.raises(OtpInvalid):
+        packages.execute_purchase(db, b.id, req, action_id=aid, actor=Actor.agent)
+    db.expire_all()
+    assert db.get(Balance, b.id).main_balance == Decimal("500")

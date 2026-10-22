@@ -5,7 +5,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.telco import PackageKind, PlanType, TxnChannel, UsageKind
+from app.models.telco import (
+    PackageKind,
+    PlanType,
+    TxnChannel,
+    TxnStatus,
+    TxnType,
+    UsageKind,
+)
 
 
 class _Base(BaseModel):
@@ -101,3 +108,37 @@ class PurchaseResult(_Base):
     expires_at: datetime
     main_balance: Decimal
     postpaid_due: Decimal
+
+
+class RechargeRequest(_Base):
+    amount: Decimal
+    channel: TxnChannel
+    target_msisdn: str | None = None
+
+
+class RechargeQuote(_Base):
+    request: RechargeRequest
+    target_msisdn: str
+    is_own_number: bool
+    cashback: Decimal
+
+
+class RechargeResult(_Base):
+    transaction_ref: str
+    amount: Decimal
+    cashback: Decimal
+    target_msisdn: str
+    main_balance: Decimal | None
+    postpaid_due: Decimal | None
+
+
+class TransactionView(_Base):
+    ref: str
+    type: TxnType
+    channel: TxnChannel
+    amount: Decimal
+    target_msisdn: str | None
+    status: TxnStatus
+    failure_reason: str | None
+    created_at: datetime
+    package_name: str | None

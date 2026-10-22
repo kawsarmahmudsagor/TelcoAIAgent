@@ -130,6 +130,14 @@ class BssWorld:
         self.db.commit()
         return i
 
+    def offer(self, **o: Any) -> Offer:
+        fields: dict[str, Any] = dict(title=f"PYTEST Offer {_next()}")
+        fields.update(o)
+        row = Offer(**fields)
+        self.db.add(row)
+        self.db.commit()
+        return row
+
     def cleanup(self) -> None:
         self.db.rollback()
         self.db.execute(delete(Subscriber).where(Subscriber.msisdn.like("01999%")))

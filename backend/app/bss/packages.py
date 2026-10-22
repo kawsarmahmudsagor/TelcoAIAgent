@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.bss import audit, otp
+from app.bss import _txn, audit, otp
 from app.bss.clock import utc_now
 from app.bss.errors import InsufficientBalance, PackageNotFound, SubscriberNotFound
 from app.bss.types import (
@@ -32,7 +32,6 @@ from app.models.telco import (
     TxnType,
     UsageEvent,
     UsageKind,
-    txn_ref_seq,
 )
 
 _PAY_CHANNELS = {TxnChannel.balance, TxnChannel.bkash, TxnChannel.nagad, TxnChannel.card}
@@ -156,10 +155,6 @@ def preview_purchase(
     )
 
 
-def _existing(db: Session, action_id: uuid.UUID) -> Transaction | None:
-    return db.scalar(select(Transaction).where(Transaction.action_id == action_id))
-
-
 def _result_from(db: Session, txn: Transaction) -> PurchaseResult:
     pkg = db.get(Package, txn.package_id)
     bal = db.get(Balance, txn.subscriber_id)
@@ -184,7 +179,7 @@ def execute_purchase(
     now: datetime | None = None,
 ) -> PurchaseResult:
     now = now or utc_now()
-    existing = _existing(db, action_id)
+    existing = _txn.existing(db, subscriber_id, action_id)
     if existing is not None:
         return _result_from(db, existing)
     otp.require_verified(
@@ -212,7 +207,7 @@ def execute_purchase(
             expires_at=expires_at,
         )
     )
-    ref = f"TXN-{db.scalar(txn_ref_seq.next_value())}"
+    ref = _txn.next_ref(db)
     db.add(
         Transaction(
             ref=ref,
@@ -238,7 +233,7 @@ def execute_purchase(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = _existing(db, action_id)
+        existing = _txn.existing(db, subscriber_id, action_id)
         if existing is None:
             raise
         return _result_from(db, existing)
