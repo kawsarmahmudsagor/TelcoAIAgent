@@ -227,12 +227,7 @@ const FALLBACK_REVEAL_MS = 60_000;
 // listing a reply is about, sent while that reply is generated.
 const LISTING_FOCUS_TOPIC = 'listing-focus';
 
-export type PropertyType =
-  | 'apartment'
-  | 'studio'
-  | 'duplex'
-  | 'commercial'
-  | 'plot';
+export type PropertyType = 'apartment' | 'studio' | 'duplex' | 'commercial' | 'plot';
 
 export interface ApartmentCardData {
   id: string;

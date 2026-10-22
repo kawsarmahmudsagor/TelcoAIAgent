@@ -6,11 +6,20 @@ import { type NextRequest, NextResponse } from 'next/server';
 const API_ON_OTHER_ORIGIN = Boolean(process.env.NEXT_PUBLIC_FASTAPI_URL);
 
 /**
- * Sends signed-out visitors to /login before the dashboard shell renders. It only checks that a
- * session cookie exists (the JWT is verified by FastAPI on every API call), so it is a fast-path
- * redirect, not the security boundary.
+ * Fast-path redirects for signed-out visitors, before any shell renders:
+ * - /dashboard/* without the admin `session` cookie goes to /login (with `next`);
+ * - /portal/* without the customer `portal_session` cookie goes to the persona picker at /.
+ * Only the cookie's presence is checked (FastAPI verifies the JWT on every API call), so this is
+ * not the security boundary.
  */
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith('/portal')) {
+    if (API_ON_OTHER_ORIGIN || request.cookies.has('portal_session')) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
   if (API_ON_OTHER_ORIGIN || request.cookies.has('session')) {
     return NextResponse.next();
   }
@@ -20,5 +29,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/portal/:path*'],
 };

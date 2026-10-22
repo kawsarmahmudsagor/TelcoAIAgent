@@ -1,5 +1,5 @@
-import { networkInterfaces } from 'node:os';
 import type { NextConfig } from 'next';
+import { networkInterfaces } from 'node:os';
 
 function localIPv4Addresses(): string[] {
   return Object.values(networkInterfaces())
@@ -23,15 +23,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [...localIPv4Addresses(), '*.trycloudflare.com'],
   // Hide the "N" dev-tools badge Next.js floats over the page in dev mode.
   devIndicators: false,
-  // Seeded listing photos. Admin-entered image URLs can be on any host, so
-  // those render with a plain <img> instead of next/image.
-  images: {
-    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
-  },
   async redirects() {
     return [
-      // The public site lives at /home; the agent is the chat bubble on every (site) page.
-      { source: '/', destination: '/home', permanent: false },
       // Voice settings moved into the Chatbot page's "Model & voice" tab.
       {
         source: '/dashboard/voice',

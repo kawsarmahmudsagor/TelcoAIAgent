@@ -66,18 +66,40 @@ const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || '/backend';
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Machine-readable reason when FastAPI sends `{"detail": {"code", "message"}}` (e.g. `otp_invalid`). */
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
-// FastAPI errors are `{"detail": "..."}` -- show that message, not the raw JSON.
-async function errorMessage(res: Response): Promise<string> {
+/** An ApiError built from a failed response: its message, plus `detail.code` when present. */
+async function apiError(res: Response): Promise<ApiError> {
   const body = await res.text();
+  return new ApiError(res.status, errorMessage(res, body), errorCode(body));
+}
+
+function errorCode(body: string): string | undefined {
+  try {
+    const { detail } = JSON.parse(body);
+    if (detail && typeof detail === 'object' && typeof detail.code === 'string') return detail.code;
+  } catch {
+    // not JSON
+  }
+  return undefined;
+}
+
+// FastAPI errors are `{"detail": "..."}` or `{"detail": {"code", "message"}}` -- show that
+// message, not the raw JSON.
+function errorMessage(res: Response, body: string): string {
   try {
     const { detail } = JSON.parse(body);
     if (typeof detail === 'string') return detail;
+    if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+      return detail.message;
+    }
     // Pydantic validation: [{loc: ['body', 'field'], msg: '...'}, ...]
     if (Array.isArray(detail) && detail.length > 0) {
       return detail
@@ -99,7 +121,7 @@ async function errorMessage(res: Response): Promise<string> {
   return body || res.statusText;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${FASTAPI_URL}${path}`, {
     ...init,
     credentials: 'include',
@@ -110,7 +132,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
-    throw new ApiError(res.status, await errorMessage(res));
+    throw await apiError(res);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -119,7 +141,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 type QueryValue = string | number | boolean | null | undefined;
 
 /** `?a=1&b=x` from the defined, non-null params ('' when none). */
-function qs(params?: object): string {
+export function qs(params?: object): string {
   if (!params) return '';
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params) as [string, QueryValue][]) {
@@ -138,7 +160,7 @@ async function postForBlob(path: string, body: unknown): Promise<Blob> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new ApiError(res.status, await errorMessage(res));
+    throw await apiError(res);
   }
   return res.blob();
 }

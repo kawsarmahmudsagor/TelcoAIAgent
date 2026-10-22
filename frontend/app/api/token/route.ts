@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-server-sdk';
 import { RoomAgentDispatch, RoomConfiguration } from '@livekit/protocol';
+import { buildDispatchMetadata } from '@/lib/agent-dispatch';
 
 type ConnectionDetails = {
   serverUrl: string;
@@ -14,13 +15,16 @@ const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
 // Must match app.config.Settings.agent_name on the backend — this is how the
-// real estate agent worker gets explicitly dispatched into rooms this route creates.
+// telco agent worker gets explicitly dispatched into rooms this route creates.
 const AGENT_NAME = process.env.AGENT_NAME || 'telco_agent';
+// Server-to-server: this route asks FastAPI directly who the portal cookie belongs to.
+const FASTAPI_INTERNAL_URL = process.env.FASTAPI_INTERNAL_URL || 'http://localhost:8011';
+const PORTAL_COOKIE = 'portal_session';
 
 // don't cache the results
 export const revalidate = 0;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   // make an exception for the vercel preview environment
   if (process.env.NODE_ENV !== 'development' && process.env.IS_VERCEL_PREVIEW !== 'true') {
     throw new Error(
@@ -54,27 +58,25 @@ export async function POST(req: Request) {
     const existingRoomName =
       typeof body?.room_name === 'string' && body.room_name.trim() ? body.room_name.trim() : null;
 
-    // Otherwise, explicitly dispatch the real estate agent into a fresh room,
-    // tagged as an inbound customer chat session (as opposed to the outbound
-    // cold-call sessions the scheduler dispatches separately). The browser's
-    // anonymous visitor id (sent as a participant attribute by useSession) goes
-    // into that metadata, so the agent stores it on the conversation row and
-    // the chat widget can list this browser's earlier conversations. It is
-    // deliberately not put into the token's own attributes.
-    if (!existingRoomName) {
-      const visitorId = parseVisitorId(body?.participant_attributes?.visitor_id);
-      const metadata = JSON.stringify({
-        channel: 'inbound_chat',
-        ...(visitorId ? { visitor_id: visitorId } : {}),
-      });
-      if (roomConfig.agents.length === 0) {
-        roomConfig.agents.push(new RoomAgentDispatch({ agentName: AGENT_NAME, metadata }));
-      } else {
-        // useSession adds a bare dispatch when the app config names the agent.
-        for (const agent of roomConfig.agents) {
-          if (!agent.metadata) agent.metadata = metadata;
-        }
-      }
+    // Every agent dispatch carries server-built metadata, tagged as an inbound customer chat
+    // (as opposed to the outbound cold-call sessions the scheduler dispatches separately).
+    // Whatever metadata the client sent is discarded: `subscriber_id` comes only from the
+    // `portal_session` cookie as verified by FastAPI, so a guest (no cookie or a rejected one)
+    // gets none. The browser's anonymous visitor id (a participant attribute set by useSession)
+    // and the nudge being answered (`nudge_id`) are passed through only when they are UUIDs.
+    const subscriberId = await resolveSubscriberId(req);
+    const metadata = buildDispatchMetadata(subscriberId, {
+      visitorId: body?.participant_attributes?.visitor_id,
+      nudgeId: body?.nudge_id,
+    });
+    for (const agent of roomConfig.agents) {
+      // useSession adds a bare dispatch when the app config names the agent.
+      agent.metadata = metadata;
+    }
+    // A fresh room gets exactly one dispatch of the telco agent; an existing room already has
+    // its agent.
+    if (!existingRoomName && roomConfig.agents.length === 0) {
+      roomConfig.agents.push(new RoomAgentDispatch({ agentName: AGENT_NAME, metadata }));
     }
 
     // Generate participant token
@@ -108,11 +110,26 @@ export async function POST(req: Request) {
   }
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** The visitor id if it's a well-formed UUID, else null (the session just isn't listed). */
-function parseVisitorId(value: unknown): string | null {
-  return typeof value === 'string' && UUID_PATTERN.test(value) ? value.toLowerCase() : null;
+/**
+ * The signed-in customer's subscriber id, verified by FastAPI's `GET /api/me` against the
+ * `portal_session` cookie; null (a guest) without the cookie or on any non-200 answer.
+ */
+async function resolveSubscriberId(req: NextRequest): Promise<string | null> {
+  const session = req.cookies.get(PORTAL_COOKIE)?.value;
+  if (!session) return null;
+  try {
+    const res = await fetch(`${FASTAPI_INTERNAL_URL}/api/me`, {
+      headers: { cookie: `${PORTAL_COOKIE}=${session}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.status !== 200) return null;
+    const me = (await res.json()) as { subscriber_id?: unknown };
+    return typeof me.subscriber_id === 'string' ? me.subscriber_id : null;
+  } catch (error) {
+    console.error('Could not resolve the portal session; dispatching as a guest.', error);
+    return null;
+  }
 }
 
 function createParticipantToken(

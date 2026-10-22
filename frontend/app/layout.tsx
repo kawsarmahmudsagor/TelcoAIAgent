@@ -1,20 +1,14 @@
 import type { Metadata } from 'next';
-import { Bricolage_Grotesque, Public_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import { ThemeProvider } from '@/components/app/theme-provider';
 import { cn } from '@/lib/shadcn/utils';
 import '@/styles/globals.css';
 
-const publicSans = Public_Sans({
-  variable: '--font-public-sans',
+// The telco. face for everything: body, page titles and figures (spec 6.6).
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
-});
-
-// Display face for page titles, KPI figures and the brand panel (see DESIGN.md).
-const bricolage = Bricolage_Grotesque({
-  variable: '--font-bricolage',
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
 });
 
 const commitMono = localFont({
@@ -45,27 +39,22 @@ const commitMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'Horizon Realty', template: '%s · Horizon Realty' },
-  description: 'Find, rent and buy homes in Dhaka with Horizon Realty.',
+  title: { default: 'telco.', template: '%s · telco.' },
+  description: 'telco. self-care portal and AI assistant (demo)',
 };
 
 interface RootLayoutProps {
   children: React.ReactNode;
 }
 
-/** Shared by every route: fonts, tokens and the colour scheme. Each surface (the public site with
- * its chat bubble, the dashboard, the login page) brings its own chrome. */
+/** Shared by every route: fonts, tokens and the colour scheme. Each surface (the persona picker,
+ * the customer portal, the admin dashboard, the login page) brings its own chrome. */
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        publicSans.variable,
-        bricolage.variable,
-        commitMono.variable,
-        'scroll-smooth font-sans antialiased'
-      )}
+      className={cn(inter.variable, commitMono.variable, 'scroll-smooth font-sans antialiased')}
     >
       <body className="overflow-x-hidden">
         <ThemeProvider

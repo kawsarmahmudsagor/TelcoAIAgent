@@ -1,11 +1,6 @@
 import type { DateString, DateTimeString, UUID } from './common';
 
-export type PropertyType =
-  | 'apartment'
-  | 'studio'
-  | 'duplex'
-  | 'commercial'
-  | 'plot';
+export type PropertyType = 'apartment' | 'studio' | 'duplex' | 'commercial' | 'plot';
 
 export type ListingType = 'rent' | 'sale';
 

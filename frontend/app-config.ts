@@ -33,9 +33,9 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Horizon Realty',
-  pageTitle: 'Horizon Realty Voice Assistant',
-  pageDescription: 'Talk to our real estate assistant to find and book your next home',
+  companyName: 'telco.',
+  pageTitle: 'telco. assistant',
+  pageDescription: 'telco. self-care portal and AI assistant (demo)',
 
   supportsChatInput: true,
   supportsVideoInput: false,
@@ -43,9 +43,9 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   isPreConnectBufferEnabled: false,
 
   logo: '/logo.svg',
-  accent: '#1e3a5f',
+  accent: '#4f46e5',
   logoDark: '/logo-dark.svg',
-  accentDark: '#d9a544',
+  accentDark: '#756cf6',
   startButtonText: 'Start call',
 
   // optional: audio visualization configuration
@@ -65,7 +65,7 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   // audioVisualizerType: 'aura',
 
   // agent dispatch configuration
-  agentName: process.env.AGENT_NAME ?? undefined,
+  agentName: 'telco_agent',
 
   // LiveKit Cloud Sandbox configuration
   sandboxId: undefined,
