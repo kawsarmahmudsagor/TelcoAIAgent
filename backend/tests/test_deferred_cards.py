@@ -1,5 +1,5 @@
-"""The shortlist cards with quick replies on: held until the main model's first
-words, so they don't appear while a filler line plays."""
+"""Cards with quick replies on: held until the main model's first words, so they
+don't appear while a filler line plays (app.agent.cards)."""
 
 import asyncio
 from types import SimpleNamespace
@@ -7,9 +7,10 @@ from types import SimpleNamespace
 from livekit.agents import llm
 
 from app.agent.gated_agent import GatedAgent
-from app.agent.tools.search_apartments import flush_shortlist, send_shortlist
+from app.agent.cards import flush_pending_card, send_card
 from app.agent.userdata import SessionUserdata
 
+_TOPIC = "telco.test"
 _CARDS = '[{"id": "1"}]'
 
 
@@ -26,7 +27,6 @@ def _userdata(*, defer: bool) -> SessionUserdata:
     room = SimpleNamespace(local_participant=participant)
     userdata = SessionUserdata(channel="web", room=room)
     userdata.defer_cards = defer
-    userdata.focused_listing = 3
     return userdata
 
 
@@ -52,36 +52,42 @@ async def _run(userdata, *items):
     return seen
 
 
-def test_cards_go_at_once_without_quick_replies():
+def test_send_card_immediate_when_not_deferred():
     async def go():
         userdata = _userdata(defer=False)
-        await send_shortlist(userdata, _CARDS, True)
-        assert _sent(userdata) == [("apartment-shortlist", _CARDS)]
-        assert userdata.focused_listing is None
+        await send_card(userdata, _TOPIC, _CARDS)
+        assert _sent(userdata) == [(_TOPIC, _CARDS)]
+        assert userdata.pending_card is None
 
     asyncio.run(go())
 
 
-def test_cards_wait_when_deferred():
+def test_send_card_deferred_then_flushed():
     async def go():
         userdata = _userdata(defer=True)
-        await send_shortlist(userdata, _CARDS, True)
-        assert _sent(userdata) == [] and userdata.focused_listing == 3
-        assert await flush_shortlist(userdata) is True
-        assert _sent(userdata) == [("apartment-shortlist", _CARDS)]
-        assert userdata.focused_listing is None
-        assert await flush_shortlist(userdata) is False  # nothing left
+        await send_card(userdata, _TOPIC, _CARDS)
+        assert _sent(userdata) == [] and userdata.pending_card == (_TOPIC, _CARDS)
+        assert await flush_pending_card(userdata) is True
+        assert _sent(userdata) == [(_TOPIC, _CARDS)]
+        assert userdata.pending_card is None
 
     asyncio.run(go())
 
 
-def test_the_latest_search_replaces_a_held_one():
+def test_flush_without_pending_card_returns_false():
+    async def go():
+        assert await flush_pending_card(_userdata(defer=True)) is False
+
+    asyncio.run(go())
+
+
+def test_the_latest_card_replaces_a_held_one():
     async def go():
         userdata = _userdata(defer=True)
-        await send_shortlist(userdata, '["old"]', True)
-        await send_shortlist(userdata, '["new"]', True)
-        await flush_shortlist(userdata)
-        assert _sent(userdata) == [("apartment-shortlist", '["new"]')]
+        await send_card(userdata, _TOPIC, '["old"]')
+        await send_card(userdata, _TOPIC, '["new"]')
+        await flush_pending_card(userdata)
+        assert _sent(userdata) == [(_TOPIC, '["new"]')]
 
     asyncio.run(go())
 
@@ -89,7 +95,7 @@ def test_the_latest_search_replaces_a_held_one():
 def test_cards_come_with_the_first_words_of_the_main_reply():
     async def go():
         userdata = _userdata(defer=True)
-        await send_shortlist(userdata, _CARDS, True)
+        await send_card(userdata, _TOPIC, _CARDS)
         # a tool-call step has no words: nothing yet; the words bring the cards
         seen = await _run(userdata, _chunk(tool_call=True), _chunk(""), _chunk("এই"), _chunk(" যে"))
         assert seen == [0, 0, 1, 1]
@@ -101,7 +107,7 @@ def test_cards_come_with_the_first_words_of_the_main_reply():
 def test_a_last_step_without_words_still_shows_the_cards():
     async def go():
         userdata = _userdata(defer=True)
-        await send_shortlist(userdata, _CARDS, True)
+        await send_card(userdata, _TOPIC, _CARDS)
         await _run(userdata, _chunk(""))
         assert len(_sent(userdata)) == 1
 
@@ -111,8 +117,8 @@ def test_a_last_step_without_words_still_shows_the_cards():
 def test_a_tool_call_step_keeps_the_cards_for_the_next_step():
     async def go():
         userdata = _userdata(defer=True)
-        await send_shortlist(userdata, _CARDS, True)
+        await send_card(userdata, _TOPIC, _CARDS)
         await _run(userdata, _chunk(tool_call=True))
-        assert _sent(userdata) == [] and userdata.pending_cards == _CARDS
+        assert _sent(userdata) == [] and userdata.pending_card == (_TOPIC, _CARDS)
 
     asyncio.run(go())

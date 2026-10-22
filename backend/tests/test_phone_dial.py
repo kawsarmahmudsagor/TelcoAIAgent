@@ -14,7 +14,6 @@ from app.agent import phone_dial
 from app.agent.entrypoint import _session_tools
 from app.agent.persona import build_system_prompt
 from app.agent.tools.schedule_followup import schedule_followup
-from app.agent.tools.search_apartments import search_apartments
 from app.agent.userdata import Channel, SessionUserdata
 from app.config import get_settings
 from app.db.session import SessionLocal
@@ -265,21 +264,6 @@ def test_phone_persona_without_a_number_asks_for_one():
     prompt = build_system_prompt(_userdata(is_phone_call=True, phone=None))
     assert "ask for their mobile number, read it back digit by digit" in prompt
     assert "email" not in prompt.split("PHONE CALL")[1]
-
-
-def test_phone_search_skips_screen_shortlist():
-    sent: list = []
-
-    async def _send_text(*args, **kwargs):
-        sent.append(args)
-
-    room = SimpleNamespace(local_participant=SimpleNamespace(send_text=_send_text))
-    ctx = SimpleNamespace(userdata=_userdata(is_phone_call=True, room=room))
-    result = asyncio.run(search_apartments(ctx, location="Gulshan"))
-    assert sent == []
-    assert result.startswith("Found")  # seed data has Gulshan listings
-    assert "phone call" in result
-    assert "shown on the customer's screen" not in result
 
 
 def test_followup_of_phone_call_rings_same_phone():

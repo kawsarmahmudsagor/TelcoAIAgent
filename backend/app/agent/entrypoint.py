@@ -20,7 +20,6 @@ from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 from app.agent import (
     booking,
     browser_end_call,
-    client_history,
     elevenlabs_keys,
     gated_agent,
     idle_checkin,
@@ -32,7 +31,6 @@ from app.agent import (
     sentence_tokenizer,
     session_context,
     usage_log,
-    viewing_context,
 )
 from app.agent.persona import build_system_prompt
 from app.agent.prompt_defaults import (
@@ -149,18 +147,6 @@ async def _mark_call_schedule_completed(userdata: SessionUserdata) -> None:
         )
     finally:
         db.close()
-
-
-async def _save_last_search(userdata: SessionUserdata) -> None:
-    """Puts the session's last search onto the client file, so the next call
-    starts from what the customer wanted most recently."""
-    client_id = userdata.client_id or (userdata.client.id if userdata.client else None)
-    if client_id is None or not userdata.last_search:
-        return
-    try:
-        await asyncio.to_thread(client_history.save_last_search, client_id, userdata.last_search)
-    except Exception:
-        logger.exception("could not save the last search of client %s", client_id)
 
 
 def _mark_call_schedule_answered(call_schedule_id: uuid.UUID) -> bool:
@@ -735,26 +721,6 @@ def _linked_identity(session: AgentSession, caller_identity: str) -> Callable[[]
     return _identity
 
 
-def _follow_viewed_listing(
-    session: AgentSession,
-    agent: Agent,
-    userdata: SessionUserdata,
-    base_prompt: object,
-    room: rtc.Room,
-    caller_identity: str,
-) -> None:
-    """Browser sessions only: keeps the agent told which listing the customer
-    has open on the website (see viewing_context)."""
-    if not isinstance(base_prompt, str):
-        return
-    viewing_context.ViewingContext(
-        agent=agent,
-        userdata=userdata,
-        base_prompt=base_prompt,
-        linked_identity=_linked_identity(session, caller_identity),
-    ).attach(room)
-
-
 def _serve_booking_form(
     session: AgentSession,
     userdata: SessionUserdata,
@@ -819,7 +785,6 @@ async def _run_phone_call(
     async def _on_shutdown() -> None:
         if recorder is not None:
             await recorder.close()
-        await _save_last_search(userdata)
         await _mark_call_schedule_completed(userdata)
 
     ctx.add_shutdown_callback(_on_shutdown)
@@ -915,15 +880,11 @@ async def entrypoint(ctx: JobContext) -> None:
         ctx.shutdown(reason=str(e))
         return
 
-    # Stored before anything can update it: the viewing note is always added
-    # to this, since update_instructions replaces the whole prompt.
-    base_prompt = agent.instructions
     recorder: TranscriptRecorder | None = None
 
     async def _on_shutdown() -> None:
         if recorder is not None:
             await recorder.close()
-        await _save_last_search(userdata)
         await _mark_call_schedule_completed(userdata)
 
     ctx.add_shutdown_callback(_on_shutdown)
@@ -931,7 +892,6 @@ async def entrypoint(ctx: JobContext) -> None:
     # greeting has played out.
     await session.start(agent=agent, room=ctx.room, room_options=gated_agent.room_options())
     await _announce_user_turns(ctx.room)
-    _follow_viewed_listing(session, agent, userdata, base_prompt, ctx.room, caller.identity)
     if isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:
         agent.prefetcher.warm()
     recorder = await TranscriptRecorder.start(session, userdata, ctx.room.name)

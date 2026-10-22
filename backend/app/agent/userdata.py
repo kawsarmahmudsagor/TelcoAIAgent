@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -65,20 +65,11 @@ class SessionUserdata:
     # A real phone call (SIP) rather than the browser: no screen to show
     # listings on, and the agent must hang up itself.
     is_phone_call: bool = False
-    # Every listing shown this session, by a #number that stays fixed across
-    # searches -- update_booking_form resolves the LLM's listing_number through
-    # this, so the LLM never handles raw property UUIDs.
-    shown_listings: dict[int, dict] = field(default_factory=dict)
-    # The #number of the single listing card on screen (app.agent.listing_focus);
-    # None while a search's shortlist is what's shown.
-    focused_listing: int | None = None
-    # With quick replies on, a search's shortlist waits in pending_cards (the JSON
-    # sent to the browser) until the main model's reply starts speaking
-    # (app.agent.tools.search_apartments.flush_shortlist), not while a filler line
-    # or the lookup is still going.
+    # With quick replies on, a card waits in pending_card (topic, JSON) until the
+    # main model's reply starts speaking (app.agent.cards), not while a filler
+    # line or the lookup is still going.
     defer_cards: bool = False
-    pending_cards: str | None = None
-    pending_cards_clear_focus: bool = False
+    pending_card: tuple[str, str] | None = None
     # The lead this session is about: a cold call's client, or the client
     # a booking created/found during a browser chat. The transcript
     # recorder links the conversation to it on close.
@@ -89,13 +80,6 @@ class SessionUserdata:
     history: "ClientHistory | None" = None
     # This session's `conversations` row, once the transcript recorder made it.
     conversation_id: UUID | None = None
-    # Normalized criteria of this session's latest search_apartments call;
-    # written back onto the client file when the session ends.
-    last_search: dict | None = None
-    # The listing the customer has open on the website's property page (the
-    # browser sets it as a participant attribute; see viewing_context). None
-    # when they aren't on one.
-    viewing_property_id: UUID | None = None
     # Set once the first message (the greeting) has played out; until then the
     # session ignores the customer's voice and typed text (entrypoint._greet).
     greeting_done: bool = False

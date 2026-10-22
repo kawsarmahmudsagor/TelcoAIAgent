@@ -27,7 +27,6 @@ from datetime import datetime
 from livekit import rtc
 from livekit.agents.llm import ToolError
 
-from app.agent import client_history
 from app.agent.tools._datetime import check_viewing_hours, parse_future_local
 from app.agent.userdata import BookingState, Channel, PendingBooking, SessionUserdata
 from app.config import get_settings
@@ -105,17 +104,6 @@ def _settle_state(pending: PendingBooking) -> None:
         pending.state = BookingState.review if complete else BookingState.collecting
 
 
-def _viewed_listing(userdata: SessionUserdata) -> dict | None:
-    """The card of the listing the customer has open on the website, if any."""
-    if userdata.viewing_property_id is None:
-        return None
-    wanted = str(userdata.viewing_property_id)
-    for card in userdata.shown_listings.values():
-        if card["id"] == wanted:
-            return card
-    return None
-
-
 def merge(
     userdata: SessionUserdata,
     pending: PendingBooking,
@@ -128,16 +116,6 @@ def merge(
     """Validates and stores each given field; returns {field: error} for the
     ones it rejected (the valid ones are kept). Never raises for bad input."""
     errors: dict[str, str] = {}
-    if listing_number is not None:
-        card = userdata.shown_listings.get(listing_number)
-        if card is None:
-            errors["listing_number"] = (
-                f"No listing #{listing_number} has been shown in this conversation. Use a "
-                "#number from a search_apartments result, or search again."
-            )
-        else:
-            pending.property_id = uuid.UUID(card["id"])
-            pending.property_title = card["title"]
     if proposed_datetime is not None and proposed_datetime.strip():
         try:
             when = parse_future_local(proposed_datetime.strip(), "proposed_datetime")
@@ -157,11 +135,6 @@ def merge(
             pending.phone = normalize_bd_mobile(phone)
         except ValueError:
             errors["phone"] = PHONE_ERROR
-    if pending.property_id is None and not pending.property_title:
-        # "Book this one" on a property page.
-        if (card := _viewed_listing(userdata)) is not None:
-            pending.property_id = uuid.UUID(card["id"])
-            pending.property_title = card["title"]
     _settle_state(pending)
     pending.revision += 1
     return errors
@@ -367,13 +340,6 @@ async def confirm_booking(userdata: SessionUserdata, room: rtc.Room | None, reco
     pending.summary = summary
     pending.revision += 1
 
-    if userdata.last_search:
-        try:
-            await asyncio.to_thread(
-                client_history.save_last_search, client_id, userdata.last_search
-            )
-        except Exception:
-            logger.exception("could not save the last search of client %s", client_id)
     await push_state(userdata, room, pending)
     if recorder is not None:
         recorder.record_tool("book_appointment", {}, summary)

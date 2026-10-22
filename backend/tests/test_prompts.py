@@ -12,7 +12,6 @@ from app.agent.tools.search_knowledge_base import (
 )
 from app.agent.tools.book_appointment import book_appointment
 from app.agent.tools.booking_form import update_booking_form
-from app.agent.tools.search_apartments import search_apartments
 from app.agent import entrypoint
 from app.agent.userdata import Channel, SessionUserdata, UpcomingViewing
 from app.services import agent_config_service
@@ -193,13 +192,6 @@ def _description(tool) -> str:
     return " ".join(tool.info.description.split())
 
 
-def test_search_description_keeps_partial_criteria_rules():
-    description = _description(search_apartments)
-    for phrase in ("a location alone", "a budget alone", "a property type alone"):
-        assert phrase in description
-    assert "budget_max to None" in description
-
-
 def _params(tool) -> list[str]:
     return list(inspect.signature(tool._func).parameters)
 
@@ -233,14 +225,3 @@ def test_prompts_ask_for_name_and_phone_never_email():
         assert "call book_appointment (it takes no arguments)" in flat, name
         on_screen = "type their name and number into the form on screen" in flat
         assert on_screen == name.endswith("_web"), name
-
-
-def test_offers_guardrail_in_every_prompt():
-    from app.agent.tools import ALL_TOOLS, INBOUND_TOOLS
-    from app.agent.tools.search_offers import search_offers
-
-    assert search_offers in ALL_TOOLS and search_offers in INBOUND_TOOLS
-    for name, prompt in _prompts().items():
-        flat = _flat(prompt)
-        assert "call search_offers and quote only the offers it returns" in flat, name
-        assert "Never invent, combine, estimate or negotiate a discount" in flat, name

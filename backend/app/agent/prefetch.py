@@ -26,8 +26,6 @@ from livekit.agents.llm import ToolError
 
 from app.agent import turn_gate, turn_router
 from app.agent.tools import search_knowledge_base
-from app.agent.tools.search_apartments import run_search
-from app.agent.tools.search_offers import run_offers
 from app.agent.turn_judge import Exchange, Judgement
 from app.agent.turn_router import RouterArgs
 from app.config import Settings
@@ -35,20 +33,11 @@ from app.services.agent_config_service import ResolvedAgentConfig
 
 logger = logging.getLogger("agent.prefetch")
 
-_SEARCH_ARGS = {
-    "budget_min", "budget_max", "budget_min_strict", "budget_max_strict", "location",
-    "locations", "location_mode", "property_type", "listing_type", "bedrooms", "bathrooms",
-    "amenities", "more",
-}  # fmt: skip
-_OFFER_ARGS = {"listing_number", "location", "offer_type"}
 # Nobody waits on the warm-up, so it may take as long as a cold start needs.
 _WARM_TIMEOUT_S = 10.0
 
-# What each lookup runs; listings_with_offers is both, as the LLM did in run_2.
+# What each lookup runs.
 _LOOKUP_TOOLS = {
-    "listings": ("search_apartments",),
-    "listings_with_offers": ("search_apartments", "search_offers"),
-    "offers": ("search_offers",),
     "knowledge_base": (search_knowledge_base.TOOL_NAME,),
 }
 
@@ -121,13 +110,12 @@ class Prefetcher:
         if not key or key in self._extracting:
             return
         self.cancel()
-        userdata = self.session.userdata
         payload = turn_router.build_request(
             self.settings.router_model,
             history,
             text,
-            userdata.last_search,
-            len(userdata.shown_listings),
+            None,
+            0,
             self.settings.router_reasoning_effort,
         )
         self._extracting[key] = asyncio.ensure_future(
@@ -191,10 +179,6 @@ class Prefetcher:
         args = await self._extracting[key]
         if args is None:
             return []
-        if "offers" in (judgement.lookup or "") and args.search.get("listing_type") == "rent":
-            # Rentals with offers: the prompt's OFFERS rule has the LLM say first
-            # that rentals have none and ask before searching.
-            return []
 
         lookups = []
         for name in tools:
@@ -204,25 +188,12 @@ class Prefetcher:
         return lookups
 
     async def _run_tool(self, name: str, args: RouterArgs, text: str) -> Lookup | None:
-        userdata = self.session.userdata
         started = time.perf_counter()
         try:
-            if name == "search_apartments":
-                call_args = {k: v for k, v in args.search.items() if k in _SEARCH_ARGS}
-                if not call_args:
-                    # Nothing to search on: the LLM asks what they're after.
-                    return None
-                output = await run_search(userdata, **call_args)
-            elif name == "search_offers":
-                call_args = {k: v for k, v in args.offers.items() if k in _OFFER_ARGS}
-                if "location" not in call_args and "location" in args.search:
-                    call_args["location"] = args.search["location"]
-                output = await run_offers(userdata, **call_args)
-            else:
-                call_args = {"query": args.knowledge_query or text}
-                output = await asyncio.to_thread(
-                    search_knowledge_base.search_text, call_args["query"], self.config
-                )
+            call_args = {"query": args.knowledge_query or text}
+            output = await asyncio.to_thread(
+                search_knowledge_base.search_text, call_args["query"], self.config
+            )
         except ToolError as exc:
             # Arguments the tool refuses: the LLM gets to call it itself.
             logger.info("prefetch %s refused %s: %s", name, args, exc)

@@ -10,7 +10,6 @@ from app.agent import client_history
 from app.agent.persona import build_system_prompt
 from app.agent.tools.book_appointment import book_appointment
 from app.agent.tools.booking_form import update_booking_form
-from app.agent.tools.search_apartments import search_apartments
 from app.agent.transcript import create_conversation
 from app.agent.userdata import Channel, SessionUserdata
 from app.db.session import SessionLocal
@@ -213,61 +212,6 @@ def test_save_last_search_updates_file_and_drops_budget_of_other_scale():
 
 async def _no_op_send_text(*args, **kwargs):
     return None
-
-
-def test_search_records_normalized_criteria_on_the_session():
-    room = SimpleNamespace(local_participant=SimpleNamespace(send_text=_no_op_send_text))
-    ctx = SimpleNamespace(userdata=SessionUserdata(channel=Channel.inbound_chat, room=room))
-    asyncio.run(
-        search_apartments(ctx, location="Gulshan", listing_type="buy", property_type="flat")
-    )
-    assert ctx.userdata.last_search == {
-        "location": "Gulshan",
-        "listing_type": "sale",
-        "property_type": "apartment",
-    }
-
-
-def test_booking_in_an_open_chat_is_remembered_by_the_next_call():
-    """The chat that booked is still open (not closed, so not linked on close)
-    when the cold call to the same client starts."""
-    room = SimpleNamespace(local_participant=SimpleNamespace(send_text=_no_op_send_text))
-    chat = SessionUserdata(channel=Channel.inbound_chat, room=room)
-    chat.conversation_id = create_conversation(chat, f"{ROOM_PREFIX}{uuid.uuid4().hex[:8]}")
-    ctx = SimpleNamespace(userdata=chat)
-    asyncio.run(search_apartments(ctx, location="Uttara", listing_type="rent"))
-    title = ctx.userdata.shown_listings[1]["title"]
-    when = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0).isoformat()
-    asyncio.run(
-        update_booking_form(
-            ctx,
-            listing_number=1,
-            proposed_datetime=when,
-            full_name="Pytest History",
-            phone=unused_test_phone(),
-        )
-    )
-    try:
-        output = asyncio.run(book_appointment(ctx))
-    finally:
-        _created_clients.append(chat.client_id)
-    assert f"Booked a viewing of {title} for Pytest History" in output
-
-    client_id = chat.client_id
-    db = SessionLocal()
-    try:
-        assert conversation_repo.get(db, chat.conversation_id).client_id == client_id
-    finally:
-        db.close()
-    client = _client(client_id)
-    assert client.preferred_location == "Uttara"
-    assert client.rent_or_buy == RentOrBuy.rent
-
-    history = _history(client_id)
-    assert history.bookings[0].property_title == title
-    rendered = client_history.render(history)
-    assert f"- {title} (" in rendered
-    assert "(upcoming, proposed)" in rendered
 
 
 def test_a_moved_viewing_is_remembered_as_an_outcome():

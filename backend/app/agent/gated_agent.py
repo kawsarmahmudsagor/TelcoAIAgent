@@ -45,10 +45,9 @@ from livekit.agents.types import FlushSentinel
 from livekit.agents import room_io
 from livekit.agents.voice.events import UserInputTranscribedEvent
 
-from app.agent import listing_focus, quick_reply, turn_gate, turn_judge, voice_level
+from app.agent import cards, quick_reply, turn_gate, turn_judge, voice_level
 from app.agent.prefetch import Prefetcher
 from app.agent.quick_reply import QuickReplyRuntime
-from app.agent.tools.search_apartments import flush_shortlist
 from app.agent.turn_gate import GateState, Thresholds, Verdict
 from app.agent.turn_judge import BotState, Exchange, Judgement
 from app.config import Settings
@@ -155,7 +154,7 @@ def jev_judge(
             turn_gate.address_form(text),
             lookup=lookup,
             knowledge_base=knowledge_base,
-            search_context=_search_context(session.userdata) if lookup else None,
+            search_context=None,
         )
         started = time.perf_counter()
         judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s)
@@ -164,13 +163,6 @@ def jev_judge(
         return judgement
 
     return _judge
-
-
-def _search_context(userdata) -> str:
-    return turn_judge.search_context(
-        getattr(userdata, "last_search", None),
-        len(getattr(userdata, "shown_listings", None) or {}),
-    )
 
 
 def _recent_exchanges(session: AgentSession) -> list[Exchange]:
@@ -1027,11 +1019,8 @@ class GatedAgent(Agent):
     def llm_node(
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
     ) -> AsyncIterable[llm.ChatChunk | str]:
-        stream = listing_focus.focus_reply(
-            self._reply(chat_ctx, tools, model_settings), _userdata(self), chat_ctx
-        )
         message_id, text = _last_user(chat_ctx)
-        return self._gate.with_filler(stream, message_id, text)
+        return self._gate.with_filler(self._reply(chat_ctx, tools, model_settings), message_id, text)
 
     async def _reply(
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
@@ -1082,7 +1071,7 @@ class GatedAgent(Agent):
             yield chunk
 
     async def _cards_with_speech(self, stream: AsyncIterable[Any]) -> AsyncIterable[Any]:
-        """The main model's stream, with the search's shortlist cards put on the
+        """The main model's stream, with a pending card put on the
         customer's screen as its first words come (the reply starts being
         transcribed and spoken), not while a filler line or the lookup is still
         going (see userdata.defer_cards). A step that ends without words and
@@ -1090,14 +1079,14 @@ class GatedAgent(Agent):
         userdata = _userdata(self)
         tool_call = False
         async for chunk in stream:
-            if userdata is not None and userdata.pending_cards is not None:
+            if userdata is not None and userdata.pending_card is not None:
                 if _has_speech(chunk):
-                    await flush_shortlist(userdata)
+                    await cards.flush_pending_card(userdata)
             if isinstance(chunk, llm.ChatChunk) and chunk.delta is not None and chunk.delta.tool_calls:
                 tool_call = True
             yield chunk
-        if userdata is not None and not tool_call and userdata.pending_cards is not None:
-            await flush_shortlist(userdata)
+        if userdata is not None and not tool_call and userdata.pending_card is not None:
+            await cards.flush_pending_card(userdata)
 
     def _forward_metrics(self, fast_llm: llm.LLM) -> None:
         """The small model's metrics go where the main model's do (timing log,
@@ -1181,13 +1170,6 @@ class TurnPublishingAgent(Agent):
             new_message.content = [text]
         if text:
             await publish_user_turn(self._room, text)
-
-    def llm_node(
-        self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
-    ) -> AsyncIterable[llm.ChatChunk | str]:
-        return listing_focus.focus_reply(
-            Agent.default.llm_node(self, chat_ctx, tools, model_settings), _userdata(self), chat_ctx
-        )
 
 
 async def _text_input_cb(session: AgentSession, ev: room_io.TextInputEvent) -> None:
