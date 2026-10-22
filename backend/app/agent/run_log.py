@@ -1,0 +1,467 @@
+"""Per-session timing log, written for people to read: where every second of
+each turn went.
+
+One file per session, logs/run_<N>.log at the repo root (RUN_LOG_DIR overrides),
+N one higher than the highest run there. The file opens with a short legend,
+then groups lines by turn: each line is the clock time, seconds since the call
+started, the part of the pipeline, and what happened in plain words. Every
+agent reply ends with a timing summary of its turn, and the file ends with a
+summary of the call.
+
+The parts timed:
+- speech-to-text: the caller stops talking -> their words arrive as text
+- turn end: the caller stops talking -> the agent decides they've finished
+- Jev: each relevance check of the turn gate (gated sessions only)
+- AI model (LLM): each call; a reply that uses a tool takes two calls
+- tools: each tool's run time (its database / API work)
+- text-to-speech: time to first audio and synthesis time per sentence
+- preparing the reply: the agent starts thinking -> starts speaking
+- total response time: the caller stops talking -> the agent starts speaking
+
+Lines also go to the "agent.timing" logger, so they show in the worker console.
+"""
+
+import json
+import logging
+import re
+import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import TextIO
+
+from livekit.agents import AgentSession
+from livekit.agents.metrics import EOUMetrics, LLMMetrics, STTMetrics, TTSMetrics
+
+logger = logging.getLogger("agent.timing")
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_RUN_FILE = re.compile(r"^run_(\d+)\.log$")
+_MAX_TEXT = 120
+_PART_WIDTH = 15
+_LABEL_WIDTH = 30
+
+_LEGEND = """\
+How to read this file
+  Each line: clock time | seconds since the call started | part | what happened.
+  Lines are grouped by turn. Turn 0 is the agent's greeting; every turn after
+  that is one thing the caller said and the agent's reply to it. Each reply ends
+  with a timing summary of its turn; the call summary is at the bottom.
+
+  Speech-to-text    turns the caller's voice into text
+  Turn end          waits after the caller goes quiet, to be sure they've finished
+  Jev               checks the caller is talking to the agent, not someone else
+                    (score 0 to 1; higher = addressed to the agent)
+  Barge-in          speech over the agent: paused, resumed, interrupted or queued
+  Router            runs the lookup a turn needs (a search) before the AI model,
+                    so the model answers in one call instead of two
+  Quick reply       the small model: asked for a filler line or a fast answer,
+                    what it wrote or said, or why it was dropped or timed out
+  AI model          the LLM writing the reply (a tool call needs a second call)
+  Tool              the agent looking something up or booking (database / API)
+  Text-to-speech    turns the reply into voice
+  Total response    caller stops talking -> agent starts speaking
+"""
+
+_AGENT_STATES = {
+    "thinking": "is working on the reply",
+    "speaking": "started speaking",
+    "listening": "is listening",
+    "initializing": "is starting up",
+    "idle": "is idle",
+}
+
+
+def default_dir() -> Path:
+    return _REPO_ROOT / "logs"
+
+
+def _next_run_file(log_dir: Path) -> tuple[int, TextIO]:
+    log_dir.mkdir(parents=True, exist_ok=True)
+    taken = [int(m.group(1)) for p in log_dir.iterdir() if (m := _RUN_FILE.match(p.name))]
+    n = max(taken, default=0) + 1
+    while True:
+        try:
+            # "x": two sessions starting at once can't both claim the same number.
+            return n, open(log_dir / f"run_{n}.log", "x", encoding="utf-8", buffering=1)
+        except FileExistsError:
+            n += 1
+
+
+def _short(text: str) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= _MAX_TEXT else text[: _MAX_TEXT - 3] + "..."
+
+
+def _s(seconds: float | None) -> str:
+    return "n/a" if seconds is None else f"{seconds:.2f} s"
+
+
+def _duration(seconds: float) -> str:
+    minutes, secs = divmod(round(seconds), 60)
+    return f"{minutes} min {secs} s" if minutes else f"{secs} s"
+
+
+def _row(label: str, value: str) -> str:
+    return f"    {(label + ' ').ljust(_LABEL_WIDTH, '.')} {value}"
+
+
+@dataclass
+class _Turn:
+    index: int
+    user_text: str | None = None
+    typed: bool = False
+    # Spoken while the agent was busy and answered by the turn gate itself.
+    gate_reply: bool = False
+    heard: bool = False
+    user_stopped_at: float | None = None
+    thinking_at: float | None = None
+    speaking_at: float | None = None
+    stt_delay: float | None = None
+    stt_audio: float = 0.0
+    eou_delay: float | None = None
+    gate_delay: float | None = None
+    jev: list[tuple[float, float | None]] = field(default_factory=list)
+    # (Jev's lookup choice, its probability, tools run, seconds)
+    router: tuple[str | None, float | None, list[str], float] | None = None
+    llm: list[tuple[float, float]] = field(default_factory=list)
+    tools: list[tuple[str, float, str]] = field(default_factory=list)
+    tts: list[tuple[float, float, float]] = field(default_factory=list)
+    # Quick replies: the filler line (text, seconds after the caller stopped,
+    # seconds the turn gate waited for it) and whether the small model answered.
+    filler: tuple[str, float | None, float] | None = None
+    fast: str | None = None
+
+    @property
+    def empty(self) -> bool:
+        return self.user_text is None and not (self.llm or self.tts or self.tools)
+
+
+class RunLog:
+    def __init__(self, label: str, run_no: int, file: TextIO, clock=time.time) -> None:
+        self.label = label
+        self.run_no = run_no
+        self._file = file
+        self._clock = clock
+        self._started = clock()
+        self._turn = _Turn(0)  # turn 0 is the greeting
+        self._turn_count = 0
+        self._heading_for: int | None = None
+        self._tool_started: dict[str, tuple[str, float]] = {}
+        # Turns the turn gate answered itself (gated_agent.on_gate_reply).
+        self._gate_replies: list[str] = []
+        self._responses: list[float] = []
+        self._closed = False
+        started = datetime.fromtimestamp(self._started)
+        self._write(f"Run {run_no} -- session {label or '(unnamed)'}")
+        self._write(f"Started {started.strftime('%A %d %B %Y, %H:%M:%S')}")
+        self._write("")
+        self._write(_LEGEND)
+
+    @classmethod
+    def open(cls, label: str, log_dir: Path | None = None) -> "RunLog":
+        run_no, file = _next_run_file(log_dir or default_dir())
+        logger.info("[%s] timing log: %s", label, file.name)
+        return cls(label, run_no, file)
+
+    def attach(self, session: AgentSession) -> None:
+        session.on("user_state_changed", self._on_user_state)
+        session.on("agent_state_changed", self._on_agent_state)
+        session.on("user_input_transcribed", self._on_transcribed)
+        session.on("metrics_collected", self._on_metrics)
+        session.on("tool_execution_updated", self._on_tool)
+        session.on("conversation_item_added", self._on_item)
+        session.on("close", self._on_close)
+
+    # ---- output ----
+
+    def _write(self, line: str) -> None:
+        if self._closed:
+            return
+        try:
+            self._file.write(line + "\n")
+        except Exception:
+            logger.exception("could not write the timing log")
+        if line.strip():
+            logger.info("[%s] %s", self.label, line.rstrip())
+
+    def _event(self, part: str, text: str, at: float | None = None, heading: bool = True) -> None:
+        if heading and self._heading_for != self._turn.index:
+            self._heading_for = self._turn.index
+            title = "Greeting" if self._turn.index == 0 else "Caller speaks, agent replies"
+            self._write("")
+            self._write(f"=== Turn {self._turn.index}: {title} ".ljust(72, "="))
+        at = self._clock() if at is None else at
+        wall = datetime.fromtimestamp(at).strftime("%H:%M:%S.%f")[:-3]
+        self._write(f"{wall}  [+{at - self._started:7.2f} s]  {part:<{_PART_WIDTH}} {text}")
+
+    # ---- events ----
+
+    def _on_user_state(self, ev) -> None:
+        if ev.new_state == "speaking":
+            if self._turn.index > 0 and self._turn.empty:
+                if self._turn.heard:
+                    self._write("    (that speech was ignored: not addressed to the agent)")
+                # Speech the gate dropped never became a turn; start over.
+                self._turn = _Turn(self._turn.index)
+            self._event("Caller", "started talking", ev.created_at)
+        elif ev.old_state == "speaking":
+            self._turn.user_stopped_at = ev.created_at
+            self._event("Caller", "stopped talking", ev.created_at)
+
+    def _on_agent_state(self, ev) -> None:
+        if ev.new_state == "thinking" and self._turn.thinking_at is None:
+            self._turn.thinking_at = ev.created_at
+        elif ev.new_state == "speaking" and self._turn.speaking_at is None:
+            self._turn.speaking_at = ev.created_at
+        state = _AGENT_STATES.get(ev.new_state, f"is {ev.new_state}")
+        self._event("Agent", state, ev.created_at)
+
+    def _on_transcribed(self, ev) -> None:
+        if ev.is_final:
+            self._turn.heard = True
+            lang = f" (language: {ev.language})" if getattr(ev, "language", None) else ""
+            self._event("Speech-to-text", f'heard "{_short(ev.transcript)}"{lang}', ev.created_at)
+
+    def judged(self, text: str, bot_state: str, seconds: float, p: float | None) -> None:
+        """One Jev call of the turn gate (see gated_agent.jev_judge)."""
+        self._turn.jev.append((seconds, p))
+        if p is None:
+            result = "no answer (failed or timed out), so the speech is accepted"
+        else:
+            result = f"score {p:.2f} out of 1"
+        when = "" if bot_state == "listening" else f" (agent was {bot_state})"
+        self._event("Jev", f"checked in {_s(seconds)}{when}: {result}")
+
+    def routed(self, lookup: str | None, lookup_p: float | None, lookups, seconds: float) -> None:
+        """The turn router's decision for a turn (see app.agent.prefetch): the
+        lookups it ran before the AI model, if any."""
+        choice = "no answer" if lookup is None else lookup
+        if lookup_p is not None:
+            choice += f" ({lookup_p:.2f})"
+        for item in lookups:
+            self._turn.tools.append((f"{item.name} (prefetched)", item.seconds, "done"))
+            self._event(
+                "Tool",
+                f"{item.name} prefetched with {_args(json.dumps(item.args))}, "
+                f"finished after {_s(item.seconds)}",
+            )
+        names = [item.name for item in lookups]
+        self._turn.router = (lookup, lookup_p, names, seconds)
+        if names:
+            text = f"Jev chose {choice}; ran {', '.join(names)} in {_s(seconds)}"
+        else:
+            text = f"Jev chose {choice}; nothing prefetched ({_s(seconds)})"
+        self._event("Router", text)
+
+    def filler(self, text: str, started_after_s: float | None, waited_s: float) -> None:
+        """A quick-reply filler line was queued (see gated_agent). It is spoken
+        before the reply, so "Agent is speaking" below marks the filler's start;
+        TOTAL RESPONSE TIME still times the reply."""
+        self._turn.filler = (text, started_after_s, waited_s)
+        after = f" {_s(started_after_s)} after the caller stopped" if started_after_s is not None else ""
+        self._event("Quick reply", f'filler "{_short(text)}" queued{after} (turn gate waited {_s(waited_s)})')
+
+    def fast_route(self, handed_off: bool) -> None:
+        """The small model took the turn; handed_off = it passed it on to the
+        main model (the first AI model line is then the small model's)."""
+        self._turn.fast = "handed off to the main model" if handed_off else "answered"
+        self._event("Quick reply", f"small model {self._turn.fast}")
+
+    def quick(self, what: str) -> None:
+        """A step of the small model's work: a call made, its line or answer, a
+        timeout or a dropped line (see quick_reply.QuickReplyRuntime.on_event)."""
+        self._event("Quick reply", _short(what))
+
+    def barge_in(self, what: str) -> None:
+        """What the turn gate did with speech over the agent (see gated_agent):
+        paused it, let it resume (and why), interrupted it or queued an answer."""
+        self._event("Barge-in", what)
+
+    def gate_reply(self, text: str) -> None:
+        """The turn gate is answering `text` itself (a barge-in or a reply queued
+        behind the current one). Such a turn has no end-of-turn metrics, so
+        without this it would read as typed."""
+        self._gate_replies.append(text)
+
+    def _on_metrics(self, ev) -> None:
+        m = ev.metrics
+        if isinstance(m, STTMetrics):
+            self._turn.stt_audio += m.audio_duration
+            took = f", request took {_s(m.duration)}" if not m.streamed else ""
+            self._event(
+                "Speech-to-text", f"{_model(m)} got {m.audio_duration:.1f} s of audio{took}"
+            )
+        elif isinstance(m, EOUMetrics):
+            t = self._turn
+            t.eou_delay = m.end_of_utterance_delay
+            t.stt_delay = m.transcription_delay
+            t.gate_delay = m.on_user_turn_completed_delay
+            self._event(
+                "Turn end",
+                f"caller finished; text ready {_s(m.transcription_delay)} after they stopped, "
+                f"turn closed after {_s(m.end_of_utterance_delay)}, "
+                f"turn gate took {_s(m.on_user_turn_completed_delay)}",
+            )
+        elif isinstance(m, LLMMetrics):
+            self._turn.llm.append((m.ttft, m.duration))
+            state = " (cut off)" if m.cancelled else ""
+            self._event(
+                "AI model",
+                f"{_model(m)}: first words after {_s(m.ttft)}, done in {_s(m.duration)}{state} "
+                f"({m.prompt_tokens} tokens in, {m.completion_tokens} out)",
+            )
+        elif isinstance(m, TTSMetrics):
+            self._turn.tts.append((m.ttfb, m.duration, m.audio_duration))
+            state = " (cut off)" if m.cancelled else ""
+            self._event(
+                "Text-to-speech",
+                f"{_model(m)}: first audio after {_s(m.ttfb)}, made {m.audio_duration:.1f} s "
+                f"of speech in {_s(m.duration)} ({m.characters_count} characters){state}",
+            )
+
+    def _on_tool(self, ev) -> None:
+        update = ev.update
+        if update.type == "tool_call_started":
+            call = update.function_call
+            self._tool_started[call.call_id] = (call.name, ev.created_at)
+            self._event("Tool", f"{call.name} started with {_args(call.arguments)}", ev.created_at)
+        elif update.type == "tool_call_ended":
+            name, started = self._tool_started.pop(update.call_id, ("?", ev.created_at))
+            seconds = ev.created_at - started
+            self._turn.tools.append((name, seconds, update.status))
+            outcome = {"done": "finished", "error": "failed", "cancelled": "was cancelled"}.get(
+                update.status, update.status
+            )
+            self._event("Tool", f"{name} {outcome} after {_s(seconds)}", ev.created_at)
+
+    def _on_item(self, ev) -> None:
+        item = ev.item
+        if getattr(item, "type", None) != "message":
+            return
+        if item.role == "user":
+            t = self._turn
+            t.user_text = item.text_content or ""
+            t.gate_reply = t.user_text in self._gate_replies
+            if t.gate_reply:
+                self._gate_replies.remove(t.user_text)
+            t.typed = not t.gate_reply and t.user_stopped_at is None and t.stt_delay is None
+            how = "typed" if t.typed else "said"
+            note = (
+                "spoken while the agent was busy; the turn gate let it through"
+                if t.gate_reply
+                else "accepted, agent will reply"
+            )
+            self._event("Caller", f'{how} "{_short(t.user_text)}" ({note})')
+        elif item.role == "assistant":
+            cut = " (interrupted before finishing)" if item.interrupted else ""
+            self._event("Agent", f'said "{_short(item.text_content or "")}"{cut}')
+            self._summarize(item)
+            self._turn_count += 1
+            self._turn = _Turn(self._turn_count)
+
+    def _on_close(self, ev) -> None:
+        self._write("")
+        # participant_disconnected: the browser left (End call button, or end_call).
+        reason = getattr(getattr(ev, "reason", None), "value", None)
+        self._event("Call", f"ended ({reason})" if reason else "ended", heading=False)
+        self._write("")
+        self._write("=== Call summary ".ljust(72, "="))
+        self._write(_row("Call length", _duration(self._clock() - self._started)))
+        self._write(_row("Caller turns answered", str(len(self._responses))))
+        if self._responses:
+            r = self._responses
+            self._write(_row("Average response time", _s(sum(r) / len(r))))
+            self._write(_row("Fastest / slowest", f"{_s(min(r))} / {_s(max(r))}"))
+        self.close()
+
+    def close(self) -> None:
+        if not self._closed:
+            self._closed = True
+            self._file.close()
+
+    # ---- turn summary ----
+
+    def _summarize(self, item) -> None:
+        t = self._turn
+        metrics = item.metrics or {}
+        rows: list[tuple[str, str]] = []
+        if t.index == 0 and t.user_text is None:
+            rows.append(("Caller said", "(nothing, this is the greeting)"))
+        else:
+            rows.append((f"Caller {'typed' if t.typed else 'said'}", f'"{_short(t.user_text or "")}"'))
+        if not t.typed and not t.gate_reply and t.index > 0:
+            rows.append(("Speech-to-text", f"{_s(t.stt_delay)} after the caller stopped"))
+            rows.append(("Turn end wait", _s(t.eou_delay)))
+        if t.jev:
+            total = sum(s for s, _ in t.jev)
+            scores = ", ".join("no answer" if p is None else f"{p:.2f}" for _, p in t.jev)
+            rows.append(("Jev relevance check", f"{_s(total)} ({_count(len(t.jev), 'check')}, score {scores})"))
+        if t.gate_delay:
+            rows.append(("Turn gate (incl. Jev)", _s(t.gate_delay)))
+        if t.router is not None:
+            lookup, lookup_p, names, seconds = t.router
+            choice = f"{lookup} ({lookup_p:.2f})" if lookup_p is not None else str(lookup)
+            ran = f"ran {', '.join(names)}" if names else "nothing prefetched"
+            rows.append(("Router", f"{choice}, {ran}, {_s(seconds)}"))
+        if t.filler is not None:
+            text, after, waited = t.filler
+            when = f", started {_s(after)} after the caller stopped" if after is not None else ""
+            rows.append(("Quick reply filler", f'"{_short(text)}"{when}, turn gate waited {_s(waited)}'))
+        if t.fast is not None:
+            rows.append(("Quick reply answer", f"small model {t.fast}"))
+        if t.llm:
+            total = sum(d for _, d in t.llm)
+            calls = ", ".join(_s(d) for _, d in t.llm)
+            rows.append(
+                ("AI model (LLM)", f"{_s(total)} in {_count(len(t.llm), 'call')} [{calls}], "
+                                   f"first words after {_s(t.llm[0][0])}")
+            )
+        for name, seconds, status in t.tools:
+            failed = "" if status == "done" else f" ({status})"
+            rows.append((f"Tool: {name}", f"{_s(seconds)}{failed}"))
+        if t.tts:
+            synth = sum(d for _, d, _ in t.tts)
+            audio = sum(a for _, _, a in t.tts)
+            rows.append(
+                ("Text-to-speech", f"{_s(synth)} for {audio:.1f} s of speech, "
+                                   f"first audio after {_s(t.tts[0][0])}")
+            )
+        if t.thinking_at is not None and t.speaking_at is not None:
+            rows.append(("Preparing the reply", f"{_s(t.speaking_at - t.thinking_at)} (thinking until speaking)"))
+        response = metrics.get("e2e_latency")
+        if response is None and t.user_stopped_at is not None and t.speaking_at is not None:
+            response = t.speaking_at - t.user_stopped_at
+        if response is not None and t.index > 0:
+            self._responses.append(response)
+            rows.append(("TOTAL RESPONSE TIME", f"{_s(response)} (caller stopped talking until agent spoke)"))
+        elif t.typed and t.thinking_at is not None and t.speaking_at is not None:
+            rows.append(("TOTAL RESPONSE TIME", f"{_s(t.speaking_at - t.thinking_at)} (message sent until agent spoke)"))
+        elif t.gate_reply and t.thinking_at is not None and t.speaking_at is not None:
+            rows.append(("TOTAL RESPONSE TIME", f"{_s(t.speaking_at - t.thinking_at)} (turn gate let it through until agent spoke)"))
+
+        self._write("")
+        self._write(f"  Turn {t.index} timing")
+        for label, value in rows:
+            self._write(_row(label, value))
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
+def _model(m) -> str:
+    meta = getattr(m, "metadata", None)
+    if meta is not None and (meta.model_provider or meta.model_name):
+        return f"{meta.model_provider or '?'}/{meta.model_name or '?'}"
+    return m.label
+
+
+def _args(arguments: str | None) -> str:
+    try:
+        args = json.loads(arguments or "{}")
+    except (TypeError, ValueError):
+        return _short(arguments or "")
+    if isinstance(args, dict):
+        return _short(", ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in args.items()) or "no arguments")
+    return _short(json.dumps(args, ensure_ascii=False))

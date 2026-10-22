@@ -1,0 +1,66 @@
+# Self-contained LiveKit + Redis + livekit-sip stack for real phone calls.
+# run-local.bat starts this when TELEPHONY=1 (instead of its plain `livekit`
+# container); the backend, agent worker and frontend keep running natively and
+# reach LiveKit at ws://127.0.0.1:7880 as before. See docs/telephony-setup.md.
+#
+#   docker compose -f docker-compose.telephony.yml up -d
+#
+# Works on Docker Desktop (Windows) and plain Linux. Twilio must be able to
+# reach this machine's public IP on 5060 and 10000-10100/udp -- behind office
+# NAT the call may connect with no audio; then run this same file on a VPS.
+# LiveKit 7880, SIP 5060 and RTP 10000-10100 are the same as the RealEstateAgent
+# telephony stack's, so only one of the two can run at a time; whichever is up
+# serves both projects (each worker only joins rooms dispatched to its AGENT_NAME).
+#
+# Pin both images to a known-good pair once a test call works (set
+# LIVEKIT_SERVER_IMAGE / LIVEKIT_SIP_IMAGE in .env); `latest` can drift apart.
+name: telco-telephony
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Not published: only livekit and livekit-sip (same network) need it.
+
+  livekit:
+    image: ${LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:latest}
+    restart: unless-stopped
+    # --dev keeps local browser calls working exactly as with run-local.bat's
+    # plain container; --redis-host is what lets livekit-sip attach.
+    # --node-ip: the address browsers send media to; run-local.bat sets it to the
+    # current LAN IP.
+    command: --dev --bind 0.0.0.0 --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1} --redis-host redis:6379
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    depends_on:
+      - redis
+
+  livekit-sip:
+    image: ${LIVEKIT_SIP_IMAGE:-livekit/sip:latest}
+    restart: unless-stopped
+    environment:
+      # Built from .env at `up` time, so no secrets are committed.
+      SIP_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-devkey}
+        api_secret: ${LIVEKIT_API_SECRET:-secret}
+        ws_url: ws://livekit:7880
+        redis:
+          address: redis:6379
+        sip_port: 5060
+        rtp_port: 10000-10100
+        # Advertise this network's public IP to Twilio (found via STUN).
+        use_external_ip: true
+        logging:
+          level: debug
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      # Kept to 100 ports: Docker Desktop handles large UDP ranges badly.
+      - "10000-10100:10000-10100/udp"
+    depends_on:
+      - redis
+      - livekit

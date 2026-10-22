@@ -1,0 +1,38 @@
+Steps below follow Twilio's usual flow. The console layout changes often, so menu names may differ slightly.
+
+1. Sign up
+
+Go to https://www.twilio.com/try-twilio.
+Enter your name, email and password, then verify your email.
+Verify your phone number with an SMS code. Use the BD mobile the bot will call. It then becomes a Verified Caller ID, so trial calls to it work right away.
+The onboarding questions (product, use case, language) don't matter. Pick Voice and Python.
+2. Secure the account
+
+Turn on two-factor authentication: profile menu → User settings.
+The Account SID and Auth Token are on the console dashboard. The app doesn't need them, but keep them secret.
+3. Upgrade (needed for a clean demo)
+
+Admin / Billing → Upgrade account.
+Add a card and prepay credit (about $20).
+Card warning: many Bangladeshi cards block international online payments. Use a dual-currency/international card, or enable international transactions with your bank first.
+Twilio may ask for identity or business details. Fill them in truthfully.
+4. Buy one number
+
+Phone Numbers → Manage → Buy a number.
+Country: US (the simplest option). Capability: Voice.
+Some countries' numbers require a regulatory address or bundle. US numbers usually don't.
+5. Allow calls to Bangladesh
+
+Voice → Settings → Geo Permissions → tick Bangladesh → Save.
+If Bangladesh needs extra approval, submit the request there.
+6. Elastic SIP Trunk (part of Phase 0)
+
+Explore Products → Elastic SIP Trunking (pin it) → Create new trunk, name it realestate.
+Termination: set the URI, e.g. realestate.pstn.twilio.com. Add a Credential List with a username and strong password you choose.
+Numbers: attach the number from step 4.
+7. Values for .env
+
+TWILIO_PHONE_NUMBER: the number from step 4, in E.164 form (+1…).
+TWILIO_SIP_TERMINATION_URI: the URI from step 6.
+TWILIO_SIP_USERNAME and TWILIO_SIP_PASSWORD: the Credential List values.
+Steps 1–5 alone get you a working account, a number, and permission to call Bangladesh. Step 6 is needed only when you start Phase 0.

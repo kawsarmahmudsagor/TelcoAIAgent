@@ -1,0 +1,126 @@
+# Explicit project name: keeps containers/volumes apart from the RealEstateAgent
+# stack this was forked from. Host ports are shifted for the same reason, except
+# LiveKit (7880), which is shared: run only one project's full compose stack at a time.
+name: telco-ai-agent
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --dev --bind 0.0.0.0
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+
+  # Knowledge-base vector store. Every backend process talks to it over HTTP;
+  # keep the image's minor version equal to the chromadb pin in pyproject.toml.
+  chroma:
+    image: chromadb/chroma:1.5.9
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - chroma_data:/data
+
+  api:
+    build: ./backend
+    command: ["api"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LIVEKIT_URL: ws://livekit:7880
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+    ports:
+      - "8011:8000"
+    volumes:
+      - uploads:/app/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chroma:
+        condition: service_started
+
+  agent-worker:
+    build: ./backend
+    command: ["agent-worker"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LIVEKIT_URL: ws://livekit:7880
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+      chroma:
+        condition: service_started
+
+  scheduler:
+    build: ./backend
+    command: ["scheduler"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      LIVEKIT_URL: ws://livekit:7880
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+    # The embedding job runner reads the documents the api stored.
+    volumes:
+      - uploads:/app/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+      chroma:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      # The /backend rewrite is fixed at build time, so the API's in-network URL is a build arg.
+      args:
+        FASTAPI_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      # Runtime copy for the /home page's server-side listings fetch.
+      FASTAPI_INTERNAL_URL: http://api:8000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
+      - livekit
+
+volumes:
+  postgres_data:
+  chroma_data:
+  uploads:

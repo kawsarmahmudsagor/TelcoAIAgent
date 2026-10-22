@@ -1,0 +1,22 @@
+# Env
+.env
+.env.livekit
+.env.local
+
+# Python
+backend/storage/
+backend/.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.mypy_cache/
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
+
+# Misc
+logs/
+.DS_Store

@@ -1,0 +1,95 @@
+import uuid
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_admin, get_db
+from app.models.conversation import ConversationStatus
+from app.repositories import client_repo, conversation_repo
+from app.schemas.conversation import (
+    BulkDeleteRequest,
+    BulkDeleteResult,
+    ConversationDetail,
+    ConversationListItem,
+    ConversationMessageOut,
+    ConversationOut,
+    ConversationPage,
+)
+
+router = APIRouter(
+    prefix="/api/conversations",
+    tags=["conversations"],
+    dependencies=[Depends(get_current_admin)],
+)
+
+PREVIEW_MAX_CHARS = 140
+# app.agent.userdata.Channel values (not imported: it pulls in livekit.rtc).
+ChannelLiteral = Literal["inbound_chat", "outbound_coldcall"]
+
+
+def _preview(text: str | None) -> str | None:
+    if text is None or len(text) <= PREVIEW_MAX_CHARS:
+        return text
+    return text[: PREVIEW_MAX_CHARS - 1] + "…"
+
+
+def list_items(rows) -> list[ConversationListItem]:
+    return [
+        ConversationListItem(
+            **ConversationOut.model_validate(conversation).model_dump(),
+            client_name=client_name,
+            preview=_preview(first_message),
+        )
+        for conversation, client_name, first_message in rows
+    ]
+
+
+@router.get("", response_model=ConversationPage)
+def list_conversations(
+    db: Session = Depends(get_db),
+    channel: ChannelLiteral | None = None,
+    conversation_status: ConversationStatus | None = Query(default=None, alias="status"),
+    client_id: uuid.UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> ConversationPage:
+    rows, total = conversation_repo.list_page(
+        db,
+        channel=channel,
+        status=conversation_status.value if conversation_status else None,
+        client_id=client_id,
+        limit=limit,
+        offset=offset,
+    )
+    return ConversationPage(items=list_items(rows), total=total, limit=limit, offset=offset)
+
+
+@router.get("/{conversation_id}", response_model=ConversationDetail)
+def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)) -> ConversationDetail:
+    conversation = conversation_repo.get(db, conversation_id)
+    if conversation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    client = client_repo.get(db, conversation.client_id) if conversation.client_id else None
+    messages = conversation_repo.list_messages(db, conversation_id)
+    return ConversationDetail(
+        **ConversationOut.model_validate(conversation).model_dump(),
+        client_name=client.full_name if client else None,
+        client_email=client.email if client else None,
+        client_phone=client.phone if client else None,
+        messages=[ConversationMessageOut.model_validate(message) for message in messages],
+    )
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)) -> Response:
+    if not conversation_repo.delete_many(db, [conversation_id]):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/bulk-delete", response_model=BulkDeleteResult)
+def bulk_delete_conversations(
+    payload: BulkDeleteRequest, db: Session = Depends(get_db)
+) -> BulkDeleteResult:
+    return BulkDeleteResult(deleted=conversation_repo.delete_many(db, list(set(payload.ids))))

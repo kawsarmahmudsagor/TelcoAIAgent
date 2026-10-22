@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 28 200 200" role="img" aria-label="Horizon Realty agent">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="70%">
+      <stop offset="0" stop-color="#e4f1ed"/>
+      <stop offset="1" stop-color="#b9d6cf"/>
+    </radialGradient>
+    <linearGradient id="blazer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#235f56"/>
+      <stop offset="1" stop-color="#173f3a"/>
+    </linearGradient>
+    <clipPath id="disc">
+      <circle cx="120" cy="120" r="120"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#disc)">
+    <rect width="240" height="240" fill="url(#bg)"/>
+    <!-- horizon line behind the shoulders -->
+    <path d="M0 168 H240" stroke="#9cc4ba" stroke-width="2"/>
+
+    <!-- hair, back -->
+    <path d="M74 96 C70 48 170 44 166 96 C168 130 172 160 178 186 L62 186 C68 160 72 130 74 96 Z" fill="#2b1d17"/>
+
+    <!-- neck -->
+    <path d="M105 134 H135 V172 C128 178 112 178 105 172 Z" fill="#d79c78"/>
+
+    <!-- blazer -->
+    <path d="M22 240 C26 204 48 186 84 178 L120 172 L156 178 C192 186 214 204 218 240 Z" fill="url(#blazer)"/>
+    <!-- shirt -->
+    <path d="M99 176 L120 172 L141 176 L120 214 Z" fill="#f4f7f6"/>
+    <!-- lapels -->
+    <path d="M84 178 L99 176 L120 214 L104 240 L92 200 Z" fill="#14362f"/>
+    <path d="M156 178 L141 176 L120 214 L136 240 L148 200 Z" fill="#14362f"/>
+
+    <!-- brass lapel pin: the Horizon roof mark -->
+    <path d="M150 206 L157 200 L164 206" fill="none" stroke="#d9a544" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M149 210 H165" stroke="#d9a544" stroke-width="2.2" stroke-linecap="round"/>
+
+    <!-- face -->
+    <ellipse cx="120" cy="102" rx="37" ry="44" fill="#e9b48f"/>
+    <!-- ears -->
+    <ellipse cx="83" cy="106" rx="6" ry="9" fill="#e0a984"/>
+    <ellipse cx="157" cy="106" rx="6" ry="9" fill="#e0a984"/>
+
+    <!-- hair, front sweep -->
+    <path d="M82 98 C78 60 112 50 134 56 C152 61 162 76 160 98 C150 80 136 72 118 74 C102 76 90 86 82 98 Z" fill="#2b1d17"/>
+    <path d="M118 74 C104 80 96 90 92 104 C88 90 92 76 104 68 Z" fill="#3a2820"/>
+
+    <!-- brows -->
+    <path d="M99 90 Q107 86 114 89" fill="none" stroke="#2b1d17" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M126 89 Q133 86 141 90" fill="none" stroke="#2b1d17" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- eyes -->
+    <ellipse cx="107" cy="101" rx="4" ry="5" fill="#2a2320"/>
+    <ellipse cx="133" cy="101" rx="4" ry="5" fill="#2a2320"/>
+    <circle cx="108.4" cy="99.4" r="1.3" fill="#ffffff"/>
+    <circle cx="134.4" cy="99.4" r="1.3" fill="#ffffff"/>
+    <!-- nose -->
+    <path d="M120 106 Q117 115 121 117" fill="none" stroke="#c98a66" stroke-width="2" stroke-linecap="round"/>
+    <!-- cheeks -->
+    <circle cx="99" cy="118" r="7" fill="#e3877a" opacity="0.28"/>
+    <circle cx="141" cy="118" r="7" fill="#e3877a" opacity="0.28"/>
+    <!-- smile -->
+    <path d="M108 126 Q120 136 132 126" fill="none" stroke="#9c4b45" stroke-width="2.6" stroke-linecap="round"/>
+
+    <!-- headset -->
+    <path d="M80 104 C78 50 162 50 160 104" fill="none" stroke="#1d2b2a" stroke-width="5" stroke-linecap="round"/>
+    <rect x="74" y="96" width="12" height="22" rx="5" fill="#1d2b2a"/>
+    <rect x="154" y="96" width="12" height="22" rx="5" fill="#1d2b2a"/>
+    <path d="M160 116 C160 132 150 138 136 136" fill="none" stroke="#1d2b2a" stroke-width="3" stroke-linecap="round"/>
+    <rect x="128" y="132" width="10" height="7" rx="3.5" fill="#d9a544"/>
+  </g>
+</svg>

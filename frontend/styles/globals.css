@@ -1,0 +1,272 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@source "../node_modules/streamdown/dist/index.js";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Horizon Realty design tokens. See frontend/DESIGN.md for the reasoning and usage rules.
+ *
+ * Evergreen (primary) is the river-and-trees green of the brand; brass is the setting sun on the
+ * horizon and is used sparingly (logo sun, active nav marker, featured listings, chart series 2).
+ * Neutrals are cool concrete greys with a faint green cast, never cream.
+ */
+:root {
+  --radius: 0.5rem;
+  /* Fixed base for the rounded-* scale, so the widget's --radius override below can't shift it. */
+  --radius-base: 0.5rem;
+
+  --background: oklch(0.975 0.004 175);
+  --foreground: oklch(0.22 0.02 190);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.02 190);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 190);
+  --primary: oklch(0.42 0.07 185);
+  --primary-foreground: oklch(0.985 0.005 175);
+  --secondary: oklch(0.94 0.012 175);
+  --secondary-foreground: oklch(0.28 0.04 188);
+  --muted: oklch(0.955 0.006 175);
+  --muted-foreground: oklch(0.5 0.018 190);
+  --accent: oklch(0.94 0.018 178);
+  --accent-foreground: oklch(0.26 0.04 188);
+  --destructive: oklch(0.55 0.2 27);
+  --border: oklch(0.905 0.008 180);
+  --input: oklch(0.88 0.01 180);
+  --ring: oklch(0.55 0.08 185);
+  /* Default border colour for every element (`* { border-color }` below). */
+  --hairline: var(--border);
+
+  --brass: oklch(0.7 0.125 75);
+  --brass-foreground: oklch(0.25 0.04 70);
+  --success: oklch(0.5 0.12 152);
+  --warning: oklch(0.52 0.13 60);
+  --info: oklch(0.5 0.12 245);
+
+  --chart-1: oklch(0.5 0.085 185);
+  --chart-2: oklch(0.72 0.13 75);
+  --chart-3: oklch(0.56 0.12 245);
+  --chart-4: oklch(0.62 0.15 15);
+  --chart-5: oklch(0.62 0.03 220);
+
+  --sidebar: oklch(0.285 0.045 190);
+  --sidebar-foreground: oklch(0.95 0.01 175);
+  --sidebar-primary: oklch(0.8 0.12 78);
+  --sidebar-primary-foreground: oklch(0.24 0.04 70);
+  --sidebar-accent: oklch(1 0 0 / 9%);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.8 0.12 78);
+}
+
+.dark {
+  --background: oklch(0.17 0.012 200);
+  --foreground: oklch(0.95 0.008 175);
+  --card: oklch(0.205 0.014 198);
+  --card-foreground: oklch(0.95 0.008 175);
+  --popover: oklch(0.225 0.015 198);
+  --popover-foreground: oklch(0.95 0.008 175);
+  --primary: oklch(0.8 0.1 175);
+  --primary-foreground: oklch(0.2 0.03 190);
+  --secondary: oklch(0.26 0.018 195);
+  --secondary-foreground: oklch(0.95 0.008 175);
+  --muted: oklch(0.24 0.014 198);
+  --muted-foreground: oklch(0.72 0.015 185);
+  --accent: oklch(0.28 0.025 190);
+  --accent-foreground: oklch(0.96 0.008 175);
+  --destructive: oklch(0.7 0.17 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.7 0.09 178);
+
+  --brass: oklch(0.8 0.12 78);
+  --brass-foreground: oklch(0.22 0.04 70);
+  --success: oklch(0.78 0.14 152);
+  --warning: oklch(0.8 0.13 70);
+  --info: oklch(0.76 0.1 240);
+
+  --chart-1: oklch(0.78 0.11 175);
+  --chart-2: oklch(0.8 0.12 78);
+  --chart-3: oklch(0.72 0.12 245);
+  --chart-4: oklch(0.72 0.14 15);
+  --chart-5: oklch(0.68 0.03 220);
+
+  --sidebar: oklch(0.145 0.012 200);
+  --sidebar-foreground: oklch(0.93 0.01 175);
+  --sidebar-primary: oklch(0.8 0.12 78);
+  --sidebar-primary-foreground: oklch(0.22 0.04 70);
+  --sidebar-accent: oklch(1 0 0 / 7%);
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.8 0.12 78);
+}
+
+/*
+ * The voice/chat widget keeps the original neutral LiveKit starter look, in two places:
+ * - the standalone chat page (app/(widget)/chat) renders a `[data-surface='widget']` element, so
+ *   these rules apply to the whole document (portals included) only while it is on screen;
+ * - the chat bubble's panel is `[data-surface='widget-panel']`. It is mounted on every public
+ *   page, so its tokens are scoped to the panel itself and never recolour the page around it.
+ * `--primary` is deliberately absent: the widget's accent comes from getStyles() in lib/utils.ts.
+ */
+:root:has([data-surface='widget']),
+[data-surface='widget-panel'] {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --hairline: color-mix(in oklab, var(--foreground) 20%, transparent);
+}
+
+.dark:has([data-surface='widget']),
+.dark [data-surface='widget-panel'] {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+}
+
+/*
+ * The in-call screen (components/agents-ui/blocks/agent-session-view-01) is always dark: the
+ * section carries `.dark`, which restores the brand's evergreen/brass dark tokens over the widget
+ * overrides above. `.dark` doesn't set --hairline, so it is reset here for default borders. The
+ * /chat page's hover theme toggle would sit over End call, so it's hidden during a call, and its corner logo uses the dark-theme mark.
+ */
+[data-surface='call'] {
+  --hairline: var(--border);
+}
+
+:root:has([data-surface='call']) [data-theme-toggle-zone],
+:root:has([data-surface='call']) [data-logo='light'] {
+  display: none;
+}
+:root:has([data-surface='call']) [data-logo='dark'] {
+  display: block;
+}
+
+@theme inline {
+  --font-sans:
+    var(--font-public-sans), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-display: var(--font-bricolage), var(--font-public-sans), ui-sans-serif, system-ui;
+  --font-mono:
+    var(--font-commit-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+
+  --radius-sm: calc(var(--radius-base) - 4px);
+  --radius-md: calc(var(--radius-base) - 2px);
+  --radius-lg: var(--radius-base);
+  --radius-xl: calc(var(--radius-base) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brass: var(--brass);
+  --color-brass-foreground: var(--brass-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    border-color: var(--hairline);
+    @apply outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Tailwind v4 resets buttons to the default cursor; restore the hand on clickable controls. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'],
+  select:not(:disabled),
+  summary,
+  label[for],
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='range']:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+  /* The root layout sets `scroll-smooth` for in-page anchors (the landing page nav). */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* The welcome view's call mark: brass arcs pulsing off the sun (components/app/welcome-view.tsx). */
+@keyframes horizon-wave {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}

@@ -1,0 +1,19 @@
+# Self-hosted LiveKit server config for public deployment. Replaces the
+# `--dev` flag, which only binds local/private addresses and bakes in the
+# devkey/secret keypair — neither works once real remote clients need to
+# reach this server. Keys are supplied separately via the LIVEKIT_KEYS
+# environment variable (see docker-compose.yml), not hardcoded here.
+port: 7880
+# Required for real phone calls: livekit-sip coordinates with the server through
+# Redis (see docker-compose.telephony.vm.yml, which runs the `redis` service).
+redis:
+  address: redis:6379
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # Auto-detects this host's public IP via STUN and advertises it as a
+  # reachable ICE candidate -- required for WebRTC media to reach clients
+  # outside this machine's local network. Requires the matching UDP range
+  # (and tcp_port above) to be open on this host's firewall/security group.
+  use_external_ip: true

@@ -1,0 +1,49 @@
+# Full-stack deployment on a Linux VPS with real phone calls. Merge with the
+# base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.telephony.vm.yml up -d
+#
+# Switches livekit from --dev to livekit.yaml (public IP, real keys, Redis) and
+# adds Redis + livekit-sip. Set a strong LIVEKIT_API_KEY / LIVEKIT_API_SECRET
+# (secret >= 32 chars) in .env first: anyone holding them can place calls on
+# your Twilio account. Firewall: allow 7880/tcp, 7881/tcp, 50000-50100/udp
+# from anywhere; 5060 and 10000-10100/udp only from Twilio's IP ranges.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Loopback only: host-networked livekit-sip reaches it here; never public.
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  livekit:
+    image: ${LIVEKIT_SERVER_IMAGE:-livekit/livekit-server:latest}
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "50000-50100:50000-50100/udp"
+    depends_on:
+      - redis
+
+  livekit-sip:
+    image: ${LIVEKIT_SIP_IMAGE:-livekit/sip:latest}
+    restart: unless-stopped
+    # Host networking: SIP/RTP see the VPS's real public IP, no Docker NAT.
+    network_mode: host
+    environment:
+      SIP_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:6379
+        sip_port: 5060
+        rtp_port: 10000-10100
+        use_external_ip: true
+    depends_on:
+      - redis
+      - livekit
