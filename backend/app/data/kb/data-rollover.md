@@ -1,29 +1,29 @@
-# Data rollover rules
+# Data rollover: there is no rollover
 
 ## English
 
-Rollover means unused data from a pack is added to your next pack instead of being lost. It is a simple rule at telco.
+telco. packs do not have data rollover. Unused data, minutes and SMS from a pack are lost when that pack expires, and they are never added to a later pack.
 
-How it works: if you renew the same data pack (same pack code) before it expires, your leftover data from that pack rolls over and is added to the new pack. For example, if you have 2 GB left on D8-7D (8 GB Weekly) and buy D8-7D again before it expires, you get 8 GB plus the 2 GB left.
+How validity works: every pack keeps its own validity, counted from the moment it was activated. For example, 8 GB Weekly (D8-7D) lasts 7 days and 15 GB Monthly (D15-30D) lasts 30 days. If you buy the same pack again before it expires, the new purchase is a separate pack with its own fresh validity. Your leftover data stays in the old pack and expires with it. Nothing is merged or carried over.
 
-Limits: rollover happens once. Rolled-over data is used first and cannot be carried forward a second time. It applies only to data, not to minutes or SMS. Buying a different pack, or buying after the pack has already expired, does not roll anything over.
+Buying early or late: renewing a day early does not save your leftover data. Choose the pack size and validity that match how much you really use, so little is wasted.
 
-Not included: the 1 GB daily pack D1-1D and the bonus data from reward points (1 GB for 700 points, valid 3 days) do not roll over.
+Check your balance: you can see the remaining data, minutes, SMS and expiry date of each active pack in the app, or ask the assistant. The assistant can also show which packs fit your usage.
 
-Tip: check your remaining data and expiry date in the app or ask the assistant, and renew a day early to keep your leftover data.
+Bonus data: the 1 GB bonus from reward points (700 points, valid 3 days) is also a pack with its own expiry and does not roll over.
 
 More help: telco. hotline 01700121121.
 
 ## বাংলা
 
-রোলওভার মানে প্যাকের অব্যবহৃত ডাটা নষ্ট না হয়ে আপনার পরের প্যাকে যোগ হয়ে যাওয়া। telco.-এ নিয়মটি সহজ।
+telco.-এর প্যাকে ডাটা রোলওভার নেই। কোনো প্যাকের মেয়াদ শেষ হলে তার অব্যবহৃত ডাটা, মিনিট ও এসএমএস চলে যায়, পরের কোনো প্যাকে যোগ হয় না।
 
-কীভাবে কাজ করে: মেয়াদ শেষ হওয়ার আগে একই ডাটা প্যাক (একই প্যাক কোড) আবার কিনলে আগের প্যাকের বাকি ডাটা নতুন প্যাকে যোগ হয়ে যায়। যেমন ৮ জিবি উইকলি (D8-7D) প্যাকে আপনার ২ জিবি বাকি আছে, মেয়াদ শেষের আগে আবার D8-7D কিনলে পাবেন ৮ জিবি আর সাথে আগের ২ জিবি।
+মেয়াদ কীভাবে কাজ করে: প্রতিটি প্যাকের নিজস্ব মেয়াদ থাকে, যা চালু হওয়ার মুহূর্ত থেকে গোনা হয়। যেমন ৮ জিবি উইকলি (D8-7D) ৭ দিন এবং ১৫ জিবি মান্থলি (D15-30D) ৩০ দিন চলে। মেয়াদ শেষের আগে একই প্যাক আবার কিনলে নতুন প্যাকটি আলাদা প্যাক হিসেবে নতুন মেয়াদ নিয়ে চালু হয়। আগের প্যাকের বাকি ডাটা আগের প্যাকেই থাকে এবং তার সাথেই শেষ হয়ে যায়। কিছুই জোড়া লাগে না, কিছুই জমা হয় না।
 
-সীমাবদ্ধতা: রোলওভার শুধু একবার হয়। রোলওভার হওয়া ডাটা আগে খরচ হয় এবং সেটি দ্বিতীয়বার জমা রাখা যায় না। এটি শুধু ডাটার জন্য, মিনিট বা এসএমএসের জন্য নয়। আলাদা প্যাক কিনলে, অথবা মেয়াদ শেষ হয়ে যাওয়ার পর কিনলে কিছুই রোলওভার হয় না।
+আগে বা পরে কেনা: একদিন আগে রিনিউ করলেও বাকি ডাটা বাঁচে না। তাই আপনার আসল ব্যবহারের সাথে মানানসই ডাটা ও মেয়াদের প্যাক বেছে নিন, যাতে অপচয় কম হয়।
 
-যেগুলোতে রোলওভার নেই: ১ জিবি ডেইলি প্যাক (D1-1D) এবং রিওয়ার্ড পয়েন্টের বোনাস ডাটা (৭০০ পয়েন্টে ১ জিবি, ৩ দিন মেয়াদ)।
+হিসাব দেখুন: প্রতিটি চালু প্যাকের বাকি ডাটা, মিনিট, এসএমএস ও মেয়াদ অ্যাপে দেখা যায়, অথবা অ্যাসিস্ট্যান্টকে জিজ্ঞেস করুন। আপনার ব্যবহারের সাথে কোন প্যাক মানায়, অ্যাসিস্ট্যান্ট তা-ও দেখাতে পারে।
 
-পরামর্শ: অ্যাপে বা অ্যাসিস্ট্যান্টকে জিজ্ঞেস করে বাকি ডাটা ও মেয়াদ দেখে নিন, আর বাকি ডাটা রাখতে চাইলে একদিন আগেই প্যাক রিনিউ করুন।
+বোনাস ডাটা: রিওয়ার্ড পয়েন্টের ১ জিবি বোনাস (৭০০ পয়েন্ট, ৩ দিন মেয়াদ) নিজস্ব মেয়াদের আলাদা প্যাক, এটিও রোলওভার হয় না।
 
 আরও সাহায্যের জন্য telco. হটলাইন ০১৭০০১২১১২১।

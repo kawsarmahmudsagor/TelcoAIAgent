@@ -2,7 +2,7 @@
 
 ## English
 
-Recharge amounts: you can recharge from 20 taka up to 1000 taka in a single transaction, and up to 5000 taka per day in total. You can recharge your own number or another telco. number. Payment is through bKash or Nagad.
+Recharge amounts: you can recharge from 20 taka up to 1000 taka in a single transaction, and up to 5000 taka per day in total. You can recharge your own number or another telco. number. Payment is through bKash, Nagad or card.
 
 Confirmation: for your safety, every recharge is confirmed with a one-time code (OTP) sent by SMS. The code is valid for 3 minutes and you get 3 attempts. After that, the request is cancelled and you can start again.
 
@@ -16,7 +16,7 @@ Support: telco. hotline 01700121121.
 
 ## বাংলা
 
-রিচার্জের সীমা: এক লেনদেনে ২০ টাকা থেকে ১০০০ টাকা পর্যন্ত রিচার্জ করা যায়, আর দিনে মোট সর্বোচ্চ ৫০০০ টাকা। নিজের নম্বরে বা অন্য যেকোনো telco. নম্বরে রিচার্জ করা যায়। পেমেন্ট হয় বিকাশ বা নগদে।
+রিচার্জের সীমা: এক লেনদেনে ২০ টাকা থেকে ১০০০ টাকা পর্যন্ত রিচার্জ করা যায়, আর দিনে মোট সর্বোচ্চ ৫০০০ টাকা। নিজের নম্বরে বা অন্য যেকোনো telco. নম্বরে রিচার্জ করা যায়। পেমেন্ট হয় বিকাশ, নগদ বা কার্ডে।
 
 নিশ্চিতকরণ: নিরাপত্তার জন্য প্রতিটি রিচার্জ এসএমএসে আসা একটি ওটিপি কোড দিয়ে নিশ্চিত করতে হয়। কোডটি ৩ মিনিট পর্যন্ত বৈধ থাকে এবং ৩ বার চেষ্টা করা যায়। এরপর অনুরোধ বাতিল হয়ে যায়, তখন আবার নতুন করে শুরু করতে হবে।
 

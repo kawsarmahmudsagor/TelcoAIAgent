@@ -8,7 +8,7 @@ Q: What is charged? Outgoing calls, incoming calls, SMS and mobile data are all 
 
 Q: How do I avoid surprise charges? Turn off mobile data and data roaming on your phone if you do not need them, because apps update in the background. Use Wi-Fi where possible. Ask the hotline for the rates of your destination before you leave.
 
-Q: What if I run out of balance abroad? Calls and data stop. You can recharge from 20 to 1000 taka per transaction through bKash or Nagad, up to 5000 taka per day, and the balance updates after the OTP confirmation.
+Q: What if I run out of balance abroad? Calls and data stop. You can recharge from 20 to 1000 taka per transaction through bKash, Nagad or card, up to 5000 taka per day, and the balance updates after the OTP confirmation.
 
 Q: Lost phone abroad? Call the hotline to block your SIM.
 
@@ -20,6 +20,6 @@ Q: Lost phone abroad? Call the hotline to block your SIM.
 
 প্রশ্ন: অপ্রত্যাশিত বিল কীভাবে এড়াবেন? দরকার না হলে ফোনে মোবাইল ডাটা ও ডাটা রোমিং বন্ধ রাখুন, কারণ অ্যাপ ব্যাকগ্রাউন্ডে আপডেট হয়। সম্ভব হলে ওয়াইফাই ব্যবহার করুন। যাওয়ার আগে হটলাইনে গন্তব্য দেশের রেট জেনে নিন।
 
-প্রশ্ন: বিদেশে ব্যালেন্স শেষ হলে? কল ও ডাটা বন্ধ হয়ে যায়। বিকাশ বা নগদে প্রতি লেনদেনে ২০ থেকে ১০০০ টাকা রিচার্জ করা যায়, দিনে সর্বোচ্চ ৫০০০ টাকা, আর ওটিপি নিশ্চিত করার পর ব্যালেন্স আপডেট হয়।
+প্রশ্ন: বিদেশে ব্যালেন্স শেষ হলে? কল ও ডাটা বন্ধ হয়ে যায়। বিকাশ, নগদ বা কার্ডে প্রতি লেনদেনে ২০ থেকে ১০০০ টাকা রিচার্জ করা যায়, দিনে সর্বোচ্চ ৫০০০ টাকা, আর ওটিপি নিশ্চিত করার পর ব্যালেন্স আপডেট হয়।
 
 প্রশ্ন: বিদেশে ফোন হারালে? সিম ব্লক করতে হটলাইনে কল করুন।

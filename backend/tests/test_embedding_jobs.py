@@ -214,7 +214,7 @@ def test_embedding_migration_reembeds_then_flips_the_model(rag_fakes, api):
     finally:
         db.close()
     if others is not None:
-        pytest.skip("the dev database has real knowledge-base sources; not migrating them")
+        pytest.skip("the dev database holds seeded or real knowledge-base sources (e.g. from seed_all); not migrating them")
 
     source_id, job_id = _text_source("migrate")
     _claim_and_run(job_id)
