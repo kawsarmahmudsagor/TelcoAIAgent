@@ -28,7 +28,27 @@ def test_no_missing_tools_mentioned():
         assert "end_call" in prompt, name
 
 
-def test_session_tools_are_end_call_plus_optional_knowledge_base():
+TELCO_TOOL_NAMES = {
+    "get_account_summary",
+    "get_usage_breakdown",
+    "explain_deductions",
+    "search_packages",
+    "recommend_packages",
+    "purchase_package",
+    "start_recharge",
+    "lookup_transactions",
+    "get_offers_and_points",
+    "redeem_reward",
+    "create_support_case",
+    "get_case_status",
+    "check_network_status",
+    "request_human_agent",
+    "verify_otp",
+    "cancel_pending_action",
+}
+
+
+def test_session_tools_are_end_call_telco_plus_optional_knowledge_base():
     def names(config=None):
         userdata = SessionUserdata(channel=Channel.inbound_chat, room=None)
         return {
@@ -36,10 +56,10 @@ def test_session_tools_are_end_call_plus_optional_knowledge_base():
             for t in entrypoint._session_tools(userdata, config)
         }
 
-    assert names() == {"end_call"}
+    assert names() == {"end_call"} | TELCO_TOOL_NAMES
     config = agent_config_service.resolve(None)
     config.rag_enabled = True
-    assert names(config) == {"end_call", "search_knowledge_base"}
+    assert names(config) == {"end_call", "search_knowledge_base"} | TELCO_TOOL_NAMES
 
 
 def test_rag_scope_replaces_default_scope():

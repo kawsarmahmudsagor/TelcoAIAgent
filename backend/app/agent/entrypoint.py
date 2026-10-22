@@ -15,6 +15,7 @@ from livekit.agents.beta.tools.end_call import EndCallTool
 from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 
 from app.agent import (
+    action_rpc,
     browser_end_call,
     elevenlabs_keys,
     gated_agent,
@@ -35,6 +36,7 @@ from app.agent.prompt_defaults import (
 from app.agent.speech_numbers import speak_numbers_as_words
 from app.agent.speech_words import respell_words_for_speech
 from app.agent.tools.search_knowledge_base import build_search_knowledge_base
+from app.agent.tools import registry
 from app.agent.transcript import TranscriptRecorder
 from app.agent.userdata import SessionUserdata
 from app.config import Settings, get_settings
@@ -400,7 +402,7 @@ def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None
 
     search_knowledge_base is added only when `config` has the knowledge base
     enabled (see _rag_enabled), bound to that config's top-k/threshold/scope."""
-    tools: list = []
+    tools: list = list(registry.telco_tools())
     if _rag_enabled(config):
         tools.append(build_search_knowledge_base(config))
     if userdata.is_phone_call:
@@ -423,6 +425,19 @@ def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None
             ).tool
         )
     return tools
+
+
+def _linked_identity(session: AgentSession, caller_identity: str) -> Callable[[], str | None]:
+    """The identity of the browser participant the session talks to."""
+
+    def _identity() -> str | None:
+        # RoomIO links the participant from a background task, so right after
+        # session.start it may not be set yet; it then links the first caller,
+        # the one entrypoint waited for.
+        participant = session.room_io.linked_participant
+        return participant.identity if participant is not None else caller_identity
+
+    return _identity
 
 
 def _turn_handling(gated: bool, endpoint_min_delay: float | None = None) -> dict:
@@ -634,7 +649,7 @@ async def entrypoint(ctx: JobContext) -> None:
     # The caller is already connected by the time this job starts, so this
     # resolves immediately; waiting guarantees a listener is in the room before
     # the greeting's text-stream chunks go out.
-    await ctx.wait_for_participant()
+    caller = await ctx.wait_for_participant()
 
     userdata = session_context.resolve(ctx.job.metadata, ctx.room)
     config = _load_agent_config()
@@ -662,6 +677,12 @@ async def entrypoint(ctx: JobContext) -> None:
     # Both paths use the gate's text callback: it drops text sent before the
     # greeting has played out.
     await session.start(agent=agent, room=ctx.room, room_options=gated_agent.room_options())
+    action_rpc.ActionRpc(
+        session=session,
+        userdata=userdata,
+        room=ctx.room,
+        linked_identity=_linked_identity(session, caller.identity),
+    ).register()
     await _announce_user_turns(ctx.room)
     if isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:
         agent.prefetcher.warm()
