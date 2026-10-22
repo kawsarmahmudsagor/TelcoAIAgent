@@ -141,7 +141,7 @@ async def purchase_package(
 ) -> str:
     """Start buying a package for the customer. Nothing is charged yet: this
     quotes the price and sends a 6-digit code to their screen; the purchase
-    happens only after verify_otp (or the Confirm button) succeeds.
+    happens only after verify_otp (or the confirm card, with the code) succeeds.
 
     Args:
         package_code: The package code from search_packages or recommend_packages.

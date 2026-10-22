@@ -4,13 +4,19 @@
 shows it on the customer's screen (`telco.otp_sms`) with a confirm card
 (`telco.confirm`). `confirm_action` (voice `verify_otp` or the card's RPC)
 checks the code and executes; `cancel_action` drops it. One pending write per
-session: a new one replaces it. All three raise BssError; callers map it."""
+session: a new one replaces it. All three raise BssError; callers map it.
+
+Start and confirm finish even when their caller is cancelled (barge-in, session
+shutdown, RPC timeout): the DB work runs in a thread that commits anyway, so
+the session's action state must still follow it."""
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Literal, TypeVar
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -40,9 +46,12 @@ CODE_WINDOW = timedelta(minutes=15)
 _SNAPSHOT_NOTE = "These figures replace the account snapshot in your instructions."
 _CODE_SENT = (
     "A 6-digit code was sent to the customer's screen. State the price and how they pay, "
-    "then ask them to say or type the code, or tap Confirm. Never read the code aloud."
+    "then ask them to say or type the code, or enter it on the confirm card. "
+    "Never read the code aloud."
 )
 _BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+
+T = TypeVar("T")
 
 
 @dataclass
@@ -62,6 +71,15 @@ class CaseDraft:
     category: str
     description: str
     priority: CasePriority
+
+
+async def _uncancellable(coro: Awaitable[T]) -> T:
+    """Awaits `coro` as its own task behind a shield: cancelling the caller
+    leaves it running to the end (its outcome then goes unreported)."""
+    task = asyncio.ensure_future(coro)
+    # Retrieve the outcome so a cancelled caller leaves no "never retrieved" noise.
+    task.add_done_callback(lambda t: t.cancelled() or t.exception())
+    return await asyncio.shield(task)
 
 
 def normalise_code(raw: str) -> str:
@@ -122,6 +140,10 @@ def _quote(db: Session, sid: UUID, kind: ActionKind, request, now: datetime) -> 
 async def start_action(
     userdata: SessionUserdata, kind: ActionKind, request, *, now: datetime | None = None
 ) -> str:
+    return await _uncancellable(_start(userdata, kind, request, now))
+
+
+async def _start(userdata: SessionUserdata, kind: ActionKind, request, now: datetime | None) -> str:
     sid = userdata.subscriber_id
     if sid is None:
         raise SubscriberNotFound()
@@ -158,6 +180,8 @@ async def start_action(
             card=card,
             postpaid=summary.plan_type == PlanType.postpaid,
         )
+        # The last confirmed action's code no longer replays its result.
+        userdata.done_action = None
         await publish(
             userdata,
             OTP_SMS,
@@ -230,7 +254,12 @@ async def confirm_action(
     action_id: UUID | None = None,
     now: datetime | None = None,
 ) -> str:
-    code = normalise_code(code)
+    return await _uncancellable(_confirm(userdata, normalise_code(code), action_id, now))
+
+
+async def _confirm(
+    userdata: SessionUserdata, code: str, action_id: UUID | None, now: datetime | None
+) -> str:
     async with userdata.action_lock:
         a = userdata.pending_action
         if a is None or (action_id is not None and action_id != a.action_id):

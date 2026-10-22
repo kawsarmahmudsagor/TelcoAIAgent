@@ -1,23 +1,25 @@
-"""The KB seed documents. The fixture removes prior `telco KB:` sources (their
-ingest jobs cascade) so a clean run is observable; seed_kb commits, so the dev
-DB is left with the six sources afterwards."""
+"""The KB seed documents. The fixture removes prior `telco KB:` sources the way
+the app does (rag_service.delete_source: vectors, files, rows and their jobs)
+so a clean run is observable; seed_kb commits, so the dev DB is left with the
+six sources afterwards."""
 
 import re
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from app.data import seed_kb, seed_telco
 from app.models.rag import EmbeddingJob, RagSource
 from app.repositories import agent_config_repo
+from app.services import rag_service
 
 PREFIX = "telco KB: "
 
 
 @pytest.fixture
 def clean_kb(db):
-    db.execute(delete(RagSource).where(RagSource.name.like(f"{PREFIX}%")))
-    db.commit()
+    for source in _kb_sources(db):
+        rag_service.delete_source(db, source.id)
     yield db
 
 

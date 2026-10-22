@@ -68,7 +68,7 @@ async def get_offers_and_points(ctx: RunContext[SessionUserdata]) -> str:
 async def redeem_reward(ctx: RunContext[SessionUserdata], offer_number: int) -> str:
     """Start redeeming reward points for an offer. Nothing is spent yet: this
     sends a 6-digit code to the customer's screen; the redemption happens only
-    after verify_otp (or the Confirm button) succeeds.
+    after verify_otp (or the confirm card, with the code) succeeds.
 
     Args:
         offer_number: The offer's number (#1, #2...) from get_offers_and_points.

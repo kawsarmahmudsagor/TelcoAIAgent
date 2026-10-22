@@ -436,8 +436,12 @@ def _linked_identity(session: AgentSession, caller_identity: str) -> Callable[[]
     def _identity() -> str | None:
         # RoomIO links the participant from a background task, so right after
         # session.start it may not be set yet; it then links the first caller,
-        # the one entrypoint waited for.
-        participant = session.room_io.linked_participant
+        # the one entrypoint waited for (also before session.start, when
+        # room_io raises).
+        try:
+            participant = session.room_io.linked_participant
+        except RuntimeError:
+            participant = None
         return participant.identity if participant is not None else caller_identity
 
     return _identity
@@ -707,12 +711,13 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(_on_shutdown)
     # Both paths use the gate's text callback: it drops text sent before the
     # greeting has played out.
+    userdata.linked_identity = _linked_identity(session, caller.identity)
     await session.start(agent=agent, room=ctx.room, room_options=gated_agent.room_options())
     action_rpc.ActionRpc(
         session=session,
         userdata=userdata,
         room=ctx.room,
-        linked_identity=_linked_identity(session, caller.identity),
+        linked_identity=userdata.linked_identity,
     ).register()
     await _announce_user_turns(ctx.room)
     if isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:

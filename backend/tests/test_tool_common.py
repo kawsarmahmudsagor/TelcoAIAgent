@@ -85,26 +85,44 @@ class _Room:
         self.local_participant = self
         self.fail = fail
 
-    async def send_text(self, payload, topic):
+    async def send_text(self, payload, *, topic, destination_identities=None):
         if self.fail:
             raise RuntimeError("down")
-        self.sent.append((topic, payload))
+        self.sent.append((topic, payload, destination_identities))
 
 
 def test_publish_sends_json_on_topic():
     async def go():
         room = _Room()
-        ud = SessionUserdata(channel=Channel.inbound_chat, room=room, defer_cards=True)
+        ud = SessionUserdata(
+            channel=Channel.inbound_chat,
+            room=room,
+            defer_cards=True,
+            linked_identity=lambda: "web-user",
+        )
         await topics.publish(ud, topics.OTP_SMS, {"a": 1})
-        assert room.sent == [("telco.otp_sms", json.dumps({"a": 1}))]
+        # Only the linked browser gets it: the code must not reach anyone else.
+        assert room.sent == [("telco.otp_sms", json.dumps({"a": 1}), ["web-user"])]
         assert ud.pending_card is None
+
+    asyncio.run(go())
+
+
+def test_publish_without_linked_identity_sends_nothing():
+    async def go():
+        room = _Room()
+        ud = SessionUserdata(channel=Channel.inbound_chat, room=room)
+        await topics.publish(ud, topics.OTP_SMS, {"code": "123456"})
+        assert room.sent == []
 
     asyncio.run(go())
 
 
 def test_publish_swallows_send_failure():
     async def go():
-        ud = SessionUserdata(channel=Channel.inbound_chat, room=_Room(fail=True))
+        ud = SessionUserdata(
+            channel=Channel.inbound_chat, room=_Room(fail=True), linked_identity=lambda: "u"
+        )
         await topics.publish(ud, topics.CONFIRM, {"a": 1})
 
     asyncio.run(go())

@@ -186,6 +186,8 @@ def test_prompt_rules_present():
     assert "request_human_agent" in prompt
     # Escalation is for account actions; information gaps go to the hotline.
     assert "an account action no tool can perform" in flat
+    # The card needs the code too: there is no code-free Confirm button.
+    assert "enter it on the confirm card" in flat and "tap Confirm" not in flat
     assert "when no tool can do what they need" not in flat
     assert "say so briefly" not in flat
     assert "ACCOUNT SNAPSHOT pytest-marker" in prompt
@@ -203,3 +205,7 @@ def test_greeting_defaults_fit_the_operator():
     assert all("{customer_name}" in line for line in SPOKEN_GREETINGS_INBOUND)
     assert len(SPOKEN_GREETINGS_GUEST) == 2
     assert not any("{customer_name}" in line for line in SPOKEN_GREETINGS_GUEST)
+    # get_offers_and_points needs a login, so the guest copy never offers it.
+    assert not any("অফার" in line for line in SPOKEN_GREETINGS_GUEST)
+    can_do = " ".join(GUEST_SNAPSHOT.split()).split("You can still talk about")[1].split(".")[0]
+    assert "offer" not in can_do and "district" in can_do

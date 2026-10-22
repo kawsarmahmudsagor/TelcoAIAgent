@@ -20,14 +20,17 @@ class _Participant:
     def __init__(self):
         self.sent: list[tuple[str, dict]] = []
 
-    async def send_text(self, payload, topic):
+    async def send_text(self, payload, *, topic, destination_identities=None):
         self.sent.append((topic, json.loads(payload)))
 
 
 def _ud(sub=None) -> SessionUserdata:
     room = SimpleNamespace(local_participant=_Participant())
     return SessionUserdata(
-        channel=Channel.inbound_chat, room=room, subscriber_id=sub.id if sub else None
+        channel=Channel.inbound_chat,
+        room=room,
+        subscriber_id=sub.id if sub else None,
+        linked_identity=lambda: "web-user",
     )
 
 

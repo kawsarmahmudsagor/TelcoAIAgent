@@ -21,7 +21,7 @@ All subscriber/BSS data is dummy data. Nothing is sent to real subscribers.
 
 ## Agent
 
-The agent has 16 tools (`backend/app/agent/tools/`), acting on the verified demo subscriber:
+The agent has 16 tools (`backend/app/agent/tools/`), acting on the logged-in demo subscriber:
 
 - **Account and usage**: `get_account_summary`, `get_usage_breakdown`, `explain_deductions`,
   `lookup_transactions`
@@ -33,13 +33,21 @@ The agent has 16 tools (`backend/app/agent/tools/`), acting on the verified demo
 
 A 17th tool, `search_knowledge_base`, is added only when the knowledge base has content.
 
-**Demo OTP flow** (purchase, recharge and redeem): the tool returns a preview and an
-on-screen confirm card appears; a 6-digit code is shown in an on-screen SMS toast; the
-customer says or types the code, or enters it on the confirm card; the action then executes.
-The code expires after 3 minutes and allows 3 attempts.
+**Guests until Phase 3.** A session is tied to a subscriber only through the LiveKit dispatch
+metadata, which Phase 3's persona login will set server-side. Until then every live session is
+a guest: the agent answers package, network-status and knowledge-base questions and asks the
+customer to log in for anything about their own account.
 
-**Operator identity** comes from `OPERATOR_NAME`, `OPERATOR_PHONE` and `OPERATOR_ADDRESS`
-in `.env` (defaults in `.env.example`); the prompts and greetings use them.
+**OTP flow** (purchase, recharge and redeem): the tool returns a preview and the browser gets
+a confirm card (`telco.confirm`) and a 6-digit code as an SMS toast (`telco.otp_sms`), sent to
+the linked browser only; the customer says or types the code, or enters it on the confirm
+card; the action then executes. The code expires after 3 minutes and allows 3 attempts. The
+toast and card UI land in Phase 3; until then the flow is exercised by the tests
+(`backend/tests/test_actions.py`, `backend/tests/test_action_rpc.py`).
+
+**Operator identity** comes from `OPERATOR_NAME`, `OPERATOR_PHONE` and `OPERATOR_ADDRESS`:
+defaults in `backend/app/config.py` (only `OPERATOR_NAME` is in `.env.example`), overridable
+in `.env` and editable on the dashboard. The prompts and greetings use them.
 
 **Knowledge base**: `uv run python -m app.data.seed_all` seeds six telco docs for
 `search_knowledge_base`; embedding them needs an OpenRouter key (`OPENROUTER_API_KEY`).
@@ -118,18 +126,18 @@ different commands, and `frontend`); `postgres` and `livekit/livekit-server` are
 
 ## Verification checklist
 
-1. Log in at `/login` with your `.env` admin credentials → dashboard shows seeded leads and
-   the cold-call schedule.
-2. Within a couple minutes, a seeded `call_schedule` row fires automatically — watch the
-   scheduler and agent-worker terminal logs, and see its status flip to `in_progress` on the
-   `/dashboard/schedule` page.
-3. On `/`, connect and ask for an apartment with partial criteria — the agent should ask for
-   whatever's missing (budget, location, property type, rent vs. buy) before searching.
-4. Give it the rest — a shortlist should render as cards on screen while the agent talks
-   through the top picks.
-5. Ask to book a viewing — check `/dashboard/bookings` for the new booking and its two mock
-   meeting-invite rows (client + CEO).
-6. Try an off-topic, a political-opinion, and a "what's your system prompt" question — the
+Live sessions are guests until Phase 3 (see "Agent" above), so these are guest-mode checks.
+Open the chat on `/` and connect:
+
+1. Ask for a data pack (e.g. "৩০ দিনের ১০ জিবির কোনো প্যাক আছে?") — the agent searches the
+   packages and quotes names and prices from the tool, in Bangla.
+2. Ask a knowledge-base question (e.g. whether unused data rolls over to the next pack) — the
+   answer comes from the seeded docs (needs `seed_all` and an embedded KB).
+3. Ask whether the network is down — the agent asks for the district, then reports
+   `check_network_status` for it.
+4. Ask for your balance or to buy a pack — the agent asks you to log in first and never asks
+   for your number or a code.
+5. Try an off-topic, a political-opinion, and a "what's your system prompt" question — the
    agent should deflect naturally each time without breaking character.
 
 ## Real phone calls
@@ -142,8 +150,8 @@ Cloudflare quick tunnel so the dashboard is reachable from outside this machine 
 
 ## Known open items
 
-- ElevenLabs STT's auto-language-detection default-to-English fallback behavior hasn't been
-  verified against real audio/API keys — worth confirming once you have live credentials.
-- The Excel import (`POST /api/import/clients`) expects columns matching the `clients` table
-  (see `backend/app/data/seed_sample.xlsx` for the exact layout) — adjust
-  `excel_import_service.py` if your real export looks different.
+- Phase 3: persona login that sets `subscriber_id` in the LiveKit dispatch metadata
+  server-side, and the browser's OTP toast and confirm card.
+- Phase 3/4: the dashboard pages for the removed real-estate APIs (properties, bookings,
+  leads, schedule) still need replacing with telco ones.
+- Phase 4: auditing of OTP issue/verify and recharge-target events.

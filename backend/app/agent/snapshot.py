@@ -24,9 +24,9 @@ from app.models.telco import Notification, NotificationKind, PlanType
 
 GUEST_SNAPSHOT = """\
 ACCOUNT SNAPSHOT — none: the customer is not logged in (a guest). You can still talk about
-packages, offers, network status and general questions. For anything about their own account
-(balance, packs, recharge, transactions, cases), ask them to log in first; never ask for their
-number or any code to identify them."""
+packages, network status (ask which district they are in) and general questions. For anything
+about their own account (balance, packs, recharge, offers and reward points, transactions,
+cases), ask them to log in first; never ask for their number or any code to identify them."""
 
 _SNAPSHOT_HEAD = """\
 ACCOUNT SNAPSHOT — sample demo data, taken when this conversation started. Use it for quick

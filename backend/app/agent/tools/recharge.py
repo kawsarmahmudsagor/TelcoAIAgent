@@ -33,7 +33,8 @@ async def start_recharge(
 ) -> str:
     """Start a recharge. Nothing is charged yet: this quotes it and sends a
     6-digit code to the customer's screen; the recharge happens only after
-    verify_otp (or the Confirm button) succeeds. 20 to 1000 taka per recharge.
+    verify_otp (or the confirm card, with the code) succeeds. 20 to 1000 taka
+    per recharge.
 
     Args:
         amount: Amount in taka.

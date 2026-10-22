@@ -24,7 +24,8 @@ class FakeRoom:
         self.rpc: dict[str, object] = {}
         self.local_participant = self
 
-    async def send_text(self, payload, topic):
+    async def send_text(self, payload, *, topic, destination_identities=None):
+        assert destination_identities == [CALLER]
         self.sent.append((topic, json.loads(payload)))
 
     def register_rpc_method(self, method, handler):
@@ -43,8 +44,13 @@ def _setup(world):
     sub = world.subscriber(main_balance=Decimal("500"))
     pkg = world.package(name="PYTEST Net 10", data_mb=10240, price=Decimal("120"))
     room, session = FakeRoom(), FakeSession()
-    ud = SessionUserdata(channel=Channel.inbound_chat, room=room, subscriber_id=sub.id)
-    rpc = ActionRpc(session=session, userdata=ud, room=room, linked_identity=lambda: CALLER)
+    ud = SessionUserdata(
+        channel=Channel.inbound_chat,
+        room=room,
+        subscriber_id=sub.id,
+        linked_identity=lambda: CALLER,
+    )
+    rpc = ActionRpc(session=session, userdata=ud, room=room, linked_identity=ud.linked_identity)
     rpc.register()
     return SimpleNamespace(sub=sub, pkg=pkg, room=room, session=session, ud=ud, rpc=rpc)
 

@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -52,6 +53,10 @@ class SessionUserdata:
     offer_ids: list[UUID] = field(default_factory=list)
     # When each OTP was issued this session (throttle).
     otp_issued_at: list[datetime] = field(default_factory=list)
+    # The identity of the browser this session talks to (entrypoint's
+    # _linked_identity); telco topics are sent to it alone, so the OTP code
+    # never reaches anyone else in the room.
+    linked_identity: Callable[[], str | None] | None = None
     # Serialises confirm/cancel between voice tools and the card RPCs.
     action_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     # Account snapshot placed in the system prompt, the customer's name, and

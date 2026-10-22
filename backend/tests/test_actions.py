@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -23,17 +24,26 @@ from app.bss.types import PurchaseRequest
 from app.models.telco import Transaction, TxnChannel
 
 
+CALLER = "web-user"
+
+
 class _Participant:
     def __init__(self):
         self.sent: list[tuple[str, dict]] = []
 
-    async def send_text(self, payload, topic):
+    async def send_text(self, payload, *, topic, destination_identities=None):
+        assert destination_identities == [CALLER]
         self.sent.append((topic, json.loads(payload)))
 
 
 def _ud(sub) -> SessionUserdata:
     room = SimpleNamespace(local_participant=_Participant())
-    return SessionUserdata(channel=Channel.inbound_chat, room=room, subscriber_id=sub.id)
+    return SessionUserdata(
+        channel=Channel.inbound_chat,
+        room=room,
+        subscriber_id=sub.id,
+        linked_identity=lambda: CALLER,
+    )
 
 
 def _sent(ud) -> list[tuple[str, dict]]:
@@ -75,6 +85,7 @@ def test_purchase_needs_code_then_executes(bss_world):
         assert [t for t, _ in _sent(ud)] == [OTP_SMS, CONFIRM]
         sms, card = _sent(ud)[0][1], _sent(ud)[1][1]
         assert sms["code"] not in out and "Never read the code aloud" in out
+        assert "enter it on the confirm card" in out and "tap Confirm" not in out
         assert sms["to"].endswith(sub.msisdn[-4:]) and sms["to"] != sub.msisdn
         assert card["state"] == "awaiting_code" and card["kind"] == "purchase"
         assert card["action_id"] == sms["action_id"] == str(ud.pending_action.action_id)
@@ -258,5 +269,60 @@ def test_failed_execute_drops_action_so_no_code_can_run_it(bss_world, monkeypatc
         with pytest.raises(NoPendingAction):
             await actions.confirm_action(ud, _wrong(code))
         assert _txns(bss_world, sub) == 0
+
+    asyncio.run(go())
+
+
+def test_cancelled_confirm_still_settles_the_action(bss_world, monkeypatch):
+    """Barge-in or shutdown cancels the tool task between verify and execute;
+    the write still commits in its thread, so the action state must follow it."""
+    sub, pkg = _buyer(bss_world)
+    ud = _ud(sub)
+    entered, release = threading.Event(), threading.Event()
+    real_execute = actions._execute
+
+    def slow_execute(*a, **k):
+        entered.set()
+        release.wait(5)
+        return real_execute(*a, **k)
+
+    async def go():
+        await actions.start_action(ud, "purchase", _purchase(pkg))
+        a_id, code = ud.pending_action.action_id, _code(ud)
+        monkeypatch.setattr(actions, "_execute", slow_execute)
+        caller = asyncio.ensure_future(actions.confirm_action(ud, code))
+        assert await asyncio.to_thread(entered.wait, 5)
+        caller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await caller
+        release.set()
+        async with ud.action_lock:  # the shielded confirm holds it until settled
+            pass
+        monkeypatch.undo()
+        assert ud.pending_action is None
+        cards = [p for t, p in _sent(ud) if t == CONFIRM and p["action_id"] == str(a_id)]
+        assert cards[-1]["state"] == "done"
+        assert _sent(ud)[-1][0] == ACCOUNT_CHANGED
+        with pytest.raises(NoPendingAction):
+            await actions.confirm_action(ud, _wrong(code))
+        assert _txns(bss_world, sub) == 1
+
+    asyncio.run(go())
+
+
+def test_done_action_not_replayed_after_a_new_action(bss_world):
+    sub, pkg = _buyer(bss_world)
+    ud = _ud(sub)
+
+    async def go():
+        await actions.start_action(ud, "purchase", _purchase(pkg))
+        a_id, a_code = ud.pending_action.action_id, _code(ud)
+        await actions.confirm_action(ud, a_code)
+        await actions.start_action(ud, "purchase", _purchase(pkg))
+        await actions.cancel_action(ud)
+        with pytest.raises(NoPendingAction):
+            await actions.confirm_action(ud, a_code, action_id=a_id)
+        with pytest.raises(NoPendingAction):
+            await actions.confirm_action(ud, a_code)
 
     asyncio.run(go())
