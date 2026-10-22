@@ -25,7 +25,7 @@ router = APIRouter(
 
 PREVIEW_MAX_CHARS = 140
 # app.agent.userdata.Channel values (not imported: it pulls in livekit.rtc).
-ChannelLiteral = Literal["inbound_chat", "outbound_coldcall"]
+ChannelLiteral = Literal["inbound_chat"]
 
 
 def _preview(text: str | None) -> str | None:

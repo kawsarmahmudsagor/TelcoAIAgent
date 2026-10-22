@@ -154,7 +154,6 @@ def jev_judge(
             turn_gate.address_form(text),
             lookup=lookup,
             knowledge_base=knowledge_base,
-            search_context=None,
         )
         started = time.perf_counter()
         judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s)

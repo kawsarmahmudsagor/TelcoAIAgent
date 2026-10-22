@@ -79,15 +79,12 @@ async def _run(models: list[str], cases_path: Path, judge_model: str) -> None:
                 "listening",
                 address_form(case["utterance"]),
                 lookup=True,
-                search_context=turn_judge.search_context(case["last_search"], case["shown"]),
             )
             ext_payloads = [
                 turn_router.build_request(
                     m,
                     history,
                     case["utterance"],
-                    case["last_search"],
-                    case["shown"],
                     settings.router_reasoning_effort,
                 )
                 for m in models
@@ -110,17 +107,13 @@ async def _run(models: list[str], cases_path: Path, judge_model: str) -> None:
                 row = {"case": case, "ms": ms, "error": args is None, "ok": None, "why": ""}
                 if args is not None and "search" in case:
                     row["ok"], row["why"] = _args_ok(
-                        case["search"], args.search, case.get("allow_extra", [])
-                    )
-                elif args is not None and "offers" in case:
-                    row["ok"], row["why"] = _args_ok(
-                        case["offers"], args.offers, bool(case.get("allow_extra_offers"))
+                        case["search"], args.packages, case.get("allow_extra", [])
                     )
                 ext_rows[model].append(row)
                 if row["ok"] is not None or row["error"]:
                     mark = "ERR" if row["error"] else "ok " if row["ok"] else "XX "
                     shown = "" if args is None else json.dumps(
-                        args.search if "search" in case else args.offers, ensure_ascii=False
+                        args.packages, ensure_ascii=False
                     )
                     print(f"     {model[:28]:28} {mark} {ms:5.0f}ms {shown} {row['why']}")
 

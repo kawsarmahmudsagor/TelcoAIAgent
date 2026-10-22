@@ -26,8 +26,11 @@ from livekit.agents.llm import ToolError
 
 from app.agent import turn_gate, turn_router
 from app.agent.tools import search_knowledge_base
+from app.agent.tools._common import run_db
+from app.agent.tools.packages import search_packages_text
 from app.agent.turn_judge import Exchange, Judgement
 from app.agent.turn_router import RouterArgs
+from app.bss.errors import BssError
 from app.config import Settings
 from app.services.agent_config_service import ResolvedAgentConfig
 
@@ -38,6 +41,7 @@ _WARM_TIMEOUT_S = 10.0
 
 # What each lookup runs.
 _LOOKUP_TOOLS = {
+    "packages": ("search_packages",),
     "knowledge_base": (search_knowledge_base.TOOL_NAME,),
 }
 
@@ -84,7 +88,7 @@ class Prefetcher:
     async def _warm(self) -> None:
         base_url = self.settings.openrouter_base_url
         payload = turn_router.build_request(
-            self.settings.router_model, [], "hello", None, 0, self.settings.router_reasoning_effort
+            self.settings.router_model, [], "hello", self.settings.router_reasoning_effort
         )
         await asyncio.gather(
             turn_router.extract(self.client, base_url, self.api_key, payload, _WARM_TIMEOUT_S),
@@ -114,8 +118,6 @@ class Prefetcher:
             self.settings.router_model,
             history,
             text,
-            None,
-            0,
             self.settings.router_reasoning_effort,
         )
         self._extracting[key] = asyncio.ensure_future(
@@ -190,11 +192,15 @@ class Prefetcher:
     async def _run_tool(self, name: str, args: RouterArgs, text: str) -> Lookup | None:
         started = time.perf_counter()
         try:
-            call_args = {"query": args.knowledge_query or text}
-            output = await asyncio.to_thread(
-                search_knowledge_base.search_text, call_args["query"], self.config
-            )
-        except ToolError as exc:
+            if name == "search_packages":
+                call_args = dict(args.packages)
+                output = await run_db(lambda db: search_packages_text(db, **call_args))
+            else:
+                call_args = {"query": args.knowledge_query or text}
+                output = await asyncio.to_thread(
+                    search_knowledge_base.search_text, call_args["query"], self.config
+                )
+        except (ToolError, BssError) as exc:
             # Arguments the tool refuses: the LLM gets to call it itself.
             logger.info("prefetch %s refused %s: %s", name, args, exc)
             return None

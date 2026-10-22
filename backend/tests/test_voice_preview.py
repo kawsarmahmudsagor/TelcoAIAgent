@@ -6,6 +6,7 @@ import json
 
 import httpx
 import pytest
+from word_checks import real_estate_words
 
 from app.config import Settings
 from app.services import voice_preview
@@ -26,7 +27,7 @@ def _settings(**values) -> Settings:
 
 def _config(**values) -> ResolvedAgentConfig:
     base = dict(
-        assistant_name="Alexa", operator_name="Horizon Realty", prompt_identity_rules=None,
+        assistant_name="Alexa", operator_name="Horizon Telecom", prompt_identity_rules=None,
         greeting_inbound=None, greeting_nudge=None, llm_provider="gemini", llm_model="m",
         temperature=None, max_output_tokens=None, api_key="", stt_tts_provider="elevenlabs",
         deepgram_tts_model="aura-2-thalia-en", elevenlabs_voice_id="v",
@@ -62,7 +63,7 @@ def test_elevenlabs_moves_on_from_a_spent_key():
     assert seen[1].url.path == "/v1/text-to-speech/voice-1"
     body = json.loads(seen[1].content)
     assert body["model_id"] == "eleven_v4_turbo"
-    assert "Horizon Realty" in body["text"]
+    assert "Horizon Telecom" in body["text"]
     assert "আসসালামু" in body["text"]
 
 
@@ -236,3 +237,11 @@ def test_route_maps_preview_errors(api, monkeypatch):
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Deepgram's Aura voices are English-only"
+
+
+@pytest.mark.parametrize("language", ["en", "bn"])
+def test_sample_lines_are_telco_with_numbers_spelled_out(language):
+    text = voice_preview.sample_text(language, _config())
+    assert "Alexa" in text and "Horizon Telecom" in text
+    assert not real_estate_words(text)
+    assert not any(ch.isdigit() for ch in text)

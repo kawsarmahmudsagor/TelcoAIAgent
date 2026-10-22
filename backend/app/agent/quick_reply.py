@@ -9,7 +9,7 @@ That one answer picks the path (route):
   end_call. When the turn needs anything it can't answer from the conversation
   it writes HANDOFF and nothing else, and the main model answers instead
   (stream_fast hands off without a word of it spoken).
-- "filler": a search is needed, so the small model writes one short line ("let
+- "filler": a lookup is needed, so the small model writes one short line ("let
   me find those for you") that is spoken until the main model's reply starts
   (compose_filler): while the search runs, and after it in front of the reply
   if the line is ready before the reply's first words, else dropped. The line
@@ -65,38 +65,39 @@ When the customer wraps up or says goodbye (also informally: tata, bye bye, আ�
 Answer only when everything you need was already said in this conversation or is in the instructions above:
 greetings, thanks, small talk, goodbyes, or repeating or explaining something already said.
 Reply with exactly {HANDOFF} and nothing else when the customer:
-- asks for any listing, price, availability, offer, discount, fee or policy detail not already said;
-- wants to search, or gives or changes what they are looking for (area, budget, rent or buy, bedrooms);
-- wants to book, change or cancel a viewing, or gives a date, time, name or phone number;
-- shows interest in a property, or asks for a follow-up or a call back;
+- asks for any balance, pack, usage, price, offer, validity or policy fact not already said;
+- wants to buy a pack, recharge, redeem an offer or open a case, or gives a number to recharge;
+- says a code of 4 to 8 digits (an OTP), in any language or script;
+- complains about the network, a charge or the service;
+- asks for a follow-up or a call back;
 - asks anything you are not sure you can answer from the conversation.
 Never guess a fact. When in doubt, reply with exactly {HANDOFF}."""
 
-_FILLER_SYSTEM = """You write the line a real-estate agency's phone assistant says the moment a customer \
+_FILLER_SYSTEM = """You write the line a mobile operator's phone assistant says the moment a customer \
 finishes speaking, while the full answer is still being looked up by someone else. It is spoken aloud.
 Write one short, warm, natural spoken sentence (under 8 words) that fits this request and tells the \
 customer you are on it. Vary it: pick a different style each time, whichever suits the request:
-- echo what they asked for ("Gulshan, three bedrooms. Okay.", "গুলশানে তিন বেডরুম, ওকে।");
-- a short reaction and the next step ("Okay, searching Dhanmondi now.", "ওকে, ধানমন্ডিতে সার্চ করছি।", \
-"ঠিক আছে, আমি দেখছি।");
-- a plain, warm wait ("Sure, one moment.", "জি, এক মিনিট।", "অবশ্যই, একটু চেক করছি।", \
-"জি, একটু ওয়েট করুন।");
-- a professional, to-the-point line ("Checking availability for you.", "এভেইলেবিলিটি চেক করছি।", \
-"লিস্টিং দেখছি।");
-- by request type: a search names the area or type ("গুলশানের ফ্ল্যাট সার্চ করছি।"); a price or offer \
-question says so ("দামটা চেক করছি।"); a viewing says so ("ভিজিটের টাইম চেক করছি।"); \
-anything vague stays simple ("ঠিক আছে, আমি দেখছি।").
+- echo what they asked for ("ইন্টারনেট প্যাক, ওকে।", "Data packs. Okay.");
+- a short reaction and the next step ("ঠিক আছে, আমি দেখছি।", "ওকে, প্যাকগুলো দেখছি।", \
+"Okay, checking that now.");
+- a plain, warm wait ("জি, এক মিনিট।", "অবশ্যই, একটু চেক করছি।", "জি, একটু ওয়েট করুন।", \
+"Sure, one moment.");
+- a professional, to-the-point line ("Checking your account.", "ব্যালেন্সটা চেক করছি।", \
+"প্যাকগুলো দেখছি।");
+- by request type: a balance or usage question says so ("ব্যালেন্সটা চেক করছি।"); a pack search \
+names what they want ("ডাটা প্যাকগুলো দেখছি।"); a price or offer question says so ("দামটা চেক করছি।", \
+"অফারগুলো দেখছি।"); a policy question stays simple ("ঠিক আছে, আমি দেখছি।").
 Language: the language of the customer's NEW message alone. Bangla (in Bengali script or written in \
 Latin letters) gets a Bangla line in Bengali script, in the respectful আপনি form, in the way people \
 actually speak, not a word-for-word translation. Use everyday English words in Bengali script where \
-Bangla speakers do (চেক, সার্চ, ওকে, ভিজিট, ওয়েট); say "দাম", not "প্রাইস". Never use literary Bangla \
-words such as মিলিয়ে, যাচাই, ঘেঁটে, খুলছি. When you echo an amount or a number the customer said, \
-say it in the customer's language: Bangla words for Bangla ("পঞ্চাশ লাখের মধ্যে, ওকে।", never "ফিফটি \
-লাখ"), English words for English. English gets an English line.
-Never state a price, a number, availability, or a result of your own (only echo what the customer \
-said), and never describe how many or how good the \
-results are (nothing is found yet; there may be none). Never answer the question; never promise an \
-outcome; never say a person is joining. No greeting, no question, no emoji.
+Bangla speakers do (চেক, প্যাক, ব্যালেন্স, ওকে, ওয়েট); say "দাম", not "প্রাইস". Never use literary \
+Bangla words such as মিলিয়ে, যাচাই, ঘেঁটে, খুলছি. When you echo an amount or a number the customer \
+said, say it in the customer's language: Bangla words for Bangla ("তিনশো টাকার মধ্যে, ওকে।"), English \
+words for English. English gets an English line.
+Never state a price, a number, a balance, availability, or a result of your own (only echo what the \
+customer said), and never describe how many or how good the results are (nothing is found yet; there \
+may be none). Never answer the question; never promise an outcome; never say a person is joining. \
+No greeting, no question, no emoji.
 Don't repeat any of the lines listed as already said, nor their verb or sentence shape.
 Reply with JSON only: {"text": "..."}"""
 
@@ -170,6 +171,10 @@ def route(
     (turn_gate.is_closing) without asking Jev -- it needs no lookup, and ending
     the call is the one tool the small model has."""
     if not config.quick_reply_enabled:
+        return None
+    # An OTP or a yes/no for a waiting action, or a case being drafted, belongs to
+    # the main model, which owns the tools; Jev may well say "none" for it.
+    if getattr(userdata, "pending_action", None) or getattr(userdata, "pending_case", None):
         return None
     if closing:
         if config.quick_fast_answer:

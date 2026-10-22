@@ -68,6 +68,11 @@ def test_list_filters_and_preview(api):
     assert api.get("/api/conversations", params={"status": "bogus"}).status_code == 422
 
 
+def test_outbound_coldcall_channel_is_rejected(api):
+    r = api.get("/api/conversations", params={"channel": "outbound_coldcall"})
+    assert r.status_code == 422
+
+
 def test_detail_has_ordered_transcript(api):
     conversation_id = _conversation()
     body = api.get(f"/api/conversations/{conversation_id}").json()

@@ -16,6 +16,7 @@ from app.agent import entrypoint, prefetch
 from app.agent.prefetch import Lookup, Prefetcher
 from app.agent.turn_judge import Judgement
 from app.agent.turn_router import RouterArgs
+from app.bss.errors import BssError
 from app.config import Settings
 from app.services import agent_config_service
 
@@ -48,8 +49,18 @@ class FakeSession:
 
 @pytest.fixture
 def tools(monkeypatch):
-    """The knowledge-base core, recording its calls."""
+    """The knowledge-base and package-search cores, recording their calls."""
     calls: list[tuple[str, dict]] = []
+
+    async def run_db(fn):
+        return fn("fake-db")
+
+    def search_packages_text(db, **args):
+        calls.append(("packages", args))
+        return "Found 2 packages: Net 7GB 7 days, 299 taka"
+
+    monkeypatch.setattr(prefetch, "run_db", run_db)
+    monkeypatch.setattr(prefetch, "search_packages_text", search_packages_text)
 
     def search_text(query, config):
         calls.append(("knowledge_base", {"query": query}))
@@ -95,6 +106,7 @@ def _run(p: Prefetcher, text: str, judgement: Judgement):
 
 
 _KB = RouterArgs(knowledge_query="5g plan price")
+_PKG = RouterArgs(packages={"kind": "data", "max_price": 300})
 _KB_NAME = prefetch.search_knowledge_base.TOOL_NAME
 _KB_ARGS = {"query": "5g plan price"}
 
@@ -115,6 +127,28 @@ def test_a_lookup_runs_before_the_llm_and_reads_as_its_own_tool_call(monkeypatch
     messages, _ = turn_ctx.to_provider_format("openai")
     assert [m["role"] for m in messages] == ["user", "assistant", "tool"]
     assert messages[1]["tool_calls"][0]["function"]["name"] == _KB_NAME
+
+
+def test_a_package_lookup_injects_a_search_packages_call_and_its_output(monkeypatch, tools):
+    p, _ = _prefetcher(monkeypatch, _PKG)
+    lookups, turn_ctx, message = _run(p, "৩০০ টাকার নেট প্যাক?", Judgement(0.9, "packages", 0.97))
+
+    assert tools == [("packages", {"kind": "data", "max_price": 300})]
+    assert [lookup.name for lookup in lookups] == ["search_packages"]
+    user, call, output = turn_ctx.items
+    assert user is message and call.name == "search_packages"
+    assert json.loads(call.arguments) == {"kind": "data", "max_price": 300}
+    assert output.call_id == call.call_id and output.output.startswith("Found 2 packages")
+
+
+def test_a_package_search_the_catalogue_refuses_leaves_it_to_the_llm(monkeypatch, tools):
+    def refuse(db, **args):
+        raise BssError("bad kind")
+
+    monkeypatch.setattr(prefetch, "search_packages_text", refuse)
+    p, _ = _prefetcher(monkeypatch, _PKG)
+    lookups, _, _ = _run(p, "৩০০ টাকার নেট প্যাক?", Judgement(0.9, "packages", 0.97))
+    assert lookups == []
 
 
 def test_the_lookup_is_kept_only_once_the_reply_is_scheduled(monkeypatch, tools):
@@ -149,6 +183,7 @@ def test_the_query_falls_back_to_the_customers_words(monkeypatch, tools):
         (_KB, Judgement(0.9, "knowledge_base", 0.4)),  # Jev unsure
         (_KB, Judgement(0.9)),  # no lookup answer
         (_KB, Judgement(0.9, "listings", 0.98)),  # lookups of the old domain are gone
+        (_PKG, Judgement(0.9, "packages", 0.4)),  # Jev unsure
         (None, Judgement(0.9, "knowledge_base", 0.98)),  # extractor failed or timed out
     ],
 )
@@ -212,7 +247,7 @@ def test_warm_up_opens_the_router_and_jev_connections_once():
         requests.append(request.url.path)
         if request.url.path.endswith("/chat/completions"):
             content = json.dumps(
-                {"search": {}, "offers": {}, "knowledge_query": None}
+                {"packages": {}, "knowledge_query": None}
             )
             return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
         return httpx.Response(200, json={"data": {}})

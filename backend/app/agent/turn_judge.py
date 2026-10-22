@@ -29,23 +29,24 @@ QUESTION_KEY = "addressed"
 LOOKUP_KEY = "lookup"
 
 _INSTRUCTIONS = (
-    "A real estate agency's voice assistant is in a live call with a customer in Dhaka. "
+    "A mobile operator's voice assistant is in a live call with a customer in Bangladesh. "
     "The microphone also picks up other people in the room and background audio (TV, "
     "chatter). Decide whether the latest utterance is the customer speaking to the "
-    "assistant about the real estate conversation, given the recent conversation. "
+    "assistant about their mobile service, given the recent conversation. "
     "Customers speak English or Bangla; they address the assistant politely (আপনি), while "
     "family or friends in the room are addressed as তুমি/তুই. Short answers to the "
-    "assistant's last question (a name, an email, a date, a number, yes/no) count. "
+    "assistant's last question (a number, a code, yes/no, a package name) count, and so "
+    "does someone reading out a 4 to 8 digit code. "
     "Requests on other topics (sports, news, weather, politics, general knowledge) do not "
     "count, even when asked to the assistant directly."
 )
 
 _CRITERIA = {
     "true": (
-        "The customer is talking to the assistant about the real estate conversation: "
-        "answering its question, asking about property, price, area, viewing, financing or "
-        "the agency, correcting it, asking it to wait, stop or repeat, or a brief greeting, "
-        "thanks or goodbye."
+        "The customer is talking to the assistant about their mobile service: answering its "
+        "question or reading out a code, asking about balance, packages, usage, offers, "
+        "recharge, a complaint or the operator, correcting it, asking it to wait, stop or "
+        "repeat, or a brief greeting, thanks or goodbye."
     ),
     "false": (
         "Someone talking to another person in the room, TV or radio audio, a request about "
@@ -57,29 +58,26 @@ _CRITERIA = {
 
 _LOOKUP_INSTRUCTIONS = (
     "Which lookup does the assistant need before it can answer the latest utterance? "
-    "Pick a search only when the customer asks for properties or offers, or gives or "
-    "changes what they want (area, budget, renting or buying, bedrooms, property type). "
-    "Questions about listings already shown, booking a viewing, giving their name or "
-    "phone, greetings and thanks need no lookup."
+    "Pick packages only when the customer asks what packs exist or gives what they want "
+    "in a pack (data, minutes, price, validity). Questions about their own account "
+    "(balance, usage, current pack) are answered from the account snapshot or by the "
+    "assistant's own tools, so they need no lookup here. Buying, recharging, redeeming, "
+    "reading out a code, filing a complaint, greetings and thanks need no lookup either."
 )
 
 _LOOKUP_CRITERIA = {
-    "listings": (
-        "Search property listings: the customer asks what's available, or gives or changes "
-        "search criteria (area, budget, rent or buy, bedrooms, property type)."
+    "packages": (
+        "Search the operator's packages: the customer asks what packs are available, or "
+        "gives or changes what they want (data amount, minutes, price, validity)."
     ),
-    "listings_with_offers": (
-        "Search listings and the offers on them: the customer wants properties that have "
-        "offers, discounts or deals."
-    ),
-    "offers": "Only offers or discounts, without a new property search.",
     "knowledge_base": (
-        "A question about the agency, its policies, fees, process or the area in general, "
-        "not about specific listings."
+        "A question about the operator, its policies, coverage, fees or how a service "
+        "works, not about the customer's own account."
     ),
     "none": (
-        "No lookup: a greeting, thanks, goodbye, a question about listings already shown, "
-        "booking details, or anything else."
+        "No lookup: a question about the customer's own account (balance, usage, current "
+        "pack, offers), a purchase, recharge, redeem or complaint request, a code being "
+        "read out, a greeting, thanks, goodbye, or anything else."
     ),
 }
 
@@ -113,7 +111,6 @@ def build_state(
     utterance: str,
     bot_state: BotState,
     address_form: str | None = None,
-    search_context: str | None = None,
 ) -> str:
     lines = ["Recent conversation:"]
     lines += [f"{'Customer' if e.role == 'user' else 'Assistant'}: {e.text}" for e in history]
@@ -127,18 +124,7 @@ def build_state(
     lines.append(f"While the assistant was {activity}, the microphone picked up: {utterance!r}")
     if address_form:
         lines.append(f"Form of address used in the utterance: {address_form}")
-    if search_context:
-        lines.append(search_context)
     return "\n".join(lines)
-
-
-def search_context(last_search: dict | None, shown_listings: int) -> str:
-    """What has been searched so far, so Jev can tell a follow-up on shown
-    listings from a new search."""
-    if not shown_listings and not last_search:
-        return "No search has been run yet in this conversation."
-    criteria = ", ".join(f"{k}={v}" for k, v in (last_search or {}).items()) or "no criteria"
-    return f"Last search: {criteria}; {shown_listings} listings shown to the customer so far."
 
 
 def lookup_question(knowledge_base: bool) -> dict:
@@ -157,11 +143,9 @@ def build_request(
     *,
     lookup: bool = False,
     knowledge_base: bool = False,
-    search_context: str | None = None,
 ) -> dict:
     """lookup adds the router's choice question (knowledge_base: whether that's
-    an option); search_context is a line about the search so far, so a follow-up
-    on shown listings isn't taken for a new search."""
+    an option)."""
     questions: dict = {
         QUESTION_KEY: {
             "type": "noul",
@@ -173,7 +157,7 @@ def build_request(
         questions[LOOKUP_KEY] = lookup_question(knowledge_base)
     return {
         "model": model,
-        "state": build_state(history, utterance, bot_state, address_form, search_context),
+        "state": build_state(history, utterance, bot_state, address_form),
         "questions": questions,
         # Customer speech: keep it out of provider training data.
         "provider": {"data_collection": "deny"},

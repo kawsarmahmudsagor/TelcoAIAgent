@@ -21,12 +21,13 @@ Language = Literal["en", "bn"]
 # Numbers spelled out, as speak_numbers_as_words does for the agent's replies.
 _SAMPLES: dict[Language, str] = {
     "en": (
-        "Hi! This is {agent_name} from {operator_name}. I found a lovely three-bedroom flat "
-        "in Gulshan for twenty-five lakh taka. Would you like to visit it this Friday?"
+        "Hi! This is {agent_name} from {operator_name}. Your main balance is four hundred "
+        "eighty-six taka, and your data pack is valid for five more days. Shall I show you "
+        "some new packs?"
     ),
     "bn": (
-        "আসসালামু আলাইকুম! আমি {operator_name} থেকে {agent_name} বলছি। গুলশানে তিন বেডরুমের "
-        "একটা সুন্দর ফ্ল্যাট পেয়েছি, দাম পঁচিশ লাখ টাকা। এই শুক্রবার দেখতে আসবেন?"
+        "আসসালামু আলাইকুম! আমি {operator_name} থেকে {agent_name} বলছি। আপনার মেইন ব্যালেন্স "
+        "চারশো ছিয়াশি টাকা, আর ডাটা প্যাকের মেয়াদ আছে আরও পাঁচ দিন। নতুন কিছু প্যাক দেখাব?"
     ),
 }
 

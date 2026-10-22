@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import httpx
 import pytest
+from word_checks import real_estate_words
 from livekit.agents import llm
 from livekit.agents.voice.generation import INSTRUCTIONS_MESSAGE_ID
 
@@ -45,7 +46,8 @@ def _config(**overrides):
 
 @dataclass
 class _Userdata:
-    pass
+    pending_action: object | None = None
+    pending_case: object | None = None
 
 
 # --- route -----------------------------------------------------------------------------
@@ -56,9 +58,9 @@ class _Userdata:
     [
         (Judgement(0.9, "none", 0.9), "fast"),
         (Judgement(0.9, "none", 0.5), None),  # not sure enough no lookup is needed
-        (Judgement(0.9, "listings", 0.8), "filler"),
+        (Judgement(0.9, "packages", 0.8), "filler"),
         (Judgement(0.9, "knowledge_base", 0.8), "filler"),
-        (Judgement(0.9, "offers", 0.4), None),  # weak guess at a search: no "let me find that"
+        (Judgement(0.9, "packages", 0.4), None),  # weak guess at a lookup: no filler line
         (Judgement(0.9, None, None), None),  # the lookup question wasn't asked
         (Judgement(None), None),
         (None, None),
@@ -70,11 +72,20 @@ def test_route(judgement, expected):
 
 def test_route_off_switches():
     s = _settings()
-    none, search = Judgement(0.9, "none", 0.9), Judgement(0.9, "listings", 0.9)
+    none, search = Judgement(0.9, "none", 0.9), Judgement(0.9, "packages", 0.9)
     assert route(none, _Userdata(), _config(quick_reply_enabled=False), s) is None
     assert route(search, _Userdata(), _config(quick_reply_enabled=False), s) is None
     assert route(none, _Userdata(), _config(quick_fast_answer=False), s) is None
     assert route(search, _Userdata(), _config(quick_filler=False), s) is None
+
+
+@pytest.mark.parametrize("pending", ["pending_action", "pending_case"])
+def test_route_is_none_while_something_is_pending(pending):
+    userdata = _Userdata(**{pending: object()})
+    s = _settings()
+    assert route(Judgement(0.9, "none", 0.99), userdata, _config(), s) is None
+    assert route(Judgement(0.9, "packages", 0.99), userdata, _config(), s) is None
+    assert route(None, userdata, _config(), s, closing=True) is None
 
 
 def test_a_goodbye_goes_to_the_small_model_without_jev():
@@ -90,10 +101,10 @@ def test_avoid_keeps_the_utterance_script():
         "Let me check.", "দেখছি।", "One moment.", "Looking now.", "Finding those.",
         "Okay.", "Sure, checking.",
     ]
-    assert runtime.avoid("any flats?") == [
+    assert runtime.avoid("any packs?") == [
         "One moment.", "Looking now.", "Finding those.", "Okay.", "Sure, checking.",
     ]
-    assert runtime.avoid("ফ্ল্যাট আছে?") == ["দেখছি।"]
+    assert runtime.avoid("প্যাক আছে?") == ["দেখছি।"]
 
 
 # --- filler ----------------------------------------------------------------------------
@@ -102,13 +113,13 @@ def test_avoid_keeps_the_utterance_script():
 @pytest.mark.parametrize(
     ("line", "utterance", "ok"),
     [
-        ("Let me find those Gulshan flats for you.", "flats in Gulshan?", True),
-        ("আপনার জন্য গুলশানের ফ্ল্যাটগুলো দেখছি।", "গুলশানে ফ্ল্যাট আছে?", True),
-        ("Finding 3 bedroom flats for you.", "3 bedroom flats?", True),  # echoes their number
-        ("We have 4 flats ready for you.", "any flats?", False),  # a number of its own
-        ("Flats from 50 lakh, one moment.", "flats with 50 parking", False),  # money
+        ("Let me check the data packs for you.", "any data packs?", True),
+        ("আপনার জন্য প্যাকগুলো দেখছি।", "ডাটা প্যাক আছে?", True),
+        ("Checking 300 taka packs for you.", "packs under 300 taka?", True),  # echoes their number
+        ("We have 4 packs ready for you.", "any packs?", False),  # a number of its own
+        ("Balance is 50 taka, one moment.", "what is my balance", False),  # money
         ("Call 01711223344 for the details.", "details?", False),  # contact
-        ("Do you want rent or buy?", "flats?", False),  # a question
+        ("Do you want data or minutes?", "packs?", False),  # a question
         ("One two three four five six seven eight nine ten eleven", "x", False),  # too long
         ("", "x", False),
     ],
@@ -123,12 +134,12 @@ def _completion(content: str) -> httpx.Response:
     )
 
 
-def _compose(handler, utterance="গুলশানে ফ্ল্যাট আছে?", timeout_s=1.0):
+def _compose(handler, utterance="ডাটা প্যাক আছে?", timeout_s=1.0):
     async def go():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             return await compose_filler(
-                client, _BASE, "or-key", "google/gemini-3.5-flash-lite", utterance, "listings",
-                [Exchange("assistant", "কী ধরনের বাসা খুঁজছেন?")], ["দেখছি।"], timeout_s=timeout_s,
+                client, _BASE, "or-key", "google/gemini-3.5-flash-lite", utterance, "packages",
+                [Exchange("assistant", "কী ধরনের প্যাক চান?")], ["দেখছি।"], timeout_s=timeout_s,
             )  # fmt: skip
 
     return asyncio.run(go())
@@ -141,9 +152,9 @@ def test_compose_filler_request_and_line():
         seen["url"] = str(request.url)
         seen["auth"] = request.headers["authorization"]
         seen["body"] = json.loads(request.content)
-        return _completion(json.dumps({"text": "আপনার জন্য গুলশানের ফ্ল্যাটগুলো দেখছি।"}))
+        return _completion(json.dumps({"text": "আপনার জন্য প্যাকগুলো দেখছি।"}))
 
-    assert _compose(handler) == "আপনার জন্য গুলশানের ফ্ল্যাটগুলো দেখছি।"
+    assert _compose(handler) == "আপনার জন্য প্যাকগুলো দেখছি।"
     assert seen["url"] == f"{_BASE}/chat/completions"
     assert seen["auth"] == "Bearer or-key"
     body = seen["body"]
@@ -152,10 +163,10 @@ def test_compose_filler_request_and_line():
     assert body["provider"]["data_collection"] == "deny"
     assert body["temperature"] == 0
     user = body["messages"][1]["content"]
-    assert "Assistant: কী ধরনের বাসা খুঁজছেন?" in user
-    assert "What is being looked up: listings." in user
+    assert "Assistant: কী ধরনের প্যাক চান?" in user
+    assert "What is being looked up: packages." in user
     assert "Already said (don't repeat): দেখছি।" in user
-    assert user.endswith("Customer's new message: গুলশানে ফ্ল্যাট আছে?")
+    assert user.endswith("Customer's new message: ডাটা প্যাক আছে?")
 
 
 def test_compose_filler_drops_unsafe_and_broken_answers():
@@ -310,3 +321,18 @@ def test_marker_cut_at_the_buffer_edge_is_never_spoken():
 
 def test_quick_reply_module_imports_without_a_worker():
     assert quick_reply.FILLER_MAX_WORDS == 10
+
+
+def test_fast_and_filler_prompts_are_telco_only():
+    assert not real_estate_words(FAST_RULES)
+    assert not real_estate_words(quick_reply._FILLER_SYSTEM)
+
+
+def test_fast_rules_hand_off_telco_facts_and_codes():
+    for needle in ("balance", "recharge", "4 to 8 digit", "complain", "redeem"):
+        assert needle in FAST_RULES
+
+
+def test_filler_examples_are_telco():
+    for line in ("ব্যালেন্সটা চেক করছি।", "প্যাকগুলো দেখছি।", "Checking your account."):
+        assert line in quick_reply._FILLER_SYSTEM

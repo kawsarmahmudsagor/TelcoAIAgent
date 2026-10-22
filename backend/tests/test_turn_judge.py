@@ -2,10 +2,12 @@
 an httpx.MockTransport, never the network."""
 
 import asyncio
+import inspect
 import json
 
 import httpx
 import pytest
+from word_checks import real_estate_words
 
 from app.agent import turn_judge
 from app.agent.turn_judge import Exchange, Judgement, build_request, decisions_url, judge
@@ -40,10 +42,10 @@ def test_decisions_url(base, expected):
 
 def test_request_is_one_noul_question_with_the_conversation_as_state():
     history = [
-        Exchange("user", "বনানীতে ফ্ল্যাট লাগবে"),
-        Exchange("assistant", "আপনার বাজেট কত?"),
+        Exchange("user", "ডাটা প্যাক লাগবে"),
+        Exchange("assistant", "কত টাকার মধ্যে?"),
     ]
-    body = build_request("typesafe/jev-1.13", history, "৫০ লাখ", "speaking", "formal")
+    body = build_request("typesafe/jev-1.13", history, "তিনশো টাকা", "speaking", "formal")
     assert body["model"] == "typesafe/jev-1.13"
     (key,) = body["questions"]
     assert key == turn_judge.QUESTION_KEY
@@ -51,9 +53,9 @@ def test_request_is_one_noul_question_with_the_conversation_as_state():
     assert question["type"] == "noul"
     assert set(question["criteria"]) == {"true", "false"}
     state = body["state"]
-    assert "Customer: বনানীতে ফ্ল্যাট লাগবে" in state
-    assert "Assistant: আপনার বাজেট কত?" in state
-    assert "'৫০ লাখ'" in state
+    assert "Customer: ডাটা প্যাক লাগবে" in state
+    assert "Assistant: কত টাকার মধ্যে?" in state
+    assert "'তিনশো টাকা'" in state
     assert "speaking" in state
     assert "formal" in state
 
@@ -113,16 +115,26 @@ def test_lookup_question_is_added_only_when_asked():
     plain = build_request("m", [], "hi", "listening")
     assert set(plain["questions"]) == {turn_judge.QUESTION_KEY}
 
-    routed = build_request(
-        "m", [], "Uttara-te flat ache?", "listening", lookup=True, search_context="Last search: x"
-    )
+    routed = build_request("m", [], "৩০০ টাকার প্যাক আছে?", "listening", lookup=True)
     question = routed["questions"][turn_judge.LOOKUP_KEY]
     assert question["type"] == "choice"
-    assert set(question["criteria"]) == {"listings", "listings_with_offers", "offers", "none"}
-    assert "Last search: x" in routed["state"]
+    assert set(question["criteria"]) == {"packages", "none"}  # knowledge_base only with RAG
+    assert "search" not in routed["state"].lower()
 
     with_kb = build_request("m", [], "hi", "listening", lookup=True, knowledge_base=True)
-    assert "knowledge_base" in with_kb["questions"][turn_judge.LOOKUP_KEY]["criteria"]
+    criteria = with_kb["questions"][turn_judge.LOOKUP_KEY]["criteria"]
+    assert set(criteria) == {"packages", "knowledge_base", "none"}
+
+
+def test_request_takes_no_search_context():
+    assert "search_context" not in inspect.signature(build_request).parameters
+    assert not hasattr(turn_judge, "search_context")
+
+
+def test_prompts_have_no_real_estate_words():
+    body = build_request("m", [], "hi", "listening", lookup=True, knowledge_base=True)
+    text = json.dumps(body["questions"], ensure_ascii=False)
+    assert not real_estate_words(text)
 
 
 def test_returns_the_lookup_choice_and_its_probability():
@@ -131,13 +143,13 @@ def test_returns_the_lookup_choice_and_its_probability():
             "addressed": {"type": "noul", "noul": 0.72},
             "lookup": {
                 "type": "choice",
-                "choice": "listings_with_offers",
-                "probabilities": {"listings": 0.04, "listings_with_offers": 0.96},
+                "choice": "packages",
+                "probabilities": {"packages": 0.96, "none": 0.04},
                 "confidence": 0.95,
             },
         }})  # fmt: skip
 
-    assert _judgement(handler, lookup=True) == Judgement(0.72, "listings_with_offers", 0.96)
+    assert _judgement(handler, lookup=True) == Judgement(0.72, "packages", 0.96)
 
 
 def test_lookup_falls_back_to_confidence_and_tolerates_a_bad_answer():
