@@ -14,18 +14,16 @@ class AgentConfigOut(BaseModel):
     saying which ones are still on their default."""
 
     assistant_name: str
-    agency_name: str
-    agency_phone: str
-    agency_address: str
+    operator_name: str
+    operator_phone: str
+    operator_address: str
     # Template text; *_is_default = nothing saved, the code default is shown.
     prompt_identity_rules: str
     prompt_is_default: bool
     greeting_inbound: str
     greeting_inbound_is_default: bool
-    greeting_coldcall: str
-    greeting_coldcall_is_default: bool
-    greeting_followup: str
-    greeting_followup_is_default: bool
+    greeting_nudge: str
+    greeting_nudge_is_default: bool
 
     llm_provider: LlmProviderLiteral
     llm_model: str
@@ -76,13 +74,12 @@ class AgentConfigUpdate(BaseModel):
     api_key is write-only: omitted/null keeps the saved key, "" clears it."""
 
     assistant_name: str | None = Field(default=None, max_length=100)
-    agency_name: str | None = Field(default=None, max_length=255)
-    agency_phone: str | None = Field(default=None, max_length=50)
-    agency_address: str | None = Field(default=None, max_length=255)
+    operator_name: str | None = Field(default=None, max_length=255)
+    operator_phone: str | None = Field(default=None, max_length=50)
+    operator_address: str | None = Field(default=None, max_length=255)
     prompt_identity_rules: str | None = Field(default=None, max_length=20000)
     greeting_inbound: str | None = Field(default=None, max_length=2000)
-    greeting_coldcall: str | None = Field(default=None, max_length=2000)
-    greeting_followup: str | None = Field(default=None, max_length=2000)
+    greeting_nudge: str | None = Field(default=None, max_length=2000)
 
     llm_provider: LlmProviderLiteral | None = None
     llm_model: str | None = Field(default=None, max_length=255)

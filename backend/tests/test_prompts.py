@@ -54,8 +54,8 @@ def test_unknown_details_point_to_the_agency_contact():
     config = agent_config_service.resolve(None)
     for rag in (False, True):
         for name, prompt in _prompts(rag=rag).items():
-            assert config.agency_phone in prompt, (name, rag)
-            assert config.agency_address in prompt, (name, rag)
+            assert config.operator_phone in prompt, (name, rag)
+            assert config.operator_address in prompt, (name, rag)
             flat = _flat(prompt)
             assert "never say you don't have the information" in flat, (name, rag)
             assert "আমাদের কাছে নেই" in flat, (name, rag)

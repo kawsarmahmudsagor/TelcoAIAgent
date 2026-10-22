@@ -17,13 +17,13 @@ from app.services.agent_config_service import render_template
 from app.services.secrets import decrypt_secret
 
 _COLUMNS = [
-    "assistant_name", "agency_name", "agency_phone", "agency_address", "prompt_identity_rules",
-    "greeting_inbound", "greeting_coldcall", "llm_provider", "llm_model", "temperature", "max_output_tokens",
+    "assistant_name", "operator_name", "operator_phone", "operator_address", "prompt_identity_rules",
+    "greeting_inbound", "greeting_nudge", "llm_provider", "llm_model", "temperature", "max_output_tokens",
     "reasoning_effort", "api_key_encrypted", "stt_tts_provider", "deepgram_tts_model", "elevenlabs_voice_id",
     "elevenlabs_tts_model", "rag_enabled", "rag_top_k", "rag_similarity_threshold", "embedding_model", "chunk_size",
     "chunk_overlap", "embedding_migration_status", "embedding_migration_target",
     "embedding_migration_error", "quick_reply_enabled", "quick_fast_answer", "quick_filler",
-    "quick_reply_model", "greeting_followup",
+    "quick_reply_model",
 ]  # fmt: skip
 
 
@@ -63,11 +63,11 @@ def _reset_all(api):
     body = {
         field: None
         for field in (
-            "assistant_name", "agency_name", "agency_phone", "agency_address",
-            "prompt_identity_rules", "greeting_inbound", "greeting_coldcall", "llm_provider",
+            "assistant_name", "operator_name", "operator_phone", "operator_address",
+            "prompt_identity_rules", "greeting_inbound", "greeting_nudge", "llm_provider",
             "llm_model", "temperature",
             "max_output_tokens", "reasoning_effort", "stt_tts_provider", "deepgram_tts_model",
-            "elevenlabs_voice_id", "elevenlabs_tts_model", "quick_reply_model", "greeting_followup",
+            "elevenlabs_voice_id", "elevenlabs_tts_model", "quick_reply_model",
         )
     }  # fmt: skip
     body["api_key"] = ""
@@ -87,7 +87,7 @@ def test_null_config_falls_back_to_env(api):
     settings = get_settings()
     body = _reset_all(api)
     assert body["assistant_name"] == settings.agent_display_name
-    assert body["agency_name"] == settings.agency_name
+    assert body["operator_name"] == settings.operator_name
     assert body["llm_provider"] == settings.llm_provider
     expected_model = (
         settings.openrouter_model if settings.llm_provider == "openrouter" else settings.gemini_model
@@ -104,35 +104,35 @@ def test_null_config_falls_back_to_env(api):
 def test_patch_sets_and_null_resets(api):
     body = api.patch(
         "/api/agent-config",
-        json={"assistant_name": "  Nadia ", "agency_name": "Test Homes", "temperature": 0.4},
+        json={"assistant_name": "  Nadia ", "operator_name": "Test Homes", "temperature": 0.4},
     ).json()
     assert body["assistant_name"] == "Nadia"
-    assert body["agency_name"] == "Test Homes"
+    assert body["operator_name"] == "Test Homes"
     assert body["temperature"] == 0.4
     # Unsent fields are untouched; null goes back to the env default.
     body = api.patch("/api/agent-config", json={"assistant_name": None}).json()
     assert body["assistant_name"] == get_settings().agent_display_name
-    assert body["agency_name"] == "Test Homes"
+    assert body["operator_name"] == "Test Homes"
 
 
-def test_agency_contact_round_trips_and_blank_resets(api):
+def test_operator_contact_round_trips_and_blank_resets(api):
     settings = get_settings()
     body = _reset_all(api)
-    assert body["agency_phone"] == settings.agency_phone
-    assert body["agency_address"] == settings.agency_address
+    assert body["operator_phone"] == settings.operator_phone
+    assert body["operator_address"] == settings.operator_address
     body = api.patch(
         "/api/agent-config",
-        json={"agency_phone": "01900000000", "agency_address": "Road 2, Banani, Dhaka"},
+        json={"operator_phone": "01900000000", "operator_address": "Road 2, Banani, Dhaka"},
     ).json()
-    assert body["agency_phone"] == "01900000000"
-    assert body["agency_address"] == "Road 2, Banani, Dhaka"
+    assert body["operator_phone"] == "01900000000"
+    assert body["operator_address"] == "Road 2, Banani, Dhaka"
     resolved = agent_config_service.load()
-    assert resolved.agency_phone == "01900000000"
+    assert resolved.operator_phone == "01900000000"
     assert "01900000000" in build_system_prompt(_inbound(), resolved)
     # Blank = back to the env default.
-    body = api.patch("/api/agent-config", json={"agency_phone": "  "}).json()
-    assert body["agency_phone"] == settings.agency_phone
-    assert body["agency_address"] == "Road 2, Banani, Dhaka"
+    body = api.patch("/api/agent-config", json={"operator_phone": "  "}).json()
+    assert body["operator_phone"] == settings.operator_phone
+    assert body["operator_address"] == "Road 2, Banani, Dhaka"
 
 
 def test_reasoning_effort_null_is_the_server_default(api):
@@ -220,11 +220,11 @@ def test_incoming_call_identity_follows_config():
     db = SessionLocal()
     try:
         row = agent_config_repo.get_or_create(db)
-        agent_config_repo.update(db, row, {"assistant_name": None, "agency_name": "Config Realty"})
+        agent_config_repo.update(db, row, {"assistant_name": None, "operator_name": "Config Realty"})
         resolved = agent_config_service.resolve(agent_config_repo.get(db))
     finally:
         db.close()
-    assert resolved.agency_name == "Config Realty"
+    assert resolved.operator_name == "Config Realty"
     assert resolved.assistant_name == get_settings().agent_display_name
 
 
@@ -290,10 +290,7 @@ def test_saving_api_key_without_encryption_key_is_400(api, no_encryption_key):
         ("prompt_identity_rules", "Hello {}.", "positional"),
         ("prompt_identity_rules", "A JSON example: {", "Literal braces must be doubled"),
         ("greeting_inbound", "Greet {client_name}.", "Unknown placeholder {client_name}"),
-        ("greeting_coldcall", "Greet {current_date}.", "Unknown placeholder {current_date}"),
-        # The viewing's placeholders are for the follow-up greeting only.
-        ("greeting_coldcall", "About {viewing_time}.", "Unknown placeholder {viewing_time}"),
-        ("greeting_followup", "Greet {current_date}.", "Unknown placeholder {current_date}"),
+        ("greeting_nudge", "Greet {current_date}.", "Unknown placeholder {current_date}"),
     ],
 )
 def test_invalid_templates_are_422(api, field, template, problem):
@@ -308,22 +305,19 @@ def test_valid_templates_are_saved(api):
     body = api.patch(
         "/api/agent-config",
         json={
-            "prompt_identity_rules": "You are {agent_name} of {agency_name}. Use {{braces}}.",
-            "greeting_coldcall": "Say hi to {client_name} from {agency_name}.",
-            "greeting_followup": "Ask {client_name} about {property} on {viewing_time}.",
+            "prompt_identity_rules": "You are {agent_name} of {operator_name}. Use {{braces}}.",
+            "greeting_nudge": "Say hi to {customer_name} from {operator_name}: {nudge_text}.",
         },
     ).json()
     assert body["prompt_is_default"] is False
-    assert body["greeting_coldcall_is_default"] is False
-    assert body["greeting_followup_is_default"] is False
-    assert body["greeting_followup"] == "Ask {client_name} about {property} on {viewing_time}."
+    assert body["greeting_nudge_is_default"] is False
     assert body["greeting_inbound_is_default"] is True
 
 
-def test_followup_greeting_defaults_until_saved(api):
-    body = api.get("/api/agent-config").json()
-    assert body["greeting_followup_is_default"] is True
-    assert "{viewing_time}" in body["greeting_followup"]
+def test_nudge_greeting_defaults_until_saved(api):
+    body = _reset_all(api)
+    assert body["greeting_nudge_is_default"] is True
+    assert "{nudge_text}" in body["greeting_nudge"]
 
 
 def test_reset_prompt_and_default_text_store_null(api):
@@ -351,8 +345,8 @@ def test_build_system_prompt_without_config_uses_defaults(api):
 def test_build_system_prompt_with_config():
     config = agent_config_service.resolve(None)
     config.assistant_name = "Nadia"
-    config.agency_name = "Test Homes"
-    config.prompt_identity_rules = "You are {agent_name} at {agency_name}. Today is {current_date}."
+    config.operator_name = "Test Homes"
+    config.prompt_identity_rules = "You are {agent_name} at {operator_name}. Today is {current_date}."
     prompt = build_system_prompt(_inbound(), config)
     assert prompt.startswith("You are Nadia at Test Homes. Today is ")
     # No {knowledge_scope} in the custom prompt -> appended automatically.
@@ -362,7 +356,7 @@ def test_build_system_prompt_with_config():
 
 def test_knowledge_scope_changes_when_rag_tool_available():
     config = agent_config_service.resolve(None)
-    config.agency_name = "Test Homes"
+    config.operator_name = "Test Homes"
     off = build_system_prompt(_inbound(), config)
     on = build_system_prompt(_inbound(), config, rag_tool_available=True)
     assert knowledge_scope_text(config, False) in off
@@ -386,7 +380,7 @@ def test_invalid_stored_template_falls_back_to_default():
     prompt = build_system_prompt(_inbound(), config)
     assert "Hi {secret" not in prompt
     assert "SCOPE" in prompt
-    values = {"agent_name": "A", "agency_name": "B"}
+    values = {"agent_name": "A", "operator_name": "B"}
     assert render_template("greeting_inbound", config.greeting_inbound, values) == (
         DEFAULT_GREETING_INBOUND.format(**values)
     )
@@ -469,8 +463,7 @@ def test_options_list_defaults(api):
     assert "elevenlabs/eleven-v4-turbo" in {
         m["id"] for m in body["elevenlabs_tts_models"]["openrouter"]
     }
-    assert "client_name" in body["placeholders"]["greeting_coldcall"]
-    assert {"property", "viewing_time"} <= set(body["placeholders"]["greeting_followup"])
+    assert {"customer_name", "nudge_text"} <= set(body["placeholders"]["greeting_nudge"])
     assert "knowledge_scope" in body["placeholders"]["prompt_identity_rules"]
     assert [m["id"] for m in body["quick_reply_models"]] == list(QUICK_REPLY_MODELS)
 
@@ -491,3 +484,19 @@ def test_options_list_defaults(api):
 def test_agent_config_routes_need_auth(anon_api, method, path):
     kwargs = {"json": {}} if method in {"patch", "post"} else {}
     assert getattr(anon_api, method)(path, **kwargs).status_code == 401
+
+
+def test_greeting_nudge_placeholders_validated(api):
+    ok = api.patch("/api/agent-config", json={"greeting_nudge": "Hi {customer_name}: {nudge_text}"})
+    assert ok.status_code == 200
+    bad = api.patch("/api/agent-config", json={"greeting_nudge": "Hi {client_name}"})
+    assert bad.status_code == 422
+
+
+def test_greeting_inbound_rejects_old_agency_placeholder(api):
+    assert api.patch("/api/agent-config", json={"greeting_inbound": "{agency_name}"}).status_code == 422
+
+
+def test_removed_greetings_not_in_api(api):
+    body = api.get("/api/agent-config").json()
+    assert "greeting_coldcall" not in body and "greeting_followup" not in body

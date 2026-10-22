@@ -45,18 +45,17 @@ class AgentConfig(TimestampedBase):
 
     # Identity
     assistant_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    agency_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    operator_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Where the agent sends customers for details it doesn't have.
-    agency_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    agency_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    operator_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    operator_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Prompt templates (str.format placeholders, validated on save)
     prompt_identity_rules: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Instructions passed to generate_reply, not text spoken verbatim.
     greeting_inbound: Mapped[str | None] = mapped_column(Text, nullable=True)
-    greeting_coldcall: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # A scheduled call to a lead with a booked viewing; greeting_coldcall is the rest.
-    greeting_followup: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Outbound nudge to a subscriber.
+    greeting_nudge: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # LLM
     llm_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)

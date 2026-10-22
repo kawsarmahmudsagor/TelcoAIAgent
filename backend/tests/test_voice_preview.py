@@ -26,8 +26,8 @@ def _settings(**values) -> Settings:
 
 def _config(**values) -> ResolvedAgentConfig:
     base = dict(
-        assistant_name="Alexa", agency_name="Horizon Realty", prompt_identity_rules=None,
-        greeting_inbound=None, greeting_coldcall=None, llm_provider="gemini", llm_model="m",
+        assistant_name="Alexa", operator_name="Horizon Realty", prompt_identity_rules=None,
+        greeting_inbound=None, greeting_nudge=None, llm_provider="gemini", llm_model="m",
         temperature=None, max_output_tokens=None, api_key="", stt_tts_provider="elevenlabs",
         deepgram_tts_model="aura-2-thalia-en", elevenlabs_voice_id="v",
     )  # fmt: skip

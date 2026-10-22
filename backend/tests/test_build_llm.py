@@ -8,10 +8,10 @@ from app.services.agent_config_service import ResolvedAgentConfig
 def _config(**overrides) -> ResolvedAgentConfig:
     values = dict(
         assistant_name="Alex",
-        agency_name="Horizon Realty",
+        operator_name="Horizon Realty",
         prompt_identity_rules=None,
         greeting_inbound=None,
-        greeting_coldcall=None,
+        greeting_nudge=None,
         llm_provider="openrouter",
         llm_model="openai/gpt-6-luna",
         temperature=None,

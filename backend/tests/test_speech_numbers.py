@@ -106,13 +106,13 @@ def test_phone_numbers_in_bangla_are_said_in_english(text, expected):
     assert numbers_to_bangla_words(text) == _bn(expected)
 
 
-def test_default_agency_phone_is_said_as_a_phone_number():
+def test_default_operator_phone_is_said_as_a_phone_number():
     # The prompt tells the agent to repeat this number as given.
     from app.config import get_settings
 
-    phone = get_settings().agency_phone
+    phone = get_settings().operator_phone
     bangla = phone.translate(str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯"))
-    spoken = "zero one seven double one two three four five six seven"
+    spoken = "zero one seven double zero one two double one two one"
     assert numbers_to_words(f"Call {phone} today") == f"Call {spoken} today"
     assert numbers_to_bangla_words(f"{bangla} নম্বরে কল করুন") == _bn(f"{spoken} নম্বরে কল করুন")
 

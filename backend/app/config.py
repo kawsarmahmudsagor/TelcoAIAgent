@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(".env", _REPO_ROOT_ENV), extra="ignore")
 
     # Postgres
-    database_url: str = "postgresql+psycopg://realestate:realestate@localhost:5432/realestate"
+    database_url: str = "postgresql+psycopg://telco:telco@localhost:5435/telco"
 
     # LiveKit
     livekit_url: str = "ws://127.0.0.1:7880"
@@ -150,13 +150,13 @@ class Settings(BaseSettings):
     # API key). Unset -> saving a key is refused; there's no insecure fallback.
     settings_encryption_key: str = ""
 
-    # Agency identity
-    agency_name: str = "Horizon Realty"
+    # Operator identity
+    operator_name: str = "telco."
     # Mock contact details: the agent points customers here for anything it
     # can't answer. Dashboard-editable (agent_config). One unbroken digit run:
     # speech_numbers only reads a number as a phone number in that form.
-    agency_phone: str = "01711234567"
-    agency_address: str = "House 12, Road 7, Gulshan 1, Dhaka 1212"
+    operator_phone: str = "01700121121"
+    operator_address: str = "telco. Experience Centre, Gulshan Avenue, Dhaka 1212"
     agent_display_name: str = "Anika"
     ceo_email: str = "ceo@example.com"
     # IANA zone the agent resolves spoken times in -- "tomorrow at 3pm" means

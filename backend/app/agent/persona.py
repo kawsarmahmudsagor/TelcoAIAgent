@@ -29,9 +29,9 @@ don't end the call.
 def knowledge_scope_text(config: ResolvedAgentConfig, rag_tool_available: bool) -> str:
     template = KNOWLEDGE_SCOPE_RAG if rag_tool_available else KNOWLEDGE_SCOPE_DEFAULT
     return template.format(
-        agency_name=config.agency_name,
-        agency_phone=config.agency_phone,
-        agency_address=config.agency_address,
+        operator_name=config.operator_name,
+        operator_phone=config.operator_phone,
+        operator_address=config.operator_address,
     )
 
 
@@ -54,7 +54,7 @@ def build_system_prompt(
         config.prompt_identity_rules,
         {
             "agent_name": config.assistant_name,
-            "agency_name": config.agency_name,
+            "operator_name": config.operator_name,
             "current_date": current_date,
             "timezone": tz.key,
             "knowledge_scope": knowledge_scope,

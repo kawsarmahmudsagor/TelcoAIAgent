@@ -72,11 +72,11 @@ def render_template(field: str, template: str | None, values: dict[str, str]) ->
 @dataclass
 class ResolvedAgentConfig:
     assistant_name: str
-    agency_name: str
+    operator_name: str
     # Raw templates (None = code default); render with render_template.
     prompt_identity_rules: str | None
     greeting_inbound: str | None
-    greeting_coldcall: str | None
+    greeting_nudge: str | None
     llm_provider: str
     llm_model: str
     temperature: float | None
@@ -98,15 +98,13 @@ class ResolvedAgentConfig:
     rag_source_ids: list[str] = field(default_factory=list)
     # OpenRouter reasoning effort (none/minimal/low/medium/high).
     reasoning_effort: str = "minimal"
-    agency_phone: str = ""
-    agency_address: str = ""
+    operator_phone: str = ""
+    operator_address: str = ""
     # Quick replies (app.agent.quick_reply): off unless the dashboard turns them on.
     quick_reply_enabled: bool = False
     quick_fast_answer: bool = True
     quick_filler: bool = True
     quick_reply_model: str = ""
-    # Raw template like the greetings above: a call to a lead with a booked viewing.
-    greeting_followup: str | None = None
 
 
 def default_model(provider: str, settings: Settings | None = None) -> str:
@@ -160,11 +158,10 @@ def resolve(row: AgentConfig | None, settings: Settings | None = None) -> Resolv
 
     return ResolvedAgentConfig(
         assistant_name=row.assistant_name or settings.agent_display_name,
-        agency_name=row.agency_name or settings.agency_name,
+        operator_name=row.operator_name or settings.operator_name,
         prompt_identity_rules=row.prompt_identity_rules,
         greeting_inbound=row.greeting_inbound,
-        greeting_coldcall=row.greeting_coldcall,
-        greeting_followup=row.greeting_followup,
+        greeting_nudge=row.greeting_nudge,
         llm_provider=provider,
         llm_model=row.llm_model or default_model(provider, settings),
         temperature=row.temperature,
@@ -186,8 +183,8 @@ def resolve(row: AgentConfig | None, settings: Settings | None = None) -> Resolv
         chunk_overlap=row.chunk_overlap if row.chunk_overlap is not None else 50,
         rag_source_ids=[str(source.id) for source in (row.rag_sources or [])],
         reasoning_effort=row.reasoning_effort or settings.llm_reasoning_effort,
-        agency_phone=row.agency_phone or settings.agency_phone,
-        agency_address=row.agency_address or settings.agency_address,
+        operator_phone=row.operator_phone or settings.operator_phone,
+        operator_address=row.operator_address or settings.operator_address,
         quick_reply_enabled=bool(row.quick_reply_enabled),
         quick_fast_answer=row.quick_fast_answer is not False,
         quick_filler=row.quick_filler is not False,

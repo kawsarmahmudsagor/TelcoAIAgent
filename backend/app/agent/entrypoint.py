@@ -605,7 +605,11 @@ def _greet(
     takes no input until it has played out (_mark_greeting_done). `room` is the
     browser room to flag the end of the greeting on; None for a phone call.
     `on_done` runs once input has reopened."""
-    values = {"agent_name": config.assistant_name, "agency_name": config.agency_name}
+    values = {
+        "agent_name": config.assistant_name,
+        "operator_name": config.operator_name,
+        "customer_name": "",
+    }
     field, template, lines = (
         "greeting_inbound",
         config.greeting_inbound,

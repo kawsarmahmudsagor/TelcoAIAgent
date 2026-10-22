@@ -21,11 +21,11 @@ Language = Literal["en", "bn"]
 # Numbers spelled out, as speak_numbers_as_words does for the agent's replies.
 _SAMPLES: dict[Language, str] = {
     "en": (
-        "Hi! This is {agent_name} from {agency_name}. I found a lovely three-bedroom flat "
+        "Hi! This is {agent_name} from {operator_name}. I found a lovely three-bedroom flat "
         "in Gulshan for twenty-five lakh taka. Would you like to visit it this Friday?"
     ),
     "bn": (
-        "আসসালামু আলাইকুম! আমি {agency_name} থেকে {agent_name} বলছি। গুলশানে তিন বেডরুমের "
+        "আসসালামু আলাইকুম! আমি {operator_name} থেকে {agent_name} বলছি। গুলশানে তিন বেডরুমের "
         "একটা সুন্দর ফ্ল্যাট পেয়েছি, দাম পঁচিশ লাখ টাকা। এই শুক্রবার দেখতে আসবেন?"
     ),
 }
@@ -53,7 +53,7 @@ class PreviewError(Exception):
 
 def sample_text(language: Language, config: ResolvedAgentConfig) -> str:
     return _SAMPLES[language].format(
-        agent_name=config.assistant_name, agency_name=config.agency_name
+        agent_name=config.assistant_name, operator_name=config.operator_name
     )
 
 

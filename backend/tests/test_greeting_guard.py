@@ -351,7 +351,7 @@ def test_a_default_greeting_is_a_canned_line_without_the_llm(monkeypatch):
 
     async def go():
         config = agent_config_service.resolve(None)
-        values = {"agent_name": config.assistant_name, "agency_name": config.agency_name}
+        values = {"agent_name": config.assistant_name, "operator_name": config.operator_name, "customer_name": ""}
         session, _, _ = await _greet(FakeHandle())
         (reply,) = session.replies
         assert reply["kind"] == "say"
