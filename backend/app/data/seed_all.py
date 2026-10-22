@@ -1,6 +1,6 @@
 import argparse
 
-from app.data import seed_telco
+from app.data import seed_kb, seed_telco
 from app.db.session import SessionLocal
 
 
@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> None:
             f"{n['transactions']} transactions, {n['cases']} cases, "
             f"{n['incidents']} incidents, {n['offers']} offers."
         )
+        print(f"Seeded {seed_kb.seed_kb(db)} KB sources.")
     finally:
         db.close()
 
