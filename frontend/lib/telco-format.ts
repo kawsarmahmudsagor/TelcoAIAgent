@@ -16,8 +16,9 @@ export function formatTaka(n: number): string {
 
 /** `"8.4 GB"` at 1024 MB or more, otherwise `"800 MB"`. */
 export function formatData(mb: number): string {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
-  return `${Math.round(mb)} MB`;
+  const wholeMb = Math.round(mb);
+  if (wholeMb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${wholeMb} MB`;
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

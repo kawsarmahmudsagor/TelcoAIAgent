@@ -225,9 +225,9 @@ export function ConversationsView() {
                 <>
                   <p className="text-foreground font-medium">No conversations yet</p>
                   <p>
-                    Start a chat on the{' '}
-                    <Link href="/home" className="text-primary underline underline-offset-2">
-                      website
+                    Start a chat in the{' '}
+                    <Link href="/" className="text-primary underline underline-offset-2">
+                      customer portal
                     </Link>{' '}
                     and its transcript appears here.
                   </p>

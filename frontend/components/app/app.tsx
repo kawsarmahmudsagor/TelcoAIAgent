@@ -97,7 +97,7 @@ export function App({ appConfig }: AppProps) {
       wasConnectedRef.current &&
       session.connectionState === ConnectionState.Disconnected
     ) {
-      router.replace('/home');
+      router.replace('/');
     }
   }, [existingRoomName, session.connectionState, router]);
 

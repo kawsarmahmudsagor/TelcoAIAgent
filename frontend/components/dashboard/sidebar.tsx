@@ -84,10 +84,10 @@ export function SidebarNav({
       ))}
 
       <a
-        href="/home"
+        href="/"
         target="_blank"
         rel="noreferrer"
-        title={rail ? 'Open the website' : undefined}
+        title={rail ? 'Open the customer portal' : undefined}
         className={cn(
           LINK,
           rail ? 'justify-center md:justify-start md:px-3' : 'px-3',
@@ -96,7 +96,7 @@ export function SidebarNav({
       >
         <ExternalLinkIcon className="size-4 shrink-0" aria-hidden="true" />
         <span className={cn('ml-3', rail && 'sr-only md:not-sr-only md:ml-3')}>
-          Open the website
+          Open the customer portal
         </span>
         <span className="sr-only"> (opens in a new tab)</span>
       </a>
