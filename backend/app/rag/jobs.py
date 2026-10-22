@@ -3,8 +3,8 @@
 
 The scheduler process calls `process_pending_jobs` every few seconds in a
 worker thread (app.scheduler.jobs.process_embedding_jobs), one batch at a
-time (max_instances=1), so the cold-call poller is never delayed by an
-embedding call.
+time (max_instances=1), so the scheduler's other jobs are never delayed
+by an embedding call.
 
 Lifecycle of a job:
 1. `reset_orphaned_jobs` (once, at scheduler start): anything left

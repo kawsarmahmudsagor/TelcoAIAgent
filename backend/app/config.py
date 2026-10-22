@@ -163,17 +163,6 @@ class Settings(BaseSettings):
     # 3pm here, not UTC. Shown to the LLM as "now" and attached to any naive
     # datetime a tool receives.
     agency_timezone: str = "Asia/Dhaka"
-    # Live viewings run from VIEWING_START_HOUR to VIEWING_END_HOUR (agency local
-    # time, any day). A viewing must start within them; the end hour itself is
-    # the last start time accepted (18 = 6 PM is fine, 6:15 PM isn't).
-    viewing_start_hour: int = Field(8, ge=0, le=23)
-    viewing_end_hour: int = Field(18, ge=1, le=24)
-
-    # Outbound cold calls: how long the agent waits for someone to answer
-    # (join the room) before marking the call "missed" and exiting. The
-    # dashboard's incoming-call screen rings for 60s, so keep this above that.
-    coldcall_ring_timeout_s: float = 120.0
-
     # Browser calls: after this long with no turn from the customer (background
     # speech the turn gate drops doesn't count), the agent asks whether they need
     # anything else, and ends the call if they say no or stay quiet for

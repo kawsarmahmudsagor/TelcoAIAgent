@@ -8,9 +8,9 @@ logger = logging.getLogger("livekit_rooms")
 
 
 async def delete_room(name: str) -> None:
-    """Best-effort room teardown. Deleting a cold-call room that nobody has
-    answered yet disconnects the agent job still waiting in it, so it exits
-    instead of idling until its ring timeout. Failures (room already gone,
+    """Best-effort room teardown. Deleting a room that nobody has joined yet
+    disconnects the agent job still waiting in it, so it exits instead of
+    idling until its wait times out. Failures (room already gone,
     LiveKit unreachable) are logged, not raised -- the call's status is the
     source of truth, not the room."""
     settings = get_settings()

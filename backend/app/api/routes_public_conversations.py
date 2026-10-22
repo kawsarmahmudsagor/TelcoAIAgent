@@ -5,7 +5,7 @@ keeps in localStorage and passes to the agent (via the token route's dispatch
 metadata), which stores it on the conversation row. The id is a bearer-like
 secret: it travels in the X-Visitor-Id header (not the query string, so it
 stays out of access logs), nothing is listed without it, a conversation of
-another visitor is a plain 404, and phone / cold-call conversations are never
+another visitor is a plain 404, and phone-call conversations are never
 returned. Responses carry no internal fields (room, client, schedule ids)."""
 
 import uuid
@@ -67,7 +67,7 @@ def list_visitor_conversations(
 
 
 # A plain str rather than uuid.UUID: a malformed id is just a conversation that
-# doesn't exist (404), like routes_public's listing pages.
+# doesn't exist (404).
 @router.get("/{conversation_id}", response_model=VisitorConversationDetail)
 def get_visitor_conversation(
     conversation_id: str,

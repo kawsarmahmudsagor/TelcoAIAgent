@@ -186,7 +186,7 @@ _VISIBLE_ROLES = (MessageRole.user.value, MessageRole.assistant.value)
 
 
 def _visitor_filters(visitor_id: uuid.UUID) -> list:
-    """A browser visitor's own chat conversations: never phone or cold calls."""
+    """A browser visitor's own chat conversations: never phone calls."""
     return [
         Conversation.visitor_id == visitor_id,
         Conversation.channel == "inbound_chat",

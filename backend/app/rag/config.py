@@ -16,7 +16,6 @@ COLLECTION_METADATA = {"hnsw:space": "cosine"}
 # source's vectors can be deleted without knowing their doc ids.
 RAG_SOURCE_ID_KEY = "rag_source_id"
 RAG_SOURCE_PAGE_ID_KEY = "rag_source_page_id"
-PROPERTY_ID_KEY = "property_id"
 
 
 def collection_for(embedding_model: str) -> str:

@@ -9,7 +9,7 @@ them itself, as it does without the router.
 
 The injected call and result are also written to the agent's chat context once
 the turn's user message is (only if the reply is scheduled), so later turns
-still see the listings.
+still see the lookup results.
 """
 
 import asyncio
