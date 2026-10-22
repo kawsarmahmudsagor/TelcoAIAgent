@@ -351,7 +351,9 @@ def test_build_system_prompt_with_config():
     assert prompt.startswith("You are Nadia at Test Homes. Today is ")
     # No {knowledge_scope} in the custom prompt -> appended automatically.
     assert knowledge_scope_text(config, False) in prompt
-    assert "mobile account questions" in prompt
+    assert "Help the customer with their mobile service" in prompt
+    # Never a shrug: unanswerable questions follow the hotline fallback.
+    assert "say so briefly" not in prompt
 
 
 def test_knowledge_scope_changes_when_rag_tool_available():

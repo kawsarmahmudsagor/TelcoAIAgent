@@ -184,6 +184,10 @@ def test_prompt_rules_present():
     assert "never repeat" in flat.lower()
     assert "PIN" in prompt
     assert "request_human_agent" in prompt
+    # Escalation is for account actions; information gaps go to the hotline.
+    assert "an account action no tool can perform" in flat
+    assert "when no tool can do what they need" not in flat
+    assert "say so briefly" not in flat
     assert "ACCOUNT SNAPSHOT pytest-marker" in prompt
     # After the identity block, before the task and closing notes.
     assert prompt.index("pytest-marker") > prompt.index("CONFIDENTIALITY")

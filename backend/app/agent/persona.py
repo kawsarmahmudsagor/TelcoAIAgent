@@ -8,8 +8,7 @@ from app.services import agent_config_service
 from app.services.agent_config_service import ResolvedAgentConfig, render_template
 
 _INBOUND_TASK = (
-    "Help the customer with their mobile account questions using your tools; "
-    "if you can't, say so briefly.\n"
+    "Help the customer with their mobile service using your tools and the ACCOUNT SNAPSHOT.\n"
 )
 
 # Browser calls: a wrap-up gets "anything else?" first; a goodbye, or a no to
