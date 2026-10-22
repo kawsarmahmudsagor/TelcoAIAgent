@@ -111,3 +111,23 @@ def test_require_verified_expires_three_minutes_after_consumption(bss_world, db)
     otp.require_verified(db, now=t0 + timedelta(minutes=2, seconds=59), **kw)
     with pytest.raises(OtpExpired):
         otp.require_verified(db, now=t0 + timedelta(minutes=3, seconds=1), **kw)
+
+
+def test_normalise_code_bengali_digits():
+    assert otp.normalise_code("১২৩ ৪৫৬") == "123456"
+
+
+def test_normalise_code_drops_separators():
+    assert otp.normalise_code("123-456") == "123456"
+    assert otp.normalise_code(" 12 34 56. ") == "123456"
+
+
+def test_issued_since_counts_window(bss_world, db):
+    s = bss_world.subscriber()
+    other = bss_world.subscriber()
+    before = utc_now() - timedelta(seconds=5)
+    for sub in (s, s, other):
+        otp.issue(db, subscriber_id=sub.id, action_id=uuid4(), purpose="purchase", payload=PAYLOAD)
+    assert otp.issued_since(db, s.id, before) == 2
+    assert otp.issued_since(db, other.id, before) == 1
+    assert otp.issued_since(db, s.id, utc_now() + timedelta(minutes=1)) == 0
