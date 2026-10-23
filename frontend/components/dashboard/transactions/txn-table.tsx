@@ -1,4 +1,4 @@
-import { Avatar } from '@/components/dashboard/avatar';
+import { PersonCell } from '@/components/dashboard/person-cell';
 import { TxnStatusChip } from '@/components/dashboard/subscribers/subscriber-parts';
 import { cn } from '@/lib/shadcn/utils';
 import { formatDayTime, formatTaka } from '@/lib/telco-format';
@@ -25,15 +25,7 @@ function typeText(t: AdminTransaction): string {
 }
 
 function Person({ t }: { t: AdminTransaction }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <Avatar name={t.subscriber_name} />
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold">{t.subscriber_name}</p>
-        <p className="text-muted-foreground truncate text-[11px] tabular-nums">{t.msisdn_masked}</p>
-      </div>
-    </div>
-  );
+  return <PersonCell name={t.subscriber_name} msisdn={t.msisdn_masked} />;
 }
 
 /** Why a payment failed, in words (not only in a tooltip, so touch screens see it too). */

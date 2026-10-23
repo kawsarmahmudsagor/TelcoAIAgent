@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.bss_http import bss_http_error
 from app.api.deps import get_current_admin, get_db
 from app.api.schemas_admin import (
+    AdminPackage,
     AiMonitor,
     CaseList,
     CaseStats,
@@ -29,12 +31,12 @@ from app.api.schemas_admin import (
     TransactionList,
     TransactionStats,
 )
-from app.bss import audit, cases, monitor, network, notifications, offers, ops, packages
+from app.bss import audit, cases, monitor, network, notifications, offers, ops
 from app.bss.clock import utc_now
 from app.bss.errors import BssError
 from app.bss.network import IncidentAdminView
-from app.bss.types import CaseView, PackageView
-from app.models.telco import Actor, CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
+from app.bss.types import CaseView
+from app.models.telco import Actor, Package, CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
 
 router = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[Depends(get_current_admin)]
@@ -177,9 +179,12 @@ def run_nudges(db: Session = Depends(get_db)):
     return _json({"created": created})
 
 
-@router.get("/packages", response_model=list[PackageView])
+@router.get("/packages", response_model=list[AdminPackage])
 def active_packages(db: Session = Depends(get_db)):
-    return _json(packages.search(db))
+    rows = db.scalars(
+        select(Package).where(Package.is_active.is_(True)).order_by(Package.price, Package.code)
+    )
+    return _json([AdminPackage.model_validate(p) for p in rows])
 
 
 @router.get("/offers", response_model=list[AdminOffer])

@@ -1,11 +1,14 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
-import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
+import { MonitorView } from '@/components/dashboard/monitor/monitor-view';
 
-const HREF = '/dashboard/ai-monitor';
+export const metadata: Metadata = { title: 'AI monitor' };
 
-export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
-
-export default function AdminPlaceholderPage() {
-  return <ComingSoon href={HREF} />;
+export default function AiMonitorPage() {
+  // The 24 h / 7 d window lives in ?window=, which needs a Suspense boundary.
+  return (
+    <Suspense>
+      <MonitorView />
+    </Suspense>
+  );
 }

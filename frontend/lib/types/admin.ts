@@ -312,4 +312,6 @@ export interface OfferCreate {
 export type OfferPatch = Partial<OfferCreate>;
 
 /** `GET /api/admin/packages`: the active catalogue (for the offer form's pack picker). */
-export type AdminPackage = PackageView;
+export interface AdminPackage extends PackageView {
+  id: UUID;
+}

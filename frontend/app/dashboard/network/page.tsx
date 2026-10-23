@@ -1,11 +1,8 @@
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
-import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
+import { NetworkView } from '@/components/dashboard/network/network-view';
 
-const HREF = '/dashboard/network';
+export const metadata: Metadata = { title: 'Network status' };
 
-export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
-
-export default function AdminPlaceholderPage() {
-  return <ComingSoon href={HREF} />;
+export default function NetworkPage() {
+  return <NetworkView />;
 }

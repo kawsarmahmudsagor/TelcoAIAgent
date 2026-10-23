@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.bss.types import AccountSummary, CaseView, NotificationView, TransactionView
+from app.bss.types import AccountSummary, CaseView, NotificationView, PackageView, TransactionView
 from app.bss.network import IncidentAdminView
 from app.models.telco import (
     CaseStatus,
@@ -199,6 +199,12 @@ class IncidentIn(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+
+
+class AdminPackage(PackageView):
+    """A catalogue package with its id, which an offer's `package_id` refers to."""
+
+    id: UUID
 
 
 class OfferSubscriberRef(BaseModel):

@@ -1,11 +1,14 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
-import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
+import { OffersView } from '@/components/dashboard/offers/offers-view';
 
-const HREF = '/dashboard/offers';
+export const metadata: Metadata = { title: 'Offers' };
 
-export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
-
-export default function AdminPlaceholderPage() {
-  return <ComingSoon href={HREF} />;
+export default function OffersPage() {
+  // The kind filter lives in ?kind=, which needs a Suspense boundary.
+  return (
+    <Suspense>
+      <OffersView />
+    </Suspense>
+  );
 }

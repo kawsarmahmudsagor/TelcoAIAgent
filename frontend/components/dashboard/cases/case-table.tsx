@@ -1,4 +1,4 @@
-import { Avatar } from '@/components/dashboard/avatar';
+import { PersonCell } from '@/components/dashboard/person-cell';
 import { caseCategoryLabel } from '@/components/portal/support/case-categories';
 import { CaseStatusChip } from '@/components/portal/support/case-table';
 import { PortalButton } from '@/components/portal/ui/link-button';
@@ -27,15 +27,7 @@ function ageTitle(c: AdminCase): string {
 }
 
 function Person({ c }: { c: AdminCase }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <Avatar name={c.subscriber_name} />
-      <div className="min-w-0">
-        <p className="truncate text-xs font-bold">{c.subscriber_name}</p>
-        <p className="text-muted-foreground truncate text-[11px] tabular-nums">{c.msisdn_masked}</p>
-      </div>
-    </div>
-  );
+  return <PersonCell name={c.subscriber_name} msisdn={c.msisdn_masked} />;
 }
 
 /** The next step(s) for a case: start review and resolve while open, reopen once resolved. */

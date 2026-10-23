@@ -26,7 +26,8 @@ def test_create_each_kind(api, bss_world):
     assert pack.json()["kind"] == "pack" and pack.json()["redemptions"] == 0
     listed = {o["id"] for o in api.get(URL).json()}
     assert {pts.json()["id"], cash.json()["id"], pack.json()["id"]} <= listed
-    assert api.get("/api/admin/packages").json()
+    catalogue = api.get("/api/admin/packages").json()
+    assert str(pkg.id) in {p["id"] for p in catalogue}
 
 
 def test_rejects_mixed_or_empty_kind(api, bss_world):

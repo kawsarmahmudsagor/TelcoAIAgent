@@ -54,3 +54,7 @@ export function FormField({
     </div>
   );
 }
+
+/** A native `<select>` that matches `Input` (use with FormField's control props). */
+export const SELECT =
+  'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive h-9 w-full min-w-0 rounded-md border bg-transparent px-2.5 text-base shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm';
