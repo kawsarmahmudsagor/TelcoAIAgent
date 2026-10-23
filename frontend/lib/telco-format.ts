@@ -124,3 +124,18 @@ export function greeting(now: Date): string {
   if (hour >= 12 && hour < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+/** `"5m"`, `"3h"` or `"2d"`: how long ago the ISO datetime was, rounded down to one unit. */
+export function formatAge(iso: string, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+/** `"human_handoff"` becomes `"Human handoff"`: for a code the UI has no label for. */
+export function humanize(code: string): string {
+  const text = code.replace(/[_-]+/g, ' ').trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

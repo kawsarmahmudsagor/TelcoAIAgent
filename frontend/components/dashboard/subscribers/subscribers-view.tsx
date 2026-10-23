@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, UsersIcon } from 'lucide-react';
+import { UsersIcon } from 'lucide-react';
+import { Avatar } from '@/components/dashboard/avatar';
+import { FIELD, SearchField } from '@/components/dashboard/list-controls';
+import { Pager } from '@/components/dashboard/pager';
 import {
-  Avatar,
   SubscriberStatusChip,
   balanceText,
 } from '@/components/dashboard/subscribers/subscriber-parts';
 import { SubscriberSheet } from '@/components/dashboard/subscribers/subscriber-sheet';
-import { PortalButton } from '@/components/portal/ui/link-button';
 import { Panel, PanelHeader } from '@/components/portal/ui/panel';
 import { Bone, LoadError } from '@/components/portal/ui/query-states';
 import { adminApi } from '@/lib/admin-api';
@@ -20,10 +21,6 @@ import type { SubscriberItem, SubscriberListParams } from '@/lib/types/admin';
 import type { PlanType } from '@/lib/types/portal';
 
 const PAGE_SIZE = 25;
-const DEBOUNCE_MS = 300;
-
-const FIELD =
-  'border-line bg-surface text-foreground rounded-button focus-visible:ring-ring/60 min-h-9 border px-3 text-xs outline-none focus-visible:ring-[3px]';
 
 export function SubscribersView() {
   const router = useRouter();
@@ -31,20 +28,10 @@ export function SubscribersView() {
   const params = useSearchParams();
   const openId = params.get('id');
 
-  const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [plan, setPlan] = useState<PlanType | ''>('');
   const [status, setStatus] = useState<SubscriberListParams['status'] | ''>('');
   const [page, setPage] = useState(0);
-
-  // Wait for a pause in typing before querying, and start from the first page of the new results.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setQ(search.trim());
-      setPage(0);
-    }, DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [search]);
 
   const query: SubscriberListParams = {
     q: q || undefined,
@@ -60,9 +47,6 @@ export function SubscribersView() {
   );
 
   const total = data?.total ?? 0;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const from = total === 0 ? 0 : page * PAGE_SIZE + 1;
-  const to = Math.min(total, (page + 1) * PAGE_SIZE);
 
   function openSheet(id: string | null) {
     router.replace(id ? `${pathname}?id=${id}` : pathname, { scroll: false });
@@ -89,20 +73,14 @@ export function SubscribersView() {
           }
         />
         <div className="phone:flex-col phone:items-stretch mb-4 flex items-center gap-2.5">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Search by name or number</span>
-            <SearchIcon
-              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or number…"
-              className={cn(FIELD, 'w-full pl-9')}
-            />
-          </label>
+          <SearchField
+            label="Search by name or number"
+            placeholder="Search name or number…"
+            onSearch={(text) => {
+              setQ(text);
+              setPage(0);
+            }}
+          />
           <div className="flex gap-2.5">
             <label className="flex-1">
               <span className="sr-only">Plan</span>
@@ -159,32 +137,7 @@ export function SubscribersView() {
             aria-busy={loading}
           >
             <SubscriberTable items={data.items} onView={openSheet} />
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-muted-foreground text-[11px]" aria-live="polite">
-                Showing {from}–{to} of {total.toLocaleString('en-IN')}
-              </p>
-              <div className="flex items-center gap-2">
-                <PortalButton
-                  variant="outline"
-                  disabled={page === 0}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeftIcon aria-hidden="true" />
-                  Previous
-                </PortalButton>
-                <span className="text-muted-foreground text-[11px] tabular-nums">
-                  Page {page + 1} of {pages}
-                </span>
-                <PortalButton
-                  variant="outline"
-                  disabled={page + 1 >= pages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next
-                  <ChevronRightIcon aria-hidden="true" />
-                </PortalButton>
-              </div>
-            </div>
+            <Pager page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
           </div>
         )}
       </Panel>

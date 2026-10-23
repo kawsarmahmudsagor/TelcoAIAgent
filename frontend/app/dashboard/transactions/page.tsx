@@ -1,11 +1,14 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
-import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
+import { TransactionsView } from '@/components/dashboard/transactions/transactions-view';
 
-const HREF = '/dashboard/transactions';
+export const metadata: Metadata = { title: 'Transactions' };
 
-export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
-
-export default function AdminPlaceholderPage() {
-  return <ComingSoon href={HREF} />;
+export default function TransactionsPage() {
+  // useSearchParams (the ?status= and ?type= filters) needs a Suspense boundary.
+  return (
+    <Suspense>
+      <TransactionsView />
+    </Suspense>
+  );
 }

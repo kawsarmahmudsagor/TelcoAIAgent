@@ -1,8 +1,8 @@
 'use client';
 
 import { BellIcon, InboxIcon } from 'lucide-react';
+import { Avatar } from '@/components/dashboard/avatar';
 import {
-  Avatar,
   SubscriberStatusChip,
   TxnStatusChip,
 } from '@/components/dashboard/subscribers/subscriber-parts';

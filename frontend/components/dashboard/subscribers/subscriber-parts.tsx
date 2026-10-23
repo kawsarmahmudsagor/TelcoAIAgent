@@ -1,5 +1,5 @@
 import { StatusChip, type StatusTone } from '@/components/portal/ui/status-chip';
-import { formatTaka, initials } from '@/lib/telco-format';
+import { formatTaka } from '@/lib/telco-format';
 import type { SubscriberItem, SubscriberStatus } from '@/lib/types/admin';
 import type { TxnStatus } from '@/lib/types/portal';
 
@@ -31,16 +31,4 @@ export function balanceText(
   return s.plan_type === 'postpaid'
     ? `${formatTaka(s.postpaid_due)} due`
     : formatTaka(s.main_balance);
-}
-
-/** Initials in a tinted circle. */
-export function Avatar({ name, className }: { name: string; className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`bg-tint-purple text-brand dark:text-brand2 grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-extrabold ${className ?? ''}`}
-    >
-      {initials(name)}
-    </span>
-  );
 }
