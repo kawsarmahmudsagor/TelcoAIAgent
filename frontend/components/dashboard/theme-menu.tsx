@@ -19,8 +19,9 @@ const OPTIONS = [
   { value: 'system', label: 'Match system', icon: MonitorIcon },
 ] as const;
 
-/** Colour scheme picker for the dashboard topbar and login page. */
-export function ThemeMenu() {
+/** Colour scheme picker for the dashboard and portal topbars, the login page and the persona picker.
+ * `triggerClassName` restyles the icon button (the portal uses its bordered 38px icon button). */
+export function ThemeMenu({ triggerClassName }: { triggerClassName?: string } = {}) {
   const { theme, resolvedTheme, setTheme } = useTheme();
   // The resolved theme is only known after hydration; render a neutral icon until then.
   const [mounted, setMounted] = useState(false);
@@ -30,7 +31,7 @@ export function ThemeMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Colour scheme">
+        <Button variant="ghost" size="icon" aria-label="Colour scheme" className={triggerClassName}>
           <Icon aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>

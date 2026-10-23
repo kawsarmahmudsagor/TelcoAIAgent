@@ -134,12 +134,6 @@ def test_verify_otp_accepts_bengali_digits_and_spaces(bss_world):
     asyncio.run(go())
 
 
-def test_normalise_code():
-    assert actions.normalise_code("১২৩ ৪৫৬") == "123456"
-    assert actions.normalise_code("123-456") == "123456"
-    assert actions.normalise_code(" 12 34 56. ") == "123456"
-
-
 def test_new_write_replaces_pending_action(bss_world):
     sub, pkg = _buyer(bss_world)
     ud = _ud(sub)

@@ -88,6 +88,47 @@ def test_search_packages_filters_and_caps_detail(bss_world):
     assert "PYTEST Dead" not in out and "PYTEST Voice" not in out
 
 
+def _capture(monkeypatch) -> list[tuple[str, dict]]:
+    sent: list[tuple[str, dict]] = []
+
+    async def fake(userdata, topic, payload):
+        sent.append((topic, payload))
+
+    monkeypatch.setattr(packages, "publish", fake)
+    return sent
+
+
+def test_search_packages_publishes_cards(bss_world, monkeypatch):
+    sent = _capture(monkeypatch)
+    bss_world.package(name="PYTEST Card", kind=PackageKind.data, data_mb=2048, price=Decimal("49"),
+                      validity_days=13)
+    asyncio.run(packages.run_search_packages(_ud(), validity_days=13))
+    (topic, payload), = sent
+    assert topic == "telco.packages" and payload["title"] == "Packages"
+    card = payload["packages"][0]
+    assert card["name"] == "PYTEST Card" and card["kind"] == "data"
+    assert isinstance(card["price"], float) and card["price"] == 49.0
+    assert set(card) == {"code", "name", "kind", "data_mb", "minutes", "sms", "validity_days", "price", "tag"}
+
+
+def test_empty_search_publishes_nothing(bss_world, monkeypatch):
+    sent = _capture(monkeypatch)
+    asyncio.run(packages.run_search_packages(_ud(), validity_days=9999))
+    assert sent == []
+
+
+def test_recommend_publishes_cards(bss_world, monkeypatch):
+    from app.models.telco import UsageKind
+
+    sent = _capture(monkeypatch)
+    sub = bss_world.subscriber()
+    bss_world.package(name="PYTEST Fit", kind=PackageKind.data, data_mb=5120)
+    bss_world.usage(sub, UsageKind.data, 1000)
+    asyncio.run(packages.run_recommend_packages(_ud(sub)))
+    assert sent[0][0] == "telco.packages" and sent[0][1]["title"] == "Recommended for you"
+    assert 1 <= len(sent[0][1]["packages"]) <= 6
+
+
 def test_search_packages_bad_kind_maps_invalid_request():
     with pytest.raises(ToolError, match="rephrase"):
         asyncio.run(packages.run_search_packages(_ud(), kind="gold"))

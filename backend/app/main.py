@@ -6,6 +6,9 @@ from app.api import (
     routes_auth,
     routes_conversations,
     routes_dashboard,
+    routes_demo,
+    routes_me,
+    routes_me_actions,
     routes_public_conversations,
     routes_rag,
 )
@@ -30,6 +33,9 @@ def create_app() -> FastAPI:
     app.include_router(routes_conversations.router)
     app.include_router(routes_public_conversations.router)
     app.include_router(routes_rag.router)
+    app.include_router(routes_demo.router)
+    app.include_router(routes_me.router)
+    app.include_router(routes_me_actions.router)
 
     @app.get("/health")
     def health() -> dict:

@@ -10,6 +10,7 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "shadcn:install": "pnpm dlx shadcn@latest add --yes @agents-ui/all && pnpm format"

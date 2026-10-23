@@ -24,7 +24,7 @@ export default async function WidgetLayout({ children }: { children: React.React
       {styles && <style>{styles}</style>}
       <header className="pointer-events-none fixed top-0 left-0 z-50 hidden w-full flex-row justify-between p-6 md:flex">
         <Link
-          href="/home"
+          href="/"
           className="pointer-events-auto scale-100 transition-transform duration-300 hover:scale-110"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

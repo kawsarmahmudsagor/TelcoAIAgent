@@ -35,6 +35,19 @@ def notify(bss_world):
     return add
 
 
+def test_snapshot_survives_network_failure(bss_world, monkeypatch):
+    from app.bss import network
+
+    def boom(*a, **k):
+        raise RuntimeError("network lookup down")
+
+    monkeypatch.setattr(network, "check_network_status", boom)
+    sub = bss_world.subscriber(full_name="Samiha Khan")
+    ctx = load_session_context(sub.id, None)
+    assert ctx.subscriber_id == sub.id and ctx.customer_name == "Samiha"
+    assert "Network status in" in ctx.snapshot and "unavailable" in ctx.snapshot
+
+
 def test_snapshot_for_prepaid_persona(bss_world):
     sub = bss_world.subscriber(full_name="Samiha Khan", main_balance=Decimal("486.50"))
     pkg = bss_world.package(name="PYTEST Net 15", kind=PackageKind.data, data_mb=15360, minutes=0)

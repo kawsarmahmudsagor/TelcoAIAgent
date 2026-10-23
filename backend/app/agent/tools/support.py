@@ -10,12 +10,27 @@ from livekit.agents import RunContext, function_tool
 from app.agent.actions import CaseDraft
 from app.agent.telco_format import format_day
 from app.agent.tools._common import parse_enum, run_db, run_read, run_write
-from app.agent.topics import ACCOUNT_CHANGED, publish
+from app.agent.topics import ACCOUNT_CHANGED, CASE_CREATED, publish
 from app.agent.userdata import SessionUserdata
 from app.bss import cases
 from app.models.telco import CasePriority, CaseSource
 
 _DETAIL = 3
+
+
+async def _publish_case(userdata: SessionUserdata, case) -> None:
+    await publish(userdata, ACCOUNT_CHANGED, {"kind": "case", "ref": case.ref})
+    await publish(
+        userdata,
+        CASE_CREATED,
+        {
+            "ref": case.ref,
+            "category": case.category,
+            "priority": case.priority.value,
+            "status": case.status.value,
+            "created_at": case.created_at.isoformat(),
+        },
+    )
 
 
 async def run_get_case_status(userdata: SessionUserdata, ref: str | None = None) -> str:
@@ -74,7 +89,7 @@ async def run_create_support_case(
                 action_id=draft.action_id,
             )
         )
-        await publish(userdata, ACCOUNT_CHANGED, {"kind": "case", "ref": case.ref})
+        await _publish_case(userdata, case)
         return (
             f"Opened support case {case.ref} ({case.priority.value} priority). "
             "Give them the case number."
@@ -91,7 +106,7 @@ async def run_request_human_agent(userdata: SessionUserdata, reason: str) -> str
                 db, sid, reason=reason, source=CaseSource.agent, action_id=uuid4()
             )
         )
-        await publish(userdata, ACCOUNT_CHANGED, {"kind": "case", "ref": case.ref})
+        await _publish_case(userdata, case)
         return (
             f"Opened high-priority case {case.ref}. "
             "A human agent will follow up on this case; there is no live transfer."

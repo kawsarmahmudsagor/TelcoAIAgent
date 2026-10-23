@@ -49,7 +49,6 @@ _CODE_SENT = (
     "then ask them to say or type the code, or enter it on the confirm card. "
     "Never read the code aloud."
 )
-_BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 
 T = TypeVar("T")
 
@@ -80,11 +79,6 @@ async def _uncancellable(coro: Awaitable[T]) -> T:
     # Retrieve the outcome so a cancelled caller leaves no "never retrieved" noise.
     task.add_done_callback(lambda t: t.cancelled() or t.exception())
     return await asyncio.shield(task)
-
-
-def normalise_code(raw: str) -> str:
-    """Bengali digits -> ASCII; everything but digits dropped ('১২৩ ৪৫৬' -> '123456')."""
-    return "".join(c for c in raw.translate(_BENGALI_DIGITS) if c in "0123456789")
 
 
 def _payload(kind: ActionKind, request) -> dict:
@@ -254,7 +248,7 @@ async def confirm_action(
     action_id: UUID | None = None,
     now: datetime | None = None,
 ) -> str:
-    return await _uncancellable(_confirm(userdata, normalise_code(code), action_id, now))
+    return await _uncancellable(_confirm(userdata, otp.normalise_code(code), action_id, now))
 
 
 async def _confirm(

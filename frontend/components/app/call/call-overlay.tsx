@@ -3,85 +3,83 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { XIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ApartmentShortlist } from '@/components/app/apartment-shortlist';
-import { BookingFormCard } from '@/components/app/booking-form-card';
-import type { BookingFormEntry, ShortlistResult } from '@/lib/livekit-text-streams';
+import { CaseCard } from '@/components/portal/assistant/cards/case-card';
+import { ConfirmCard } from '@/components/portal/assistant/cards/confirm-card';
+import { PackageCards } from '@/components/portal/assistant/cards/package-cards';
 import { cn } from '@/lib/shadcn/utils';
-import { orderOverlayItems } from './overlay-order';
+import type { ConfirmState, TelcoCard, TelcoPackage } from '@/lib/telco-topics';
+import { confirmKey, orderOverlayItems } from './overlay-order';
 
-// A booked form has nothing left to do; it steps aside after a moment.
-const BOOKED_HIDE_MS = 6000;
+// A settled confirm card has nothing left to do; it steps aside after a moment.
+const SETTLED_HIDE_MS = 6000;
 
 const ITEM_SHELL =
-  'relative shrink-0 rounded-2xl bg-background/75 shadow-2xl shadow-black/40 backdrop-blur-xl [&_[data-slot=bubble-content]]:w-full [&_[data-slot=bubble]]:w-full';
+  'relative shrink-0 rounded-2xl bg-background/75 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl';
 
 interface CallOverlayProps {
-  results: ShortlistResult[];
-  forms: BookingFormEntry[];
+  cards: TelcoCard[];
+  confirm: ConfirmState | null;
+  /** A package card's Buy: asks the agent in the chat. */
+  onBuy(pkg: TelcoPackage): void;
   /** Whether anything is on screen, e.g. so the stage can make room for the side column. */
   onVisibleChange?: (visible: boolean) => void;
   className?: string;
 }
 
 /**
- * The latest search result and any booking form, over the call: a column on the left of a wide
- * screen, a sheet along the bottom of a narrow one. A new search fades the previous one out. The
- * text-stream hooks live in the call view (one handler per topic), so this only renders what it's
- * given. Dismissing here only hides a result from the call; the conversation keeps it. A
- * dismissed booking form is only hidden, so a half-typed name or number isn't lost.
+ * The agent's latest card over the call: a column on the left of a wide screen, a sheet along
+ * the bottom of a narrow one. A confirm card waiting for its code stays until it is settled.
+ * The text-stream hooks live in the call view (one handler per topic), so this only renders what
+ * it's given. Dismissing here only hides a card from the call; the conversation keeps it.
  */
-export function CallOverlay({ results, forms, onVisibleChange, className }: CallOverlayProps) {
-  const [formDismissals, setFormDismissals] = useState<ReadonlyMap<string, number>>(
-    () => new Map()
-  );
-  const [dismissedResultIds, setDismissedResultIds] = useState<ReadonlySet<number>>(
-    () => new Set()
-  );
-  const dismissForm = (formId: string, revision: number) =>
-    setFormDismissals((prev) => new Map(prev).set(formId, revision));
+export function CallOverlay({
+  cards,
+  confirm,
+  onBuy,
+  onVisibleChange,
+  className,
+}: CallOverlayProps) {
+  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const dismiss = (key: string) => setDismissed((prev) => new Set(prev).add(key));
 
-  // Hide each form a few seconds after it's booked.
-  const bookedTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  // Hide each confirm card a few seconds after it settles.
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
-    const timers = bookedTimersRef.current;
-    for (const { form } of forms) {
-      if (form.state !== 'booked' || timers.has(form.form_id)) continue;
-      timers.set(
-        form.form_id,
-        setTimeout(
-          () => setFormDismissals((prev) => new Map(prev).set(form.form_id, form.revision)),
-          BOOKED_HIDE_MS
-        )
-      );
-    }
-  }, [forms]);
+    if (!confirm || confirm.state === 'awaiting_code') return;
+    const key = confirmKey(confirm);
+    if (timersRef.current.has(key)) return;
+    timersRef.current.set(
+      key,
+      setTimeout(() => setDismissed((prev) => new Set(prev).add(key)), SETTLED_HIDE_MS)
+    );
+  }, [confirm]);
   useEffect(() => {
-    const timers = bookedTimersRef.current;
+    const timers = timersRef.current;
     return () => timers.forEach(clearTimeout);
   }, []);
 
   const items = useMemo(
-    () => orderOverlayItems(results, forms, formDismissals, dismissedResultIds),
-    [results, forms, formDismissals, dismissedResultIds]
+    () => orderOverlayItems(cards, confirm, dismissed),
+    [cards, confirm, dismissed]
   );
-  const visible = items.some((item) => item.kind === 'shortlist' || !item.hidden);
-  const formActive = items.some(
-    (item) => item.kind === 'form' && !item.hidden && item.entry.form.state !== 'booked'
+  const visible = items.length > 0;
+  const confirmActive = items.some(
+    (item) => item.kind === 'confirm' && item.confirm.state === 'awaiting_code'
   );
 
   useEffect(() => onVisibleChange?.(visible), [visible, onVisibleChange]);
 
   return (
     <aside
-      aria-label="Listings and bookings"
-      data-form-active={formActive || undefined}
+      aria-label="The agent’s cards"
+      data-form-active={confirmActive || undefined}
       inert={!visible}
       className={cn(
         'absolute z-20 flex flex-col gap-3 overflow-y-auto overscroll-contain p-1',
         // Narrow: a sheet along the bottom of the stage.
         'inset-x-3 top-auto bottom-2 max-h-[62%] data-[form-active]:max-h-[94%]',
         // Wide: a column on the left, clear of the page's corner logo.
-        '@5xl:inset-x-auto @5xl:top-16 @5xl:bottom-auto @5xl:left-6 @5xl:max-h-[calc(100%-5rem)] @5xl:w-[420px] @5xl:data-[form-active]:max-h-[calc(100%-5rem)]',
+        '@5xl:inset-x-auto @5xl:top-16 @5xl:bottom-auto @5xl:left-6 @5xl:max-h-[calc(100%-5rem)] @5xl:w-[420px]',
         'transition-[opacity,translate] duration-300 ease-out motion-reduce:transition-opacity',
         visible
           ? 'translate-0 opacity-100'
@@ -90,38 +88,34 @@ export function CallOverlay({ results, forms, onVisibleChange, className }: Call
       )}
     >
       <AnimatePresence mode="popLayout" initial={false}>
-        {items.map((item) =>
-          item.kind === 'shortlist' ? (
-            <motion.div
-              key={item.key}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0, transition: { duration: 0.35, delay: 0.15 } }}
-              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.3, ease: 'easeIn' } }}
-              className={ITEM_SHELL}
-            >
-              <ApartmentShortlist
-                result={item.result}
-                onDismiss={(id) => setDismissedResultIds((prev) => new Set(prev).add(id))}
-                listClassName="max-h-none overflow-y-visible overscroll-auto"
-              />
-            </motion.div>
-          ) : (
-            <div key={item.key} className={cn(ITEM_SHELL, item.hidden && 'hidden')}>
-              {/* No dismiss while the agent waits on a yes: hiding it wouldn't stop the booking. */}
-              {item.entry.form.state !== 'review' && (
-                <button
-                  type="button"
-                  onClick={() => dismissForm(item.entry.form.form_id, item.entry.form.revision)}
-                  aria-label="Hide booking form"
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-1.5 right-2 z-10 rounded-full p-1 transition-colors"
-                >
-                  <XIcon aria-hidden="true" className="size-3.5" />
-                </button>
-              )}
-              <BookingFormCard form={item.entry.form} />
-            </div>
-          )
-        )}
+        {items.map((item) => (
+          <motion.div
+            key={item.key}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.35, delay: 0.15 } }}
+            exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.3, ease: 'easeIn' } }}
+            className={ITEM_SHELL}
+          >
+            {/* No dismiss while the agent waits on the code: hiding it wouldn't cancel it. */}
+            {!(item.kind === 'confirm' && item.confirm.state === 'awaiting_code') && (
+              <button
+                type="button"
+                onClick={() => dismiss(item.key)}
+                aria-label="Hide card"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground absolute top-1.5 right-2 z-10 rounded-full p-1 transition-colors"
+              >
+                <XIcon aria-hidden="true" className="size-3.5" />
+              </button>
+            )}
+            {item.kind === 'confirm' ? (
+              <ConfirmCard key={item.confirm.action_id} confirm={item.confirm} />
+            ) : item.card.kind === 'packages' ? (
+              <PackageCards data={item.card.data} onBuy={onBuy} />
+            ) : (
+              <CaseCard data={item.card.data} />
+            )}
+          </motion.div>
+        ))}
       </AnimatePresence>
     </aside>
   );

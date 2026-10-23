@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 
 from app.agent.tools import packages, recharge, rewards, support, verify
 from app.agent.tools._common import ERROR_TEXT, NOT_LOGGED_IN
-from app.agent.topics import ACCOUNT_CHANGED, OTP_SMS
+from app.agent.topics import ACCOUNT_CHANGED, CASE_CREATED, OTP_SMS
 from app.agent.userdata import Channel, SessionUserdata
 from app.models.telco import CasePriority, SupportCase, Transaction
 
@@ -127,9 +127,28 @@ def test_support_case_needs_confirmation(bss_world):
         assert len(rows) == 1 and rows[0].ref in first
         again = await support.run_create_support_case(ud, *args, confirmed=True)
         assert len(_cases(bss_world, sub)) == 1 and rows[0].ref in again
-        assert _sent(ud)[-1] == (ACCOUNT_CHANGED, {"kind": "case", "ref": rows[0].ref})
+        assert (ACCOUNT_CHANGED, {"kind": "case", "ref": rows[0].ref}) in _sent(ud)
 
     asyncio.run(go())
+
+
+def test_create_case_publishes_case_created(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    args = ("slow_data", "Data is slow in Dhanmondi since morning.")
+
+    async def go():
+        await support.run_create_support_case(ud, *args)
+        assert not [t for t, _ in _sent(ud) if t == CASE_CREATED]
+        await support.run_create_support_case(ud, *args, confirmed=True)
+
+    asyncio.run(go())
+    row = _cases(bss_world, sub)[0]
+    (payload,) = [p for t, p in _sent(ud) if t == CASE_CREATED]
+    assert payload == {
+        "ref": row.ref, "category": "slow_data", "priority": "normal",
+        "status": row.status.value, "created_at": row.created_at.isoformat(),
+    }
 
 
 def test_confirmed_case_without_draft_asks_first(bss_world):
@@ -145,6 +164,16 @@ def test_human_agent_opens_high_priority_case(bss_world):
     rows = _cases(bss_world, sub)
     assert len(rows) == 1 and rows[0].priority == CasePriority.high
     assert rows[0].ref in out and "no live transfer" in out
+
+
+def test_human_agent_publishes_case_created(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    asyncio.run(support.run_request_human_agent(ud, "Customer asked for a person."))
+    row = _cases(bss_world, sub)[0]
+    (payload,) = [p for t, p in _sent(ud) if t == CASE_CREATED]
+    assert payload["ref"] == row.ref and payload["priority"] == "high"
+    assert any(t == ACCOUNT_CHANGED for t, _ in _sent(ud))
 
 
 def test_write_tools_without_subscriber_say_log_in():

@@ -6,7 +6,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.bss.clock import utc_now
@@ -15,6 +15,12 @@ from app.models.telco import OtpChallenge
 
 OTP_TTL = timedelta(minutes=3)
 MAX_ATTEMPTS = 3
+_BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+
+
+def normalise_code(raw: str) -> str:
+    """Bengali digits -> ASCII; everything but digits dropped ('১২৩ ৪৫৬' -> '123456')."""
+    return "".join(c for c in raw.translate(_BENGALI_DIGITS) if c in "0123456789")
 
 
 def _sha256(text: str) -> str:
@@ -34,6 +40,15 @@ def _get(db: Session, subscriber_id: uuid.UUID, action_id: uuid.UUID) -> OtpChal
         select(OtpChallenge).where(
             OtpChallenge.subscriber_id == subscriber_id, OtpChallenge.action_id == action_id
         )
+    )
+
+
+def issued_since(db: Session, subscriber_id: uuid.UUID, since: datetime) -> int:
+    """Challenges created at or after `since` (one row per issue when action ids are fresh)."""
+    return db.scalar(
+        select(func.count())
+        .select_from(OtpChallenge)
+        .where(OtpChallenge.subscriber_id == subscriber_id, OtpChallenge.created_at >= since)
     )
 
 

@@ -6,6 +6,7 @@ English facts for the LLM, like tool output. A missing or unknown subscriber is
 a guest; a nudge counts only when it belongs to the session's subscriber.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -21,6 +22,8 @@ from app.bss.errors import SubscriberNotFound
 from app.bss.types import AccountSummary
 from app.db.session import SessionLocal
 from app.models.telco import Notification, NotificationKind, PlanType
+
+logger = logging.getLogger("agent.snapshot")
 
 GUEST_SNAPSHOT = """\
 ACCOUNT SNAPSHOT — none: the customer is not logged in (a guest). You can still talk about
@@ -57,7 +60,11 @@ def load_session_context(
             summary = accounts.get_account_summary(db, subscriber_id, now=now)
         except SubscriberNotFound:
             return GUEST
-        incidents = network.check_network_status(db, summary.district, now=now)
+        try:
+            incidents = network.check_network_status(db, summary.district, now=now)
+        except Exception:
+            logger.exception("network status lookup failed; keeping the customer logged in")
+            incidents = None
         return SessionContext(
             subscriber_id=summary.subscriber_id,
             customer_name=_first_name(summary.full_name),
@@ -73,7 +80,7 @@ def _first_name(full_name: str) -> str | None:
     return parts[0] if parts else None
 
 
-def _snapshot_text(s: AccountSummary, incidents: list) -> str:
+def _snapshot_text(s: AccountSummary, incidents: list | None) -> str:
     lines = [
         _SNAPSHOT_HEAD,
         f"Customer: {s.full_name}, number {s.masked_msisdn}, {s.plan_type.value}, "
@@ -95,7 +102,9 @@ def _snapshot_text(s: AccountSummary, incidents: list) -> str:
         lines.append("No active packs.")
     lines.append(f"Reward points: {s.reward_points:,}.")
     lines.append(f"Open support cases: {s.open_cases}.")
-    if incidents:
+    if incidents is None:
+        lines.append(f"Network status in {s.district} is unavailable right now.")
+    elif incidents:
         lines.append(f"Network incidents in {s.district}:")
         lines.extend(f"- {i.area}: {i.kind.value}, {i.status.value}." for i in incidents)
     else:

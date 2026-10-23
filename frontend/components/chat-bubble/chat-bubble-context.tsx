@@ -11,19 +11,30 @@ import { useVisitorId, useVisitorSessionOptions } from '@/lib/visitor-id';
 /** The panel's element id, for `aria-controls`. */
 export const CHAT_PANEL_ID = 'chat-bubble-panel';
 
+export interface StartSessionOptions {
+  /** Turn the mic on once connected (a voice chat); otherwise the session is text-only. */
+  voice: boolean;
+  /** Show the bubble's panel once connected. */
+  openPanel: boolean;
+}
+
 interface ChatBubbleContextValue {
-  /**
-   * Whether the chat panel is showing; only ever during a call. A closed panel is hidden, never
-   * unmounted.
-   */
+  /** Whether the bubble's panel is showing. A closed panel is hidden, never unmounted. */
   isOpen: boolean;
-  /** Shows the panel of the call in progress (no-op outside a call). */
+  /** Shows the panel (connected or not). */
   open: () => void;
-  /** Starts a call and shows the panel once it's connected; during a call, just shows it. */
+  /**
+   * Starts the session; during one it only shows the panel (when asked to). Resolves once
+   * connected, or false when the connect failed (already toasted).
+   */
+  startSession: (options: StartSessionOptions) => Promise<boolean>;
+  /** A voice call that shows the panel: `startSession({ voice: true, openPanel: true })`. */
   startCall: () => void;
-  /** A call started by startCall() is connecting: the launcher shows a spinner. */
+  /** A session started by startSession() is connecting. */
   autoConnecting: boolean;
-  /** Hides the panel; the call keeps running. */
+  /** The current (or connecting) session was started for voice: the mic goes on at connect. */
+  voiceRequested: boolean;
+  /** Hides the panel; the session keeps running. */
   close: () => void;
   /**
    * Whether the panel fills the viewport (from `sm` up; below it the panel is always a sheet).
@@ -31,26 +42,23 @@ interface ChatBubbleContextValue {
    */
   isFullscreen: boolean;
   toggleFullscreen: () => void;
-  /**
-   * Back to the docked panel size, e.g. when a listing card opens its page behind the chat.
-   * During a call, which is always fullscreen, it minimises the panel instead (the call goes on).
-   */
+  /** Back to the docked panel size; during a call it minimises the panel instead. */
   exitFullscreen: () => void;
   /** This browser's anonymous visitor id (null until mounted), for the chat history. */
   visitorId: string | null;
   /** The session's room, e.g. for setting participant attributes from a page. */
   room: Room;
   isConnected: boolean;
-  /** For ChatBubble only: the session it provides to the agent UI. */
+  /** The one agent session, for the provider that hands it to the agent UI. */
   session: UseSessionReturn;
 }
 
 const ChatBubbleContext = createContext<ChatBubbleContextValue | null>(null);
 
 /**
- * Owns the public site's agent session and the bubble's open state. It wraps the (site) layout's
- * children and the ChatBubble as a plain context provider, so pages never remount and the call
- * survives client navigation between public pages.
+ * Owns the agent session and the bubble's open state. The portal layout wraps its whole shell in
+ * it (through AssistantProvider), so pages never remount it: one session survives client
+ * navigation, and the bubble and the full assistant page show the same conversation.
  */
 export function ChatBubbleProvider({
   appConfig,
@@ -69,33 +77,45 @@ export function ChatBubbleProvider({
   const close = useCallback(() => setIsOpen(false), []);
   const isConnected = session.isConnected;
   const [autoConnecting, setAutoConnecting] = useState(false);
-  const startCall = useCallback(() => {
-    if (session.connectionState !== ConnectionState.Disconnected) {
-      setIsOpen(true);
-      return;
-    }
-    // The panel opens once connected (effect below), so the docked Start call screen never
-    // shows in between; meanwhile the launcher shows a spinner.
-    setAutoConnecting(true);
-    // Connect with the mic off; AppSetup (useMicOnConnect) turns it on once connected.
-    session.start({ tracks: { microphone: { enabled: false } } }).catch((error: unknown) => {
-      console.error('Failed to start the call:', error);
-      toast.error('Couldn’t start the call', { description: 'Please try again.' });
-      setAutoConnecting(false);
-    });
-  }, [session]);
+  const [openWhenConnected, setOpenWhenConnected] = useState(false);
+  const [voiceRequested, setVoiceRequested] = useState(false);
 
-  // Connected: show the call. Disconnected (the call ended): close the panel, so the launcher
-  // goes back to the phone icon instead of leaving the Start call screen up.
+  const startSession = useCallback(
+    async ({ voice, openPanel }: StartSessionOptions): Promise<boolean> => {
+      if (session.connectionState !== ConnectionState.Disconnected) {
+        if (openPanel) setIsOpen(true);
+        return true;
+      }
+      setVoiceRequested(voice);
+      setOpenWhenConnected(openPanel);
+      setAutoConnecting(true);
+      try {
+        // Connect with the mic off; useMicOnConnect turns it on once connected (voice only).
+        await session.start({ tracks: { microphone: { enabled: false } } });
+        return true;
+      } catch (error: unknown) {
+        console.error('Failed to start the assistant session:', error);
+        toast.error('Couldn’t reach the assistant', { description: 'Please try again.' });
+        setAutoConnecting(false);
+        return false;
+      }
+    },
+    [session]
+  );
+  const startCall = useCallback(
+    () => void startSession({ voice: true, openPanel: true }),
+    [startSession]
+  );
+
+  // Connected: show the panel if the start asked for it. Disconnected: leave fullscreen.
   useEffect(() => {
     if (!isConnected) {
-      setIsOpen(false);
       setIsFullscreen(false);
     } else if (autoConnecting) {
-      setIsOpen(true);
+      if (openWhenConnected) setIsOpen(true);
       setAutoConnecting(false);
     }
-  }, [isConnected, autoConnecting]);
+  }, [isConnected, autoConnecting, openWhenConnected]);
   const toggleFullscreen = useCallback(() => setIsFullscreen((fullscreen) => !fullscreen), []);
   const exitFullscreen = useCallback(() => {
     if (isConnected) setIsOpen(false);
@@ -104,11 +124,12 @@ export function ChatBubbleProvider({
 
   const value = useMemo<ChatBubbleContextValue>(
     () => ({
-      // The panel only shows during a call (also covers the render before the effect closes it).
-      isOpen: isOpen && isConnected,
+      isOpen,
       open,
+      startSession,
       startCall,
       autoConnecting,
+      voiceRequested,
       close,
       isFullscreen: isFullscreen || isConnected,
       toggleFullscreen,
@@ -121,8 +142,10 @@ export function ChatBubbleProvider({
     [
       isOpen,
       open,
+      startSession,
       startCall,
       autoConnecting,
+      voiceRequested,
       close,
       isFullscreen,
       toggleFullscreen,
@@ -136,7 +159,7 @@ export function ChatBubbleProvider({
   return <ChatBubbleContext.Provider value={value}>{children}</ChatBubbleContext.Provider>;
 }
 
-/** The bubble's context, or null outside the public site (e.g. the standalone /chat page). */
+/** The bubble's context, or null outside the provider (e.g. the standalone /chat page). */
 export function useOptionalChatBubble(): ChatBubbleContextValue | null {
   return useContext(ChatBubbleContext);
 }

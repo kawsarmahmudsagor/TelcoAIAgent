@@ -33,17 +33,18 @@ The agent has 16 tools (`backend/app/agent/tools/`), acting on the logged-in dem
 
 A 17th tool, `search_knowledge_base`, is added only when the knowledge base has content.
 
-**Guests until Phase 3.** A session is tied to a subscriber only through the LiveKit dispatch
-metadata, which Phase 3's persona login will set server-side. Until then every live session is
-a guest: the agent answers package, network-status and knowledge-base questions and asks the
-customer to log in for anything about their own account.
+**Subscriber vs guest.** A session is tied to a subscriber only through the LiveKit dispatch
+metadata, which the frontend's `/api/token` route sets server-side from the verified
+`portal_session` cookie (never from the request body). Logged in as a persona, the agent acts
+on that subscriber; without a persona it is a guest: it answers package, network-status and
+knowledge-base questions and asks the customer to log in for anything about their own account.
 
 **OTP flow** (purchase, recharge and redeem): the tool returns a preview and the browser gets
 a confirm card (`telco.confirm`) and a 6-digit code as an SMS toast (`telco.otp_sms`), sent to
 the linked browser only; the customer says or types the code, or enters it on the confirm
 card; the action then executes. The code expires after 3 minutes and allows 3 attempts. The
-toast and card UI land in Phase 3; until then the flow is exercised by the tests
-(`backend/tests/test_actions.py`, `backend/tests/test_action_rpc.py`).
+portal's own recharge uses the same OTP flow. Tests: `backend/tests/test_actions.py`,
+`backend/tests/test_action_rpc.py`.
 
 **Operator identity** comes from `OPERATOR_NAME`, `OPERATOR_PHONE` and `OPERATOR_ADDRESS`:
 defaults in `backend/app/config.py` (only `OPERATOR_NAME` is in `.env.example`), overridable
@@ -111,9 +112,37 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3001 for the public site (the agent is its chat bubble),
+Open http://localhost:3001 for the persona picker (see "Customer portal" below),
 http://localhost:3001/chat for the standalone full-screen chat page, and http://localhost:3001/login for the
-admin dashboard (credentials from `.env`).
+admin dashboard (credentials from `.env`). `run-local.bat` starts the API, agent worker,
+scheduler and frontend together.
+
+## Customer portal
+
+`/` is a persona picker; choosing one sets the `portal_session` cookie and lands on `/portal`
+(overview, packages, recharge, support, and the assistant page and chat bubble). The admin
+dashboard is unchanged: `/login` then `/dashboard`. Run the backend, the agent worker and the
+frontend as in "Local dev setup"; the assistant needs all three, and `seed_all --reset` first.
+
+| Persona | MSISDN | Scenario |
+|---|---|---|
+| Samiha | 01712342841 | Pack expiring in 3 days |
+| Rafi | 01812347392 | Low balance, a recharge pending |
+| Nusrat | 01912345501 | Postpaid bill due |
+| Tanvir | 01612341109 | Low data in a congested area |
+| Farhana | 01512346620 | Lots of reward points, one open case |
+
+Demo script checklist:
+
+1. Persona login from `/`, landing on `/portal`.
+2. Overview figures match the persona's scenario.
+3. Portal recharge: the OTP arrives as an SMS toast; enter it to complete.
+4. Ask the assistant for the balance in Bangla.
+5. Ask for packages; package cards appear, buy one through the confirm card.
+6. The overview updates live after the purchase.
+7. Raise a case through the assistant; it appears on Support.
+8. As Tanvir, ask about the network.
+9. Switch persona; the call ends.
 
 ## Docker Compose (once you're past active development)
 
@@ -126,8 +155,8 @@ different commands, and `frontend`); `postgres` and `livekit/livekit-server` are
 
 ## Verification checklist
 
-Live sessions are guests until Phase 3 (see "Agent" above), so these are guest-mode checks.
-Open the chat on `/` and connect:
+Guest-mode checks (no persona logged in; see "Agent" above). Open `/chat` and connect.
+The logged-in flows are the demo checklist under "Customer portal".
 
 1. Ask for a data pack (e.g. "৩০ দিনের ১০ জিবির কোনো প্যাক আছে?") — the agent searches the
    packages and quotes names and prices from the tool, in Bangla.
@@ -150,8 +179,6 @@ Cloudflare quick tunnel so the dashboard is reachable from outside this machine 
 
 ## Known open items
 
-- Phase 3: persona login that sets `subscriber_id` in the LiveKit dispatch metadata
-  server-side, and the browser's OTP toast and confirm card.
-- Phase 3/4: the dashboard pages for the removed real-estate APIs (properties, bookings,
+- Phase 4: the dashboard pages for the removed real-estate APIs (properties, bookings,
   leads, schedule) still need replacing with telco ones.
 - Phase 4: auditing of OTP issue/verify and recharge-target events.

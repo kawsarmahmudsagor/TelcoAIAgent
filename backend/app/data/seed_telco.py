@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.bss._txn import next_ref
 from app.config import get_settings
+from app.data.personas import FARHANA, NUSRAT, RAFI, SAMIHA, TANVIR
 from app.models.telco import (
     Balance,
     CasePriority,
@@ -62,20 +63,20 @@ PACKAGES = [
 
 # msisdn, name, plan, district, joined_on, balance, due, points, daily data MB range
 PERSONAS = [
-    ("01712342841", "Samiha Khan", "prepaid", "Dhaka", date(2024, 3, 14), "486.50", "0", 840, (150, 350)),
-    ("01812347392", "Rafi Ahmed", "prepaid", "Chattogram", date(2023, 9, 2), "42.00", "0", 120, (300, 600)),
-    ("01912345501", "Nusrat Mahmud", "postpaid", "Rajshahi", date(2022, 6, 21), "0", "1240.00", 300, (600, 1200)),
-    ("01612341109", "Tanvir Hasan", "prepaid", "Sylhet", date(2024, 11, 5), "215.00", "0", 60, (200, 500)),
-    ("01512346620", "Farhana Islam", "prepaid", "Gazipur", date(2021, 12, 9), "730.25", "0", 2150, (250, 450)),
+    (SAMIHA, "Samiha Khan", "prepaid", "Dhaka", date(2024, 3, 14), "486.50", "0", 840, (150, 350)),
+    (RAFI, "Rafi Ahmed", "prepaid", "Chattogram", date(2023, 9, 2), "42.00", "0", 120, (300, 600)),
+    (NUSRAT, "Nusrat Mahmud", "postpaid", "Rajshahi", date(2022, 6, 21), "0", "1240.00", 300, (600, 1200)),
+    (TANVIR, "Tanvir Hasan", "prepaid", "Sylhet", date(2024, 11, 5), "215.00", "0", 60, (200, 500)),
+    (FARHANA, "Farhana Islam", "prepaid", "Gazipur", date(2021, 12, 9), "730.25", "0", 2150, (250, 450)),
 ]
 
 # msisdn -> [(package code, data_left, minutes_left, sms_left, expires in days)]
 SUBSCRIPTIONS = {
-    "01712342841": [("B15-300", 8602, 182, 0, 3), ("S100-30D", 0, 0, 74, 20)],
-    "01812347392": [("D8-7D", 2100, 0, 0, 5)],
-    "01912345501": [("B40-500", 30000, 410, 0, 18)],
-    "01612341109": [("D15-30D", 1200, 0, 0, 11)],
-    "01512346620": [("B20-200", 12000, 150, 0, 20)],
+    SAMIHA: [("B15-300", 8602, 182, 0, 3), ("S100-30D", 0, 0, 74, 20)],
+    RAFI: [("D8-7D", 2100, 0, 0, 5)],
+    NUSRAT: [("B40-500", 30000, 410, 0, 18)],
+    TANVIR: [("D15-30D", 1200, 0, 0, 11)],
+    FARHANA: [("B20-200", 12000, 150, 0, 20)],
 }
 
 REWARD_CODE = "RW-1G-3D"
@@ -274,7 +275,7 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
         counts["transactions"] += 1
 
     st, rc, pu = TxnStatus, TxnType.recharge, TxnType.purchase
-    sam, rafi = "01712342841", "01812347392"
+    sam, rafi = SAMIHA, RAFI
     txn(sam, rc, TxnChannel.bkash, "200", now - timedelta(hours=2), st.success)
     txn(sam, rc, TxnChannel.nagad, "100", now - timedelta(days=8), st.success)
     txn(sam, rc, TxnChannel.bkash, "300", now - timedelta(days=12), st.failed,
@@ -310,12 +311,12 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     case(sam, "Package activation confirmation",
          "Asked for confirmation that my pack was activated.",
          CaseStatus.resolved, ref="TC-1986", age=timedelta(days=40))
-    case("01612341109", "Slow mobile data", "Mobile data has been very slow in the evenings.",
+    case(TANVIR, "Slow mobile data", "Mobile data has been very slow in the evenings.",
          CaseStatus.open, source=CaseSource.portal, age=timedelta(hours=5))
-    case("01512346620", "Unexpected data deduction",
+    case(FARHANA, "Unexpected data deduction",
          "Data balance dropped sharply overnight without use.",
          CaseStatus.open, priority=CasePriority.high, age=timedelta(hours=20))
-    case("01512346620", "SIM replacement query",
+    case(FARHANA, "SIM replacement query",
          "How to replace a damaged SIM and keep my number.",
          CaseStatus.resolved, age=timedelta(days=30))
 

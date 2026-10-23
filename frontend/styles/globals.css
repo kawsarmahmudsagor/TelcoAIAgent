@@ -3,102 +3,149 @@
 @source "../node_modules/streamdown/dist/index.js";
 
 @custom-variant dark (&:is(.dark *));
+/* The reference UI's breakpoints, inclusive like its `max-width` queries (Tailwind's `max-[…]`
+ * is exclusive): `tablet:` at 1100px and below, `phone:` at 760px and below (the off-canvas
+ * sidebar), `narrow:` at 390px and below. */
+@custom-variant tablet (@media (max-width: 1100px));
+@custom-variant phone (@media (max-width: 760px));
+@custom-variant narrow (@media (max-width: 390px));
 
 /*
- * Horizon Realty design tokens. See frontend/DESIGN.md for the reasoning and usage rules.
+ * telco. design tokens (spec 6.6; values from the reference UI, telco_dashboard.html).
  *
- * Evergreen (primary) is the river-and-trees green of the brand; brass is the setting sun on the
- * horizon and is used sparingly (logo sun, active nav marker, featured listings, chart series 2).
- * Neutrals are cool concrete greys with a faint green cast, never cream.
+ * Indigo (#4f46e5) is the brand and the primary action; brand2 (#756cf6) is its lighter partner
+ * and the primary in dark mode. Mint, orange and red are the data/status accents. The shadcn
+ * variables below are re-skinned to this palette, and the reference's own names (surface,
+ * surface2, line, the tint pairs and the status chips) are added beside them for the portal.
  */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
   /* Fixed base for the rounded-* scale, so the widget's --radius override below can't shift it. */
-  --radius-base: 0.5rem;
+  --radius-base: 0.625rem;
 
-  --background: oklch(0.975 0.004 175);
-  --foreground: oklch(0.22 0.02 190);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.02 190);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.02 190);
-  --primary: oklch(0.42 0.07 185);
-  --primary-foreground: oklch(0.985 0.005 175);
-  --secondary: oklch(0.94 0.012 175);
-  --secondary-foreground: oklch(0.28 0.04 188);
-  --muted: oklch(0.955 0.006 175);
-  --muted-foreground: oklch(0.5 0.018 190);
-  --accent: oklch(0.94 0.018 178);
-  --accent-foreground: oklch(0.26 0.04 188);
-  --destructive: oklch(0.55 0.2 27);
-  --border: oklch(0.905 0.008 180);
-  --input: oklch(0.88 0.01 180);
-  --ring: oklch(0.55 0.08 185);
+  /* Reference palette. */
+  --brand: #4f46e5;
+  --brand2: #756cf6;
+  --mint: #20b89a;
+  --orange: #ff9b55;
+  --red: #e45b73;
+  --surface: #ffffff;
+  --surface2: #f8fafc;
+  --line: #e6eaf2;
+  --shadow-panel-value: 0 12px 34px rgba(24, 34, 70, 0.06);
+
+  /* Tint pairs: icon wells and soft badges. */
+  --tint-purple: #efedff;
+  --tint-green: #e2faf4;
+  --tint-orange: #fff0e3;
+  --tint-pink: #ffeaf0;
+
+  /* Status chips (transactions, cases): background + text. */
+  --status-success: #e5f9f1;
+  --status-success-foreground: #0d9b79;
+  --status-pending: #fff2df;
+  --status-pending-foreground: #c17a1c;
+  --status-failed: #ffeaed;
+  --status-failed-foreground: #df5b72;
+  --status-open: #eeedff;
+  --status-open-foreground: var(--brand);
+
+  /* shadcn, re-skinned. */
+  --background: #f5f7fb;
+  --foreground: #172033;
+  --card: var(--surface);
+  --card-foreground: #172033;
+  --popover: var(--surface);
+  --popover-foreground: #172033;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface2);
+  --secondary-foreground: #172033;
+  --muted: var(--surface2);
+  --muted-foreground: #778198;
+  --accent: #eeedff;
+  --accent-foreground: #172033;
+  --destructive: var(--red);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
   /* Default border colour for every element (`* { border-color }` below). */
   --hairline: var(--border);
 
-  --brass: oklch(0.7 0.125 75);
-  --brass-foreground: oklch(0.25 0.04 70);
-  --success: oklch(0.5 0.12 152);
-  --warning: oklch(0.52 0.13 60);
-  --info: oklch(0.5 0.12 245);
+  /* `brass` is the admin dashboard's warm highlight; in telco. it is the orange accent. */
+  --brass: var(--orange);
+  --brass-foreground: #4a3328;
+  --success: #0d9b79;
+  --warning: #c17a1c;
+  --info: var(--brand);
 
-  --chart-1: oklch(0.5 0.085 185);
-  --chart-2: oklch(0.72 0.13 75);
-  --chart-3: oklch(0.56 0.12 245);
-  --chart-4: oklch(0.62 0.15 15);
-  --chart-5: oklch(0.62 0.03 220);
+  --chart-1: var(--brand);
+  --chart-2: var(--mint);
+  --chart-3: var(--orange);
+  --chart-4: var(--red);
+  --chart-5: var(--brand2);
 
-  --sidebar: oklch(0.285 0.045 190);
-  --sidebar-foreground: oklch(0.95 0.01 175);
-  --sidebar-primary: oklch(0.8 0.12 78);
-  --sidebar-primary-foreground: oklch(0.24 0.04 70);
-  --sidebar-accent: oklch(1 0 0 / 9%);
-  --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.8 0.12 78);
+  /* The admin dashboard's and admin login's dark navy panel. */
+  --sidebar: #172033;
+  --sidebar-foreground: #f2f5ff;
+  --sidebar-primary: var(--mint);
+  --sidebar-primary-foreground: #0b1020;
+  --sidebar-accent: rgb(255 255 255 / 9%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 10%);
+  --sidebar-ring: var(--brand2);
 }
 
 .dark {
-  --background: oklch(0.17 0.012 200);
-  --foreground: oklch(0.95 0.008 175);
-  --card: oklch(0.205 0.014 198);
-  --card-foreground: oklch(0.95 0.008 175);
-  --popover: oklch(0.225 0.015 198);
-  --popover-foreground: oklch(0.95 0.008 175);
-  --primary: oklch(0.8 0.1 175);
-  --primary-foreground: oklch(0.2 0.03 190);
-  --secondary: oklch(0.26 0.018 195);
-  --secondary-foreground: oklch(0.95 0.008 175);
-  --muted: oklch(0.24 0.014 198);
-  --muted-foreground: oklch(0.72 0.015 185);
-  --accent: oklch(0.28 0.025 190);
-  --accent-foreground: oklch(0.96 0.008 175);
-  --destructive: oklch(0.7 0.17 25);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.7 0.09 178);
+  --surface: #141b2d;
+  --surface2: #1a2338;
+  --line: #27314a;
+  --shadow-panel-value: 0 12px 34px rgba(0, 0, 0, 0.22);
 
-  --brass: oklch(0.8 0.12 78);
-  --brass-foreground: oklch(0.22 0.04 70);
-  --success: oklch(0.78 0.14 152);
-  --warning: oklch(0.8 0.13 70);
-  --info: oklch(0.76 0.1 240);
+  --tint-purple: #302d5b;
+  --tint-green: #183f3b;
+  --tint-orange: #4a3328;
+  --tint-pink: #4b2735;
 
-  --chart-1: oklch(0.78 0.11 175);
-  --chart-2: oklch(0.8 0.12 78);
-  --chart-3: oklch(0.72 0.12 245);
-  --chart-4: oklch(0.72 0.14 15);
-  --chart-5: oklch(0.68 0.03 220);
+  --status-success: #173e35;
+  --status-pending: #493821;
+  --status-failed: #4b2530;
+  --status-open: #2d2a59;
+  --status-open-foreground: var(--brand2);
 
-  --sidebar: oklch(0.145 0.012 200);
-  --sidebar-foreground: oklch(0.93 0.01 175);
-  --sidebar-primary: oklch(0.8 0.12 78);
-  --sidebar-primary-foreground: oklch(0.22 0.04 70);
-  --sidebar-accent: oklch(1 0 0 / 7%);
-  --sidebar-accent-foreground: oklch(0.99 0 0);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.8 0.12 78);
+  --background: #0b1020;
+  --foreground: #f2f5ff;
+  --card: var(--surface);
+  --card-foreground: #f2f5ff;
+  --popover: var(--surface2);
+  --popover-foreground: #f2f5ff;
+  --primary: var(--brand2);
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface2);
+  --secondary-foreground: #f2f5ff;
+  --muted: var(--surface2);
+  --muted-foreground: #9aa6c1;
+  --accent: #29284d;
+  --accent-foreground: #f2f5ff;
+  --destructive: var(--red);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand2);
+
+  --brass: var(--orange);
+  --brass-foreground: #2a1a10;
+  --success: var(--mint);
+  --warning: var(--orange);
+  --info: var(--brand2);
+
+  --sidebar: #10172a;
+  --sidebar-foreground: #f2f5ff;
+  --sidebar-primary: var(--mint);
+  --sidebar-primary-foreground: #0b1020;
+  --sidebar-accent: rgb(255 255 255 / 7%);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 8%);
+  --sidebar-ring: var(--brand2);
 }
 
 /*
@@ -155,7 +202,7 @@
 
 /*
  * The in-call screen (components/agents-ui/blocks/agent-session-view-01) is always dark: the
- * section carries `.dark`, which restores the brand's evergreen/brass dark tokens over the widget
+ * section carries `.dark`, which restores the brand's dark tokens over the widget
  * overrides above. `.dark` doesn't set --hairline, so it is reset here for default borders. The
  * /chat page's hover theme toggle would sit over End call, so it's hidden during a call, and its corner logo uses the dark-theme mark.
  */
@@ -173,9 +220,10 @@
 
 @theme inline {
   --font-sans:
-    var(--font-public-sans), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
-    'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-display: var(--font-bricolage), var(--font-public-sans), ui-sans-serif, system-ui;
+    var(--font-inter), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  /* One family (spec 6.6): titles and figures use Inter too. */
+  --font-display: var(--font-inter), ui-sans-serif, system-ui;
   --font-mono:
     var(--font-commit-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     'Liberation Mono', 'Courier New', monospace;
@@ -184,6 +232,13 @@
   --radius-md: calc(var(--radius-base) - 2px);
   --radius-lg: var(--radius-base);
   --radius-xl: calc(var(--radius-base) + 4px);
+  /* Reference radii: rounded-panel / -metric / -hero / -button. */
+  --radius-panel: 17px;
+  --radius-metric: 16px;
+  --radius-hero: 20px;
+  --radius-button: 10px;
+
+  --shadow-panel: var(--shadow-panel-value);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -221,6 +276,27 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-brand: var(--brand);
+  --color-brand2: var(--brand2);
+  --color-mint: var(--mint);
+  --color-orange: var(--orange);
+  --color-red: var(--red);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-line: var(--line);
+  --color-tint-purple: var(--tint-purple);
+  --color-tint-green: var(--tint-green);
+  --color-tint-orange: var(--tint-orange);
+  --color-tint-pink: var(--tint-pink);
+  --color-status-success: var(--status-success);
+  --color-status-success-foreground: var(--status-success-foreground);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-foreground: var(--status-pending-foreground);
+  --color-status-failed: var(--status-failed);
+  --color-status-failed-foreground: var(--status-failed-foreground);
+  --color-status-open: var(--status-open);
+  --color-status-open-foreground: var(--status-open-foreground);
 }
 
 @layer base {

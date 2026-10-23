@@ -10,6 +10,8 @@ logger = logging.getLogger("agent.topics")
 ACCOUNT_CHANGED = "telco.account_changed"
 OTP_SMS = "telco.otp_sms"
 CONFIRM = "telco.confirm"
+PACKAGES = "telco.packages"
+CASE_CREATED = "telco.case_created"
 RPC_CONFIRM = "telco.confirm_action"
 RPC_CANCEL = "telco.cancel_action"
 

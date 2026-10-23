@@ -67,6 +67,14 @@ export interface AgentChatTranscriptProps
    */
   renderAfterMessage?: (message: ReceivedMessage) => ReactNode;
   /**
+   * Renders one message in place of the default bubble, e.g. in a host page's own chat style.
+   */
+  renderMessage?: (message: ReceivedMessage) => ReactNode;
+  /**
+   * Replaces the default "Thinking..." marker shown while the agent is thinking.
+   */
+  thinkingContent?: ReactNode;
+  /**
    * Additional CSS class names to apply to the conversation container.
    */
   className?: string;
@@ -104,6 +112,8 @@ export function AgentChatTranscript({
   messages = [],
   trailingContent,
   renderAfterMessage,
+  renderMessage,
+  thinkingContent,
   className,
   ...props
 }: AgentChatTranscriptProps) {
@@ -142,18 +152,22 @@ export function AgentChatTranscript({
               return (
                 <Fragment key={id}>
                   <MessageScrollerItem messageId={id} scrollAnchor={_scrollAnchor}>
-                    <Message align={isUser ? 'end' : 'start'} title={title}>
-                      <MessageContent>
-                        <Bubble
-                          align={isUser ? 'end' : 'start'}
-                          variant={isUser ? 'secondary' : 'ghost'}
-                        >
-                          <BubbleContent>
-                            <Streamdown>{message}</Streamdown>
-                          </BubbleContent>
-                        </Bubble>
-                      </MessageContent>
-                    </Message>
+                    {renderMessage ? (
+                      renderMessage(receivedMessage)
+                    ) : (
+                      <Message align={isUser ? 'end' : 'start'} title={title}>
+                        <MessageContent>
+                          <Bubble
+                            align={isUser ? 'end' : 'start'}
+                            variant={isUser ? 'secondary' : 'ghost'}
+                          >
+                            <BubbleContent>
+                              <Streamdown>{message}</Streamdown>
+                            </BubbleContent>
+                          </Bubble>
+                        </MessageContent>
+                      </Message>
+                    )}
                   </MessageScrollerItem>
                   {/* See the content-visibility note on trailingContent below. */}
                   {afterContent && (
@@ -169,13 +183,13 @@ export function AgentChatTranscript({
               Every MessageScrollerItem gets `content-visibility: auto` with a
               10rem intrinsic-size placeholder (see message-scroller.tsx) so
               off-screen chat bubbles skip layout for perf. That estimate is
-              harmless for a couple lines of text, but the apartment shortlist
-              can be 500-600px+ tall -- the browser renders it at the 160px
+              harmless for a couple lines of text, but a card the agent sent
+              (a confirm card, a package row) can be much taller -- the browser renders it at the 160px
               placeholder height, then snaps to its real height the moment
               content-visibility decides it needs to actually lay it out. That
               snap is the jitter: verified by polling this item's rect every
               frame, which showed height jump 0 -> 160 (the placeholder) ->
-              its true ~550px in discrete, unanimated steps. Forcing this one
+              its true height in discrete, unanimated steps. Forcing this one
               item to always render for real removes the placeholder stage
               entirely, leaving a single clean reflow instead of two.
             */}
@@ -188,12 +202,14 @@ export function AgentChatTranscript({
             {/* Agent is thinking indicator */}
             {agentState === 'thinking' && (
               <MessageScrollerItem>
-                <Marker role="status">
-                  <MarkerIcon>
-                    <AgentChatIndicator size="sm" />
-                  </MarkerIcon>
-                  <MarkerContent className="shimmer">Thinking...</MarkerContent>
-                </Marker>
+                {thinkingContent ?? (
+                  <Marker role="status">
+                    <MarkerIcon>
+                      <AgentChatIndicator size="sm" />
+                    </MarkerIcon>
+                    <MarkerContent className="shimmer">Thinking...</MarkerContent>
+                  </Marker>
+                )}
               </MessageScrollerItem>
             )}
           </MessageScrollerContent>

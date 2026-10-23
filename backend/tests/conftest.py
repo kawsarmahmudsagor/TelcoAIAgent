@@ -3,7 +3,7 @@ pytest_plugins = ["bss_helpers"]
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_current_subscriber
 from app.main import app
 
 
@@ -13,6 +13,18 @@ def api():
     app.dependency_overrides[get_current_admin] = lambda: "pytest"
     yield TestClient(app)
     app.dependency_overrides.pop(get_current_admin, None)
+
+
+@pytest.fixture
+def customer_api():
+    """Factory: customer_api(subscriber_id) -> client signed in as that subscriber."""
+
+    def make(subscriber_id):
+        app.dependency_overrides[get_current_subscriber] = lambda: subscriber_id
+        return TestClient(app)
+
+    yield make
+    app.dependency_overrides.pop(get_current_subscriber, None)
 
 
 @pytest.fixture
