@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.bss.clock import utc_now
 from app.bss.types import TransactionView
-from app.models.telco import Package, Transaction, TxnStatus, TxnType
+from app.models.telco import Offer, Package, Transaction, TxnStatus, TxnType
 
 
 def lookup(
@@ -24,8 +24,9 @@ def lookup(
 ) -> list[TransactionView]:
     now = now or utc_now()
     q = (
-        select(Transaction, Package.name)
+        select(Transaction, Package.name, Offer.points_cost)
         .outerjoin(Package, Package.id == Transaction.package_id)
+        .outerjoin(Offer, Offer.id == Transaction.offer_id)
         .where(Transaction.subscriber_id == subscriber_id)
     )
     if ref is not None:
@@ -48,6 +49,7 @@ def lookup(
             failure_reason=t.failure_reason,
             created_at=t.created_at,
             package_name=name,
+            points_spent=points if t.type == TxnType.redeem else None,
         )
-        for t, name in rows
+        for t, name, points in rows
     ]

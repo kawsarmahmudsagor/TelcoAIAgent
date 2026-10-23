@@ -341,7 +341,10 @@ class AuditEvent(TimestampedBase):
 
     __tablename__ = "audit_events"
 
-    subscriber_id: Mapped[uuid.UUID | None] = _subscriber_fk(nullable=True)
+    # The trail outlives the subscriber it was about.
+    subscriber_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscribers.id", ondelete="SET NULL"), nullable=True
+    )
     actor: Mapped[Actor] = mapped_column(Enum(Actor, name="audit_actor"))
     action: Mapped[str] = mapped_column(String(40))
     action_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)

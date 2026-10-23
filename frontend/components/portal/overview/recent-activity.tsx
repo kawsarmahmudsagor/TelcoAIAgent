@@ -37,13 +37,13 @@ function title(txn: TransactionView, ownMsisdn: string): string {
 }
 
 /**
- * Recharges add (+), purchases and redemptions spend (−). A points redemption carries no taka
- * amount (the API reports 0 and not the points spent), so it reads "Points" unless one is given.
+ * Recharges add (+), purchases spend (−). A points redemption carries no taka amount, so it
+ * shows the points spent.
  */
 function amount(txn: TransactionView): string {
   if (txn.type === 'recharge') return `+${formatTaka(txn.amount)}`;
   if (txn.channel === 'points') {
-    return txn.amount > 0 ? `−${txn.amount.toLocaleString('en-IN')} pts` : 'Points';
+    return txn.points_spent !== null ? `${txn.points_spent.toLocaleString('en-IN')} pts` : 'Points';
   }
   return `−${formatTaka(txn.amount)}`;
 }

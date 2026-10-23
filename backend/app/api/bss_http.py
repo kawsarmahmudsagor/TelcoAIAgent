@@ -20,6 +20,7 @@ _STATUS_BY_CODE: dict[str, int] = {
     "otp_invalid": 400,
     "otp_expired": 410,
     "otp_attempts_exceeded": 429,
+    "too_many_codes": 429,
 }
 
 

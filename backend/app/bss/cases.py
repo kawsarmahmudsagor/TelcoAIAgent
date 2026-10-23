@@ -136,6 +136,17 @@ def get_case_status(
     return [_view(r) for r in rows]
 
 
+def list_recent(db: Session, subscriber_id: uuid.UUID, *, limit: int = 20) -> list[CaseView]:
+    """Newest first across all statuses."""
+    rows = db.scalars(
+        select(SupportCase)
+        .where(SupportCase.subscriber_id == subscriber_id)
+        .order_by(SupportCase.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [_view(r) for r in rows]
+
+
 def set_case_status(
     db: Session, ref: str, status: CaseStatus, *, actor: Actor = Actor.admin
 ) -> CaseView:

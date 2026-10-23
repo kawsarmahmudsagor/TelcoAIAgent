@@ -154,6 +154,7 @@ class TransactionView(_Base):
     failure_reason: str | None
     created_at: datetime
     package_name: str | None
+    points_spent: int | None = None
 
 
 class OfferView(_Base):

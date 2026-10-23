@@ -51,6 +51,11 @@ class OtpAttemptsExceeded(BssError):
     default_message = "Too many incorrect code attempts"
 
 
+class TooManyCodes(BssError):
+    code = "too_many_codes"
+    default_message = "Too many verification codes requested"
+
+
 class NoPendingAction(BssError):
     code = "no_pending_action"
     default_message = "No pending action to confirm"

@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Literal, TypeVar
 from uuid import UUID, uuid4
 
@@ -39,9 +39,6 @@ from app.bss.types import PurchaseRequest, RechargeRequest
 from app.models.telco import Actor, CasePriority, PlanType, TxnChannel
 
 ActionKind = Literal["purchase", "recharge", "redeem"]
-
-MAX_CODES_PER_WINDOW = 5
-CODE_WINDOW = timedelta(minutes=15)
 
 _SNAPSHOT_NOTE = "These figures replace the account snapshot in your instructions."
 _CODE_SENT = (
@@ -149,13 +146,14 @@ async def _start(userdata: SessionUserdata, kind: ActionKind, request, now: date
         summary = accounts.get_account_summary(db, sid)
         text, card = _quote(db, sid, kind, request, now)
         code = otp.issue(
-            db, subscriber_id=sid, action_id=action_id, purpose=kind, payload=payload, now=now
+            db, subscriber_id=sid, action_id=action_id, purpose=kind, payload=payload, now=now,
+            actor=Actor.agent,
         )
         return summary, text, card, code
 
     async with userdata.action_lock:
-        recent = [t for t in userdata.otp_issued_at if now - t < CODE_WINDOW]
-        if len(recent) >= MAX_CODES_PER_WINDOW:
+        recent = [t for t in userdata.otp_issued_at if now - t < otp.CODE_WINDOW]
+        if len(recent) >= otp.MAX_CODES_PER_WINDOW:
             raise LimitExceeded("Too many verification codes requested")
         summary, text, card, code = await run_db(prepare)
         userdata.otp_issued_at = recent + [now]
@@ -279,6 +277,7 @@ async def _confirm(
                 payload=a.payload,
                 code=code,
                 now=now,
+                actor=Actor.agent,
             )
 
         try:

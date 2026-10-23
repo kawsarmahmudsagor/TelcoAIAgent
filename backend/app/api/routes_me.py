@@ -153,9 +153,7 @@ def offers(
 def list_cases(
     subscriber_id: uuid.UUID = Depends(get_current_subscriber), db: Session = Depends(get_db)
 ):
-    rows = cases.get_case_status(db, subscriber_id, limit=_CASE_LIMIT)
-    # bss lists open cases first; the portal shows newest first.
-    return _json(sorted(rows, key=lambda c: c.created_at, reverse=True))
+    return _json(cases.list_recent(db, subscriber_id, limit=_CASE_LIMIT))
 
 
 @router.post("/cases", response_model=CaseView, status_code=201)

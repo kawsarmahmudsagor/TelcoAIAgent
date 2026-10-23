@@ -26,12 +26,12 @@ from app.api.schemas_admin import (
     TransactionList,
     TransactionStats,
 )
-from app.bss import cases, monitor, network, ops
+from app.bss import audit, cases, monitor, network, notifications, ops
 from app.bss.clock import utc_now
 from app.bss.errors import BssError
 from app.bss.network import IncidentAdminView
 from app.bss.types import CaseView
-from app.models.telco import CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
+from app.models.telco import Actor, CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
 
 router = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[Depends(get_current_admin)]
@@ -162,3 +162,13 @@ def resolve_incident(incident_id: uuid.UUID, db: Session = Depends(get_db)):
         return _json(network.resolve_incident(db, incident_id))
     except BssError as e:
         raise bss_http_error(e)
+
+
+@router.post("/nudges/run")
+def run_nudges(db: Session = Depends(get_db)):
+    created = notifications.run_sweep(db)
+    audit.record(
+        db, actor=Actor.admin, action="nudges_run", subscriber_id=None, detail=dict(created)
+    )
+    db.commit()
+    return _json({"created": created})

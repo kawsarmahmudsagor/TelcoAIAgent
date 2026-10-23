@@ -98,6 +98,8 @@ export interface TransactionView {
   failure_reason: string | null;
   created_at: DateTimeString;
   package_name: string | null;
+  /** The offer's points cost on a redeem row, else null. */
+  points_spent: number | null;
 }
 
 export interface TransactionParams {

@@ -11,6 +11,7 @@ import pytest
 from livekit.agents.llm import ToolError
 from sqlalchemy import func, select
 
+from app.bss import otp
 from app.agent import actions
 from app.agent.tools import packages as package_tools
 from app.agent.tools import recharge as recharge_tools
@@ -198,13 +199,13 @@ def test_code_throttle(bss_world):
     ud = _ud(sub)
 
     async def go():
-        for _ in range(actions.MAX_CODES_PER_WINDOW):
+        for _ in range(otp.MAX_CODES_PER_WINDOW):
             await package_tools.run_purchase_package(ud, pkg.code)
         with pytest.raises(ToolError) as e:
             await package_tools.run_purchase_package(ud, pkg.code)
         assert str(e.value) == ERROR_TEXT["limit_exceeded"]
         # Outside the window the codes no longer count.
-        later = utc_now() + actions.CODE_WINDOW + timedelta(seconds=1)
+        later = utc_now() + otp.CODE_WINDOW + timedelta(seconds=1)
         await actions.start_action(ud, "purchase", _purchase(pkg), now=later)
 
     asyncio.run(go())
