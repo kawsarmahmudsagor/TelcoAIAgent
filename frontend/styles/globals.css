@@ -50,6 +50,45 @@
   --status-open: #eeedff;
   --status-open-foreground: var(--brand);
 
+  /* Brand-tinted surfaces and text used across the portal (light / dark pairs). */
+  --brand-text: var(--brand);
+  --brand-start: #6158f5;
+  --tint-selected: var(--tint-purple);
+  --chip-border: #bcb8ff;
+  --featured-border: #d8d5ff;
+  --featured-from: #e8e8ff;
+  --featured-to: #f7f7ff;
+  --featured-fg: #28265d;
+  --featured-muted: #66659a;
+  --featured-chip: #d7d4ff;
+  --featured-chip-fg: #3933a2;
+  --scrim: #0b102077;
+  --toast: #172033;
+  --toast-foreground: #ffffff;
+  --chat-canvas: #fbfcff;
+  --bkash: #e2136e;
+  --nagad: #f6921e;
+  --hero-from: #37328d;
+  --hero-via: #5148ce;
+  --hero-to: #6d68ee;
+  --hero-soft: #dfdeff;
+  --hero-muted: #d5d4ff;
+  --hero-dot: #55e4c5;
+  --promo-from: #252b63;
+  --promo-to: #4942a5;
+  --promo-foreground: #d9dcff;
+  --promo-ink: #39358c;
+  --persona-1-from: #f4b58e;
+  --persona-1-to: #dd6c8d;
+  --persona-2-from: #6158f5;
+  --persona-2-to: #9b8cff;
+  --persona-3-from: #20b89a;
+  --persona-3-to: #6fd6c0;
+  --persona-4-from: #ff9b55;
+  --persona-4-to: #f6c177;
+  --persona-5-from: #e45b73;
+  --persona-5-to: #b46fe0;
+
   /* shadcn, re-skinned. */
   --background: #f5f7fb;
   --foreground: #172033;
@@ -112,6 +151,20 @@
   --status-failed: #4b2530;
   --status-open: #2d2a59;
   --status-open-foreground: var(--brand2);
+
+  --brand-text: #a9a3ff;
+  --tint-selected: #29274e;
+  --chip-border: #4a4690;
+  --featured-border: #3a3775;
+  --featured-from: #2b2a5e;
+  --featured-to: #1c2240;
+  --featured-fg: #f2f5ff;
+  --featured-muted: #b8b6e6;
+  --featured-chip: #3d3a85;
+  --featured-chip-fg: #d9d6ff;
+  --toast: #eef2ff;
+  --toast-foreground: #172033;
+  --chat-canvas: #101729;
 
   --background: #0b1020;
   --foreground: #f2f5ff;
@@ -297,6 +350,44 @@
   --color-status-failed-foreground: var(--status-failed-foreground);
   --color-status-open: var(--status-open);
   --color-status-open-foreground: var(--status-open-foreground);
+
+  --color-brand-text: var(--brand-text);
+  --color-brand-start: var(--brand-start);
+  --color-tint-selected: var(--tint-selected);
+  --color-chip-border: var(--chip-border);
+  --color-featured-border: var(--featured-border);
+  --color-featured-from: var(--featured-from);
+  --color-featured-to: var(--featured-to);
+  --color-featured-fg: var(--featured-fg);
+  --color-featured-muted: var(--featured-muted);
+  --color-featured-chip: var(--featured-chip);
+  --color-featured-chip-fg: var(--featured-chip-fg);
+  --color-scrim: var(--scrim);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+  --color-chat-canvas: var(--chat-canvas);
+  --color-bkash: var(--bkash);
+  --color-nagad: var(--nagad);
+  --color-hero-from: var(--hero-from);
+  --color-hero-via: var(--hero-via);
+  --color-hero-to: var(--hero-to);
+  --color-hero-soft: var(--hero-soft);
+  --color-hero-muted: var(--hero-muted);
+  --color-hero-dot: var(--hero-dot);
+  --color-promo-from: var(--promo-from);
+  --color-promo-to: var(--promo-to);
+  --color-promo-foreground: var(--promo-foreground);
+  --color-promo-ink: var(--promo-ink);
+  --color-persona-1-from: var(--persona-1-from);
+  --color-persona-1-to: var(--persona-1-to);
+  --color-persona-2-from: var(--persona-2-from);
+  --color-persona-2-to: var(--persona-2-to);
+  --color-persona-3-from: var(--persona-3-from);
+  --color-persona-3-to: var(--persona-3-to);
+  --color-persona-4-from: var(--persona-4-from);
+  --color-persona-4-to: var(--persona-4-to);
+  --color-persona-5-from: var(--persona-5-from);
+  --color-persona-5-to: var(--persona-5-to);
 }
 
 @layer base {

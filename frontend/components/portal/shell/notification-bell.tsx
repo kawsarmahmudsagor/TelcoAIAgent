@@ -185,7 +185,7 @@ function NotificationList({
           type="button"
           onClick={onMarkAllRead}
           disabled={unread === 0}
-          className="text-brand focus-visible:ring-ring/60 -mr-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-40 dark:text-[#a9a3ff]"
+          className="text-brand-text focus-visible:ring-ring/60 -mr-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-40"
         >
           <CheckCheckIcon className="size-3.5" aria-hidden="true" />
           Mark all read

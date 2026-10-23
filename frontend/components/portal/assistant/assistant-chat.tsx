@@ -34,7 +34,7 @@ export function BotAvatar({ size = 'md', className }: { size?: 'sm' | 'md'; clas
     <span
       aria-hidden="true"
       className={cn(
-        'grid shrink-0 place-items-center bg-linear-135 from-[#4f46e5] to-[#24b89a] text-white',
+        'from-brand to-mint grid shrink-0 place-items-center bg-linear-135 text-white',
         size === 'md'
           ? 'size-[39px] rounded-[13px] [&_svg]:size-5'
           : 'size-[29px] rounded-[9px] [&_svg]:size-4',
@@ -78,7 +78,7 @@ export function AssistantChatHeader({
       <div className="min-w-0 flex-1">
         <Title className="truncate text-[13px] font-bold">Telco AI Assistant</Title>
         <p className="text-muted-foreground truncate text-[11px]" aria-live="polite">
-          <span className="font-semibold text-[#0eae8a]">● Online</span> · {status}
+          <span className="text-success font-semibold">● Online</span> · {status}
         </p>
       </div>
       <StartAudioButton label="Allow audio" size="sm" />
@@ -160,7 +160,7 @@ function MessageRow({ message }: { message: ReceivedMessage }) {
         <small
           className={cn(
             'mt-[5px] block text-[10px]',
-            isUser ? 'text-[#d7d4ff]' : 'text-muted-foreground'
+            isUser ? 'text-white/75' : 'text-muted-foreground'
           )}
         >
           {timeFormat.format(new Date(message.timestamp))}
@@ -384,7 +384,7 @@ export function AssistantConversation({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 bg-[#fbfcff] dark:bg-[#101729]">
+      <div className="bg-chat-canvas min-h-0 flex-1">
         {empty ? (
           <EmptyState compact={compact} />
         ) : (

@@ -51,7 +51,7 @@ export function OfferCard({
 }) {
   const variant = offerVariant(offer);
   const featured = variant === 'package';
-  const muted = featured ? 'text-[#66659a] dark:text-[#b8b6e6]' : 'text-muted-foreground';
+  const muted = featured ? 'text-featured-muted' : 'text-muted-foreground';
   const pkg = offer.package;
 
   let headline = offer.title;
@@ -115,16 +115,14 @@ export function OfferCard({
       className={cn(
         'rounded-metric phone:p-[17px] relative flex min-w-0 flex-col overflow-hidden border p-[18px]',
         featured
-          ? 'border-[#d8d5ff] bg-linear-145 from-[#e8e8ff] to-[#f7f7ff] text-[#28265d] dark:border-[#3a3775] dark:from-[#2b2a5e] dark:to-[#1c2240] dark:text-[#f2f5ff]'
+          ? 'border-featured-border from-featured-from to-featured-to text-featured-fg bg-linear-145'
           : 'bg-surface border-line'
       )}
     >
       <span
         className={cn(
           'inline-flex items-center gap-1 self-start rounded-md px-[7px] py-[5px] text-[9px] font-extrabold tracking-[0.7px] uppercase',
-          featured
-            ? 'bg-[#d7d4ff] text-[#3933a2] dark:bg-[#3d3a85] dark:text-[#d9d6ff]'
-            : 'bg-tint-purple text-brand dark:text-[#a9a3ff]'
+          featured ? 'bg-featured-chip text-featured-chip-fg' : 'bg-tint-purple text-brand-text'
         )}
       >
         {featured && <SparklesIcon className="size-2.5" aria-hidden="true" />}

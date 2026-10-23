@@ -54,7 +54,7 @@ export function OtpDialog(props: OtpDialogProps) {
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-50 bg-[#0b102077]" />
+        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 bg-scrim fixed inset-0 z-50" />
         {start && <OtpContent key={start.action_id} {...props} start={start} />}
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
@@ -110,7 +110,7 @@ function OtpContent({
       <div className="mb-[7px] flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="bg-tint-purple text-brand grid size-9 shrink-0 place-items-center rounded-[11px] dark:text-[#a9a3ff]"
+          className="bg-tint-purple text-brand-text grid size-9 shrink-0 place-items-center rounded-[11px]"
         >
           <ShieldCheckIcon className="size-[17px]" />
         </span>

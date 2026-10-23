@@ -6,7 +6,7 @@ export function TelcoMark({ className }: { className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        'to-mint grid size-[38px] shrink-0 place-items-center rounded-[13px] bg-linear-135 from-[#6158f5] text-xl font-black text-white shadow-[0_7px_16px_#635bdf44]',
+        'to-mint from-brand-start grid size-[38px] shrink-0 place-items-center rounded-[13px] bg-linear-135 text-xl font-black text-white shadow-[0_7px_16px_#635bdf44]',
         className
       )}
     >

@@ -40,12 +40,12 @@ function SmsCard({
     <div
       role="status"
       aria-label={`Text message to ${to}: telco. OTP ${code}`}
-      className="w-[min(340px,calc(100vw-32px))] rounded-[18px] bg-[#172033] p-3.5 text-white shadow-[0_18px_44px_#0b102040] ring-1 ring-white/10 dark:bg-[#eef2ff] dark:text-[#172033] dark:ring-[#17203314]"
+      className="bg-toast text-toast-foreground w-[min(340px,calc(100vw-32px))] rounded-[18px] p-3.5 shadow-[0_18px_44px_#0b102040] ring-1 ring-white/10"
     >
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="grid size-[22px] shrink-0 place-items-center rounded-[7px] bg-linear-135 from-[#6158f5] to-[#20b89a] text-[11px] font-black text-white"
+          className="from-brand-start to-mint grid size-[22px] shrink-0 place-items-center rounded-[7px] bg-linear-135 text-[11px] font-black text-white"
         >
           t
         </span>
@@ -60,7 +60,7 @@ function SmsCard({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss message"
-          className="-m-1 grid size-7 place-items-center rounded-full opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[#a9a3ff]"
+          className="focus-visible:ring-brand-text -m-1 grid size-7 place-items-center rounded-full opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
         >
           <XIcon className="size-3.5" aria-hidden="true" />
         </button>

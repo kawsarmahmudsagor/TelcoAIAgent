@@ -5,7 +5,7 @@ import { formatTaka } from '@/lib/telco-format';
 import type { AccountSummary } from '@/lib/types/portal';
 
 const HERO =
-  'relative isolate overflow-hidden rounded-hero bg-linear-[115deg] from-[#37328d] via-[#5148ce] via-53% to-[#6d68ee] px-[27px] py-[25px] text-white shadow-[0_14px_28px_#4d46be22] min-h-[225px] tablet:p-[22px] phone:min-h-[215px]';
+  'relative isolate overflow-hidden rounded-hero bg-linear-[115deg] from-hero-from via-hero-via via-53% to-hero-to px-[27px] py-[25px] text-white shadow-[0_14px_28px_#4d46be22] min-h-[225px] tablet:p-[22px] phone:min-h-[215px]';
 
 /** The indigo balance card: main balance (prepaid) or the bill due (postpaid), and the next steps. */
 export function BalanceHero({ summary }: { summary: AccountSummary }) {
@@ -25,10 +25,10 @@ export function BalanceHero({ summary }: { summary: AccountSummary }) {
       </span>
 
       <div className="relative z-[2]">
-        <p className="flex flex-wrap items-center gap-[9px] text-xs font-semibold text-[#dfdeff]">
+        <p className="text-hero-soft flex flex-wrap items-center gap-[9px] text-xs font-semibold">
           <span
             aria-hidden="true"
-            className="size-[7px] rounded-full bg-[#55e4c5] shadow-[0_0_0_4px_#55e4c522]"
+            className="bg-hero-dot size-[7px] rounded-full shadow-[0_0_0_4px_#55e4c522]"
           />
           {postpaid ? 'POSTPAID ACCOUNT' : 'PREPAID ACCOUNT'}
           <span aria-hidden="true" className="opacity-50">
@@ -39,7 +39,7 @@ export function BalanceHero({ summary }: { summary: AccountSummary }) {
         <p className="phone:text-[35px] mt-[17px] mb-0.5 text-[39px] leading-tight font-[850] tracking-[-1.6px]">
           <span className="text-[17px] font-semibold tracking-normal">৳</span> {figure}
         </p>
-        <p className="text-xs text-[#d5d4ff]">
+        <p className="text-hero-muted text-xs">
           {postpaid ? 'Bill due this cycle' : 'Available main balance'}
         </p>
         <div className="narrow:[&_a]:px-2.5 narrow:[&_a]:py-[9px] mt-[23px] flex flex-wrap gap-2.5">

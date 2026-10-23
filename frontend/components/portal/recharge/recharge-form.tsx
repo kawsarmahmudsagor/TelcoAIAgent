@@ -149,8 +149,7 @@ export function RechargeForm() {
                   key={value}
                   className={cn(
                     'rounded-button bg-surface border-line has-focus-visible:ring-ring/60 grid min-h-11 cursor-pointer place-items-center border px-1 py-3 text-sm font-extrabold has-focus-visible:ring-[3px]',
-                    selected &&
-                      'border-brand text-brand bg-tint-purple dark:bg-[#29274e] dark:text-[#a9a3ff]'
+                    selected && 'border-brand text-brand-text bg-tint-selected'
                   )}
                 >
                   <input

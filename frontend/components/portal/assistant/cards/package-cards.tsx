@@ -45,7 +45,7 @@ export function PackageCards({
               className={cn(
                 'rounded-metric flex w-[188px] shrink-0 snap-start flex-col border p-3.5',
                 featured
-                  ? 'border-[#d8d5ff] bg-linear-145 from-[#e8e8ff] to-[#f7f7ff] text-[#28265d] dark:border-[#3a3775] dark:from-[#2b2a5e] dark:to-[#1c2240] dark:text-[#f2f5ff]'
+                  ? 'border-featured-border from-featured-from to-featured-to text-featured-fg bg-linear-145'
                   : 'bg-surface border-line'
               )}
             >
@@ -54,8 +54,8 @@ export function PackageCards({
                   className={cn(
                     'mb-2 inline-flex items-center gap-1 self-start rounded-md px-1.5 py-[3px] text-[9px] font-extrabold tracking-[0.6px] uppercase',
                     featured
-                      ? 'bg-[#d7d4ff] text-[#3933a2] dark:bg-[#3d3a85] dark:text-[#d9d6ff]'
-                      : 'bg-tint-purple text-brand dark:text-[#a9a3ff]'
+                      ? 'bg-featured-chip text-featured-chip-fg'
+                      : 'bg-tint-purple text-brand-text'
                   )}
                 >
                   {featured && <SparklesIcon className="size-2.5" aria-hidden="true" />}
@@ -68,7 +68,7 @@ export function PackageCards({
               <p
                 className={cn(
                   'mt-1 text-[11px] leading-snug',
-                  featured ? 'text-[#66659a] dark:text-[#b8b6e6]' : 'text-muted-foreground'
+                  featured ? 'text-featured-muted' : 'text-muted-foreground'
                 )}
               >
                 {packageContents(pkg)} · {validity(pkg.validity_days)}

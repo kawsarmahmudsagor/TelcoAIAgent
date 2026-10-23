@@ -161,7 +161,7 @@ function PayFromChooser({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-[#0b102077]" />
+        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 bg-scrim fixed inset-0 z-50" />
         {pkg && (
           <DialogPrimitive.Content className="bg-surface border-line data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 phone:p-5 fixed top-1/2 left-1/2 z-[51] w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border p-6 shadow-[0_25px_70px_#0003] outline-none">
             <DialogPrimitive.Title className="mb-[7px] text-lg font-bold tracking-[-0.3px]">

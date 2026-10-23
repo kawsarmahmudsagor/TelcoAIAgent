@@ -16,11 +16,11 @@ type LoadState =
 
 // Avatar gradients, one per seeded persona in order (the reference's profile avatar is the first).
 const AVATAR_GRADIENTS = [
-  'from-[#f4b58e] to-[#dd6c8d]',
-  'from-[#6158f5] to-[#9b8cff]',
-  'from-[#20b89a] to-[#6fd6c0]',
-  'from-[#ff9b55] to-[#f6c177]',
-  'from-[#e45b73] to-[#b46fe0]',
+  'from-persona-1-from to-persona-1-to',
+  'from-persona-2-from to-persona-2-to',
+  'from-persona-3-from to-persona-3-to',
+  'from-persona-4-from to-persona-4-to',
+  'from-persona-5-from to-persona-5-to',
 ];
 
 function errorText(error: unknown): string {
@@ -144,7 +144,7 @@ function PersonaButton({
         'group border-line bg-surface rounded-metric shadow-panel flex h-full w-full flex-col gap-4 border p-[18px] text-left outline-none',
         'focus-visible:border-primary focus-visible:ring-primary/30 focus-visible:ring-4',
         'motion-safe:transition-[border-color,transform] motion-safe:duration-150',
-        'enabled:hover:border-[#b7b2ff] enabled:motion-safe:hover:-translate-y-0.5',
+        'enabled:hover:border-chip-border enabled:motion-safe:hover:-translate-y-0.5',
         disabled && !pending && 'opacity-55',
         pending && 'border-primary'
       )}

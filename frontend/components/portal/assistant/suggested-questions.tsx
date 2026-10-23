@@ -28,13 +28,10 @@ export function PopularQuestionList({ onAsk }: { onAsk(text: string): void }) {
             type="button"
             lang={q.lang}
             onClick={() => onAsk(q.text)}
-            className="hover:text-brand focus-visible:ring-ring/60 flex min-h-11 w-full items-center justify-between gap-3 rounded-md py-2.5 text-left text-xs outline-none focus-visible:ring-[3px] motion-safe:transition-colors dark:hover:text-[#a9a3ff]"
+            className="hover:text-brand-text focus-visible:ring-ring/60 flex min-h-11 w-full items-center justify-between gap-3 rounded-md py-2.5 text-left text-xs outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
           >
             {q.text}
-            <ArrowUpRightIcon
-              className="text-brand size-3.5 shrink-0 dark:text-[#a9a3ff]"
-              aria-hidden="true"
-            />
+            <ArrowUpRightIcon className="text-brand-text size-3.5 shrink-0" aria-hidden="true" />
           </button>
         </li>
       ))}
@@ -58,7 +55,7 @@ export function QuestionChips({
           type="button"
           lang={q.lang}
           onClick={() => onAsk(q.text)}
-          className="text-brand bg-surface focus-visible:ring-ring/60 hover:bg-tint-purple min-h-8 rounded-lg border border-[#bcb8ff] px-[9px] py-[7px] text-[11px] font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors dark:border-[#4a4690] dark:text-[#a9a3ff]"
+          className="text-brand-text bg-surface focus-visible:ring-ring/60 hover:bg-tint-purple border-chip-border min-h-8 rounded-lg border px-[9px] py-[7px] text-[11px] font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
         >
           {q.text}
         </button>
