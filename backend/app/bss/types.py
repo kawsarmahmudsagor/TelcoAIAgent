@@ -11,6 +11,7 @@ from app.models.telco import (
     CaseStatus,
     IncidentKind,
     IncidentStatus,
+    NotificationKind,
     PackageKind,
     PlanType,
     TxnChannel,
@@ -205,3 +206,13 @@ class IncidentView(_Base):
     message: str
     starts_at: datetime
     ends_at: datetime | None
+
+
+class NotificationView(_Base):
+    id: UUID
+    kind: NotificationKind
+    title: str
+    body: str
+    payload: dict
+    created_at: datetime
+    read_at: datetime | None

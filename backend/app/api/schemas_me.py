@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from app.bss.types import NotificationView
 from app.models.telco import CasePriority, PlanType, TxnChannel
 
 PORTAL_CASE_CATEGORIES = (
@@ -95,3 +96,12 @@ class ActionResult(BaseModel):
     main_balance: float | None
     postpaid_due: float | None
     reward_points: int | None
+
+
+class NotificationList(BaseModel):
+    unread: int
+    items: list[NotificationView]
+
+
+class ReadAllResult(BaseModel):
+    updated: int

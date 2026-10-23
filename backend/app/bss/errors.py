@@ -74,3 +74,8 @@ class CaseNotFound(BssError):
 class InvalidRequest(BssError):
     code = "invalid_request"
     default_message = "Invalid request"
+
+
+class NotificationNotFound(BssError):
+    code = "notification_not_found"
+    default_message = "Notification not found"
