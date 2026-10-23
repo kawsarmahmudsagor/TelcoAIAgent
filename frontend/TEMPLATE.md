@@ -6,7 +6,7 @@ The Next.js frontend for the telco. voice and chat agent, built on LiveKit's [Ja
 - `/login` then `/dashboard`: the admin portal (control center, subscribers, transactions, support cases, network incidents, AI monitor, offers, chatbot, knowledge, conversations, listen).
 - `/chat`: the standalone full-screen voice/chat widget, which keeps the original LiveKit starter look.
 
-The app implements its own token server (`/api/token` for customers with a portal session, `/api/listen-token` for admins). Both only join an existing room.
+The app implements its own token server. `/api/token` serves portal customers and guests (the subscriber is resolved server-side from the `portal_session` cookie); joining an existing room via `room_name` needs an admin session. `/api/listen-token` (dev-only listen-in) always needs an admin session.
 
 ## Running locally
 

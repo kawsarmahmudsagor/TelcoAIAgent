@@ -180,7 +180,9 @@ now" triggers one on demand. It creates `pack_expiring`, `low_balance`, `low_dat
 **Notification bell.** The portal topbar bell lists the customer's notifications. Clicking one
 opens `/portal/assistant` and the agent greets the customer with that nudge.
 
-`/api/token` and `/api/listen-token` only join an existing room, and need an admin session.
+`/api/token` serves portal customers and guests (the subscriber is resolved server-side from the
+`portal_session` cookie); joining an existing room via `room_name` needs an admin session.
+`/api/listen-token` (dev-only listen-in) always needs an admin session.
 
 ## Docker Compose (once you're past active development)
 

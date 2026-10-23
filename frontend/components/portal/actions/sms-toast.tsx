@@ -60,7 +60,7 @@ function SmsCard({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss message"
-          className="focus-visible:ring-brand-text -m-1 grid size-7 place-items-center rounded-full opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+          className="focus-visible:ring-toast-foreground/70 -m-1 grid size-7 place-items-center rounded-full opacity-60 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
         >
           <XIcon className="size-3.5" aria-hidden="true" />
         </button>
