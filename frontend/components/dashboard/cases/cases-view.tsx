@@ -44,7 +44,7 @@ export function CasesView() {
 
   const query: CaseListParams = {
     priority: filter === 'high' ? 'high' : undefined,
-    status: filter === 'open' ? 'open' : undefined,
+    open_only: filter === 'open' ? true : undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   };

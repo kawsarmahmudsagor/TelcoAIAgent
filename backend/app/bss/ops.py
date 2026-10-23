@@ -8,10 +8,10 @@ from typing import Any
 from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.bss import accounts, monitor, network, notifications
+from app.bss import accounts, monitor, network, notifications, transactions
 from app.bss.clock import local_day_bounds, local_day_start, local_tz, utc_now
 from app.bss.errors import SubscriberNotFound
-from app.bss.types import CaseView, TransactionView
+from app.bss.types import CaseView
 from app.models.telco import (
     Balance,
     CasePriority,
@@ -20,6 +20,7 @@ from app.models.telco import (
     IncidentKind,
     IncidentStatus,
     NetworkIncident,
+    Offer,
     Package,
     PlanType,
     Subscriber,
@@ -154,11 +155,11 @@ def overview(db: Session, *, now: datetime | None = None) -> dict[str, Any]:
         select(NetworkIncident)
         .where(
             NetworkIncident.status != IncidentStatus.resolved,
-            NetworkIncident.starts_at <= now,
             (NetworkIncident.ends_at.is_(None)) | (NetworkIncident.ends_at > now),
         )
         .order_by(NetworkIncident.starts_at)
     ).all()
+    incidents = [i for i in incidents if network.is_active(i, now)]
 
     m = monitor.metrics(db, since=day_ago)
 
@@ -266,18 +267,9 @@ def list_subscribers(
     return [_subscriber_item(s, b) for s, b in rows], total
 
 
-def _txn_view(t: Transaction, package_name: str | None) -> TransactionView:
-    return TransactionView(
-        ref=t.ref,
-        type=t.type,
-        channel=t.channel,
-        amount=t.amount,
-        target_msisdn=accounts.mask_msisdn(t.target_msisdn) if t.target_msisdn else None,
-        status=t.status,
-        failure_reason=t.failure_reason,
-        created_at=t.created_at,
-        package_name=package_name,
-    )
+def _txn_view(t: Transaction, package_name: str | None, points_cost: int | None = None):
+    masked = accounts.mask_msisdn(t.target_msisdn) if t.target_msisdn else None
+    return transactions.view(t, package_name, points_cost, target_msisdn=masked)
 
 
 def subscriber_detail(db: Session, subscriber_id: uuid.UUID) -> dict[str, Any]:
@@ -285,8 +277,9 @@ def subscriber_detail(db: Session, subscriber_id: uuid.UUID) -> dict[str, Any]:
     if sub is None:
         raise SubscriberNotFound()
     txns = db.execute(
-        select(Transaction, Package.name)
+        select(Transaction, Package.name, Offer.points_cost)
         .outerjoin(Package, Package.id == Transaction.package_id)
+        .outerjoin(Offer, Offer.id == Transaction.offer_id)
         .where(Transaction.subscriber_id == subscriber_id)
         .order_by(Transaction.created_at.desc())
         .limit(10)
@@ -304,7 +297,7 @@ def subscriber_detail(db: Session, subscriber_id: uuid.UUID) -> dict[str, Any]:
             "preferred_language": sub.preferred_language,
         },
         "summary": accounts.get_account_summary(db, subscriber_id),
-        "transactions": [_txn_view(t, name) for t, name in txns],
+        "transactions": [_txn_view(t, name, pts) for t, name, pts in txns],
         "cases": [CaseView.model_validate(c) for c in cases],
         "notifications": notifications.list_for(db, subscriber_id, limit=10)[1],
     }
@@ -360,6 +353,7 @@ def list_cases(
     *,
     status: CaseStatus | None = None,
     priority: CasePriority | None = None,
+    open_only: bool = False,
     limit: int = 25,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
@@ -369,6 +363,8 @@ def list_cases(
     )
     if status is not None:
         base = base.where(SupportCase.status == status)
+    if open_only:
+        base = base.where(SupportCase.status != CaseStatus.resolved)
     if priority is not None:
         base = base.where(SupportCase.priority == priority)
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
@@ -448,7 +444,8 @@ def network_overview(db: Session, *, now: datetime | None = None) -> dict[str, A
     counts: dict[str, int] = {}
     for inc in current:
         counts[inc.district] = counts.get(inc.district, 0) + 1
-        if network.is_active(inc, now) and inc.kind != IncidentKind.maintenance:
+        started = inc.starts_at <= now
+        if started and network.is_active(inc, now) and inc.kind != IncidentKind.maintenance:
             health[inc.district] = "degraded"
         elif inc.kind == IncidentKind.maintenance and health.get(inc.district) != "degraded":
             health[inc.district] = "maintenance"

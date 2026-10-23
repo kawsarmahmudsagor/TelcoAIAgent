@@ -15,13 +15,13 @@ from sqlalchemy.orm import Session
 from app.api.bss_http import bss_http_error
 from app.api.deps import get_current_admin, get_db
 from app.api.schemas_admin import (
+    AdminOffer,
     AdminPackage,
     AiMonitor,
     CaseList,
     CaseStats,
     CaseStatusIn,
     IncidentIn,
-    AdminOffer,
     NetworkOverview,
     OfferIn,
     OfferPatch,
@@ -36,7 +36,16 @@ from app.bss.clock import utc_now
 from app.bss.errors import BssError
 from app.bss.network import IncidentAdminView
 from app.bss.types import CaseView
-from app.models.telco import Actor, Package, CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
+from app.models.telco import (
+    Actor,
+    CasePriority,
+    CaseStatus,
+    Package,
+    PlanType,
+    SubscriberStatus,
+    TxnStatus,
+    TxnType,
+)
 
 router = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[Depends(get_current_admin)]
@@ -126,11 +135,14 @@ def ai_monitor(window: Literal["24h", "7d"] = "24h", db: Session = Depends(get_d
 def case_list(
     status: CaseStatus | None = None,
     priority: CasePriority | None = None,
+    open_only: bool = False,
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    items, total = ops.list_cases(db, status=status, priority=priority, limit=limit, offset=offset)
+    items, total = ops.list_cases(
+        db, status=status, priority=priority, open_only=open_only, limit=limit, offset=offset
+    )
     return _json({"items": items, "total": total})
 
 

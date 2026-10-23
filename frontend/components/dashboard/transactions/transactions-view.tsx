@@ -125,7 +125,7 @@ export function TransactionsView() {
         />
         <div className="tablet:flex-col tablet:items-stretch mb-4 flex items-center gap-2.5">
           <SearchField
-            label="Search by reference, name or number"
+            label="Search by reference or number"
             placeholder="Search reference or number…"
             onSearch={(text) => {
               setQ(text);

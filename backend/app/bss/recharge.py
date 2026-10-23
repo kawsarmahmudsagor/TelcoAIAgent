@@ -199,7 +199,7 @@ def execute_recharge(
         detail={
             "amount": str(req.amount),
             "channel": req.channel.value,
-            "target": target,
+            "target_masked": mask_msisdn(target),
             "cashback": str(cashback),
             "ref": ref,
         },

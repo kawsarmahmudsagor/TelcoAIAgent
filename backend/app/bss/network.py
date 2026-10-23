@@ -8,7 +8,7 @@ from app.bss import audit
 from app.bss.clock import utc_now
 from app.bss.errors import IncidentNotFound, InvalidRequest
 from app.bss.types import IncidentView
-from app.models.telco import Actor, IncidentKind, IncidentStatus, NetworkIncident
+from app.models.telco import Actor, IncidentKind, IncidentStatus, NetworkIncident, Subscriber
 
 
 class IncidentAdminView(IncidentView):
@@ -58,6 +58,19 @@ def _aware(dt: datetime | None) -> datetime | None:
     return dt.replace(tzinfo=timezone.utc) if dt is not None and dt.tzinfo is None else dt
 
 
+def _canonical_district(db: Session, name: str) -> str:
+    """Reuse the spelling of a district already in use (any case), else title-case the name."""
+    name = " ".join(name.split())
+    key = name.lower()
+    for model in (Subscriber, NetworkIncident):
+        found = db.scalar(
+            select(model.district).where(func.lower(model.district) == key).limit(1)
+        )
+        if found:
+            return found
+    return name.title()
+
+
 def create_incident(
     db: Session,
     *,
@@ -72,6 +85,7 @@ def create_incident(
     if status not in (IncidentStatus.investigating, IncidentStatus.scheduled):
         raise InvalidRequest("status must be investigating or scheduled")
     now = utc_now()
+    district = _canonical_district(db, district)
     starts_at = _aware(starts_at) or now
     ends_at = _aware(ends_at)
     if ends_at is not None and ends_at <= starts_at:

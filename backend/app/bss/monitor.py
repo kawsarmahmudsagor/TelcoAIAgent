@@ -1,6 +1,7 @@
 """AI monitor: what the agent did, derived from stored conversations and the audit trail."""
 
 import math
+import re
 import uuid
 from collections import Counter, defaultdict
 from datetime import datetime
@@ -143,6 +144,15 @@ def review_queue(db: Session, *, since: datetime, limit: int = 5) -> list[dict[s
     return out
 
 
+_LOCAL_MSISDN = re.compile(r"^01[3-9]\d{8}$")
+
+
+def _safe(value: Any) -> str:
+    """Audit values as text, with any full local MSISDN masked (old rows hold raw targets)."""
+    text = str(value)
+    return mask_msisdn(text) if _LOCAL_MSISDN.match(text) else text
+
+
 def audit_trail(db: Session, *, limit: int = 50) -> list[dict[str, Any]]:
     rows = db.execute(
         select(AuditEvent, Subscriber.full_name, Subscriber.msisdn)
@@ -157,7 +167,7 @@ def audit_trail(db: Session, *, limit: int = 50) -> list[dict[str, Any]]:
             "action": e.action,
             "subscriber_name": name,
             "msisdn_masked": mask_msisdn(msisdn) if msisdn else None,
-            "detail": ", ".join(f"{k}: {v}" for k, v in (e.detail or {}).items()),
+            "detail": ", ".join(f"{k}: {_safe(v)}" for k, v in (e.detail or {}).items()),
         }
         for e, name, msisdn in rows
     ]

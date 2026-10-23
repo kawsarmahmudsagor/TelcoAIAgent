@@ -174,8 +174,9 @@ Sign in at `/login` (credentials from `.env`); routes under `/dashboard`:
 | `/dashboard/chatbot`, `knowledge`, `conversations`, `listen` | Agent settings, knowledge base, conversation history and live listen-in |
 
 **Nudges.** A scheduler sweep runs every 15 minutes (`run-local.bat` starts it) and "Run nudges
-now" triggers one on demand. It creates `pack_expiring`, `low_balance`, `low_data` and
-`case_update` notifications for active subscribers, at most once per subject.
+now" triggers one on demand. It creates `pack_expiring`, `low_balance` and `low_data`
+notifications for active subscribers, at most once per subject. `case_update` notifications are
+not part of the sweep: they are created when an admin changes a case's status.
 
 **Notification bell.** The portal topbar bell lists the customer's notifications. Clicking one
 opens `/portal/assistant` and the agent greets the customer with that nudge.
@@ -219,4 +220,5 @@ Cloudflare quick tunnel so the dashboard is reachable from outside this machine 
 
 ## Known open items
 
-- Phase 4: auditing of OTP issue/verify and recharge-target events.
+- A case that is resolved, reopened and resolved again notifies the customer only for the first
+  resolution (the notification subject key is `ref:status`).

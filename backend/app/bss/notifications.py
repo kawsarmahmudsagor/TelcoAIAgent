@@ -130,6 +130,17 @@ def _money(value: Any) -> str:
     return f"৳ {Decimal(str(value)):,.2f}"
 
 
+CASE_STATUS_WORDS = {
+    "open": "open again",
+    "in_review": "being reviewed",
+    "resolved": "resolved",
+}
+
+
+def case_status_words(status: Any) -> str:
+    return CASE_STATUS_WORDS.get(str(status), "updated")
+
+
 def describe(row: Notification) -> tuple[str, str]:
     """English title and body for the portal inbox."""
     p = row.payload or {}
@@ -145,7 +156,7 @@ def describe(row: Notification) -> tuple[str, str]:
     if row.kind is NotificationKind.low_data:
         left = format_data(int(p.get("data_left_mb", 0)))
         return "Data running low", f"Only {left} left on {p.get('package_name', 'your pack')}."
-    return "Case update", f"{p.get('case_ref', 'Your case')} is now {p.get('status', 'updated')}."
+    return "Case update", f"{p.get('case_ref', 'Your case')} is {case_status_words(p.get('status'))}."
 
 
 def _view(row: Notification) -> NotificationView:

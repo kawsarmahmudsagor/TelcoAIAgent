@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.bss import audit
@@ -176,4 +177,8 @@ def delete_offer(db: Session, offer_id: uuid.UUID) -> None:
         detail={"offer_id": str(o.id), "title": o.title},
     )
     db.delete(o)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise OfferInUse()

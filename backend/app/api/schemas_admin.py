@@ -234,15 +234,18 @@ class AdminOffer(BaseModel):
     redemptions: int
 
 
+_MAX_MONEY = Decimal("9999999999.99")
+
+
 class OfferIn(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     description: str | None = None
     terms: str | None = None
     package_id: UUID | None = None
-    points_cost: int | None = None
-    cashback_percent: Decimal | None = None
-    cashback_cap: Decimal | None = None
-    min_recharge: Decimal | None = None
+    points_cost: int | None = Field(default=None, gt=0, le=1_000_000)
+    cashback_percent: Decimal | None = Field(default=None, gt=0, le=100)
+    cashback_cap: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY)
+    min_recharge: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY)
     audience: OfferAudience = OfferAudience.all
     subscriber_ids: list[UUID] = []
     starts_on: date | None = None
@@ -257,10 +260,10 @@ class OfferPatch(BaseModel):
     description: str | None = None
     terms: str | None = None
     package_id: UUID | None = None
-    points_cost: int | None = None
-    cashback_percent: Decimal | None = None
-    cashback_cap: Decimal | None = None
-    min_recharge: Decimal | None = None
+    points_cost: int | None = Field(default=None, gt=0, le=1_000_000)
+    cashback_percent: Decimal | None = Field(default=None, gt=0, le=100)
+    cashback_cap: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY)
+    min_recharge: Decimal | None = Field(default=None, ge=0, le=_MAX_MONEY)
     audience: OfferAudience | None = None
     subscriber_ids: list[UUID] | None = None
     starts_on: date | None = None

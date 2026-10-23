@@ -38,18 +38,26 @@ def lookup(
     if status is not None:
         q = q.where(Transaction.status == status)
     rows = db.execute(q.order_by(Transaction.created_at.desc()).limit(limit)).all()
-    return [
-        TransactionView(
-            ref=t.ref,
-            type=t.type,
-            channel=t.channel,
-            amount=t.amount,
-            target_msisdn=t.target_msisdn,
-            status=t.status,
-            failure_reason=t.failure_reason,
-            created_at=t.created_at,
-            package_name=name,
-            points_spent=points if t.type == TxnType.redeem else None,
-        )
-        for t, name, points in rows
-    ]
+    return [view(t, name, points) for t, name, points in rows]
+
+
+def view(
+    t: Transaction,
+    package_name: str | None,
+    points_cost: int | None,
+    *,
+    target_msisdn: str | None = None,
+) -> TransactionView:
+    """One transaction as the API shape; `points_cost` is its offer's cost (redeems only)."""
+    return TransactionView(
+        ref=t.ref,
+        type=t.type,
+        channel=t.channel,
+        amount=t.amount,
+        target_msisdn=target_msisdn if target_msisdn is not None else t.target_msisdn,
+        status=t.status,
+        failure_reason=t.failure_reason,
+        created_at=t.created_at,
+        package_name=package_name,
+        points_spent=points_cost if t.type == TxnType.redeem else None,
+    )

@@ -169,6 +169,8 @@ export interface AdminCase extends CaseView {
 export interface CaseListParams {
   status?: CaseStatus;
   priority?: CasePriority;
+  /** Everything not resolved (open and in review), as the Open cases tile counts. */
+  open_only?: boolean;
   /** 1..100, default 25 */
   limit?: number;
   offset?: number;
