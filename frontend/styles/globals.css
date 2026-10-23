@@ -437,3 +437,15 @@
     opacity: 0.9;
   }
 }
+
+/* Home page hero: the sample chat lines rise in one after another. */
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

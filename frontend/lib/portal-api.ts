@@ -38,6 +38,8 @@ export const portalApi = {
   /** Signs in as a persona (sets the `portal_session` cookie). */
   login: (msisdn: string) => post<PortalMe>('/api/demo/login', { msisdn }),
   logout: () => post<{ ok: boolean }>('/api/demo/logout'),
+  /** Unauthenticated: the active pack catalog, for the public home page. */
+  catalog: (kind?: PackageKind) => get<PackageView[]>(`/api/catalog/packages${qs({ kind })}`),
 
   me: () => get<PortalMe>('/api/me'),
   summary: () => get<AccountSummary>('/api/me/summary'),

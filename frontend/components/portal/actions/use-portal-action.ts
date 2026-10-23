@@ -7,6 +7,7 @@ import { OtpDialog } from '@/components/portal/actions/otp-dialog';
 import { showSmsToast } from '@/components/portal/actions/sms-toast';
 import { ApiError } from '@/lib/api-client';
 import { portalApi } from '@/lib/portal-api';
+import { signInHref } from '@/lib/portal-next';
 import { invalidatePortal } from '@/lib/portal-sync';
 import type { ActionStart, PortalAction } from '@/lib/types/portal';
 
@@ -55,7 +56,7 @@ export function usePortalAction(): { start(a: PortalAction): Promise<void>; dial
   const onAuthLost = useCallback(
     (e: ApiError) => {
       if (e.status !== 401) return false;
-      router.replace('/');
+      router.replace(signInHref(window.location.pathname + window.location.search));
       return true;
     },
     [router]

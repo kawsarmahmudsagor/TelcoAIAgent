@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api-client';
+import { signInHref } from '@/lib/portal-next';
 
 /** The portal's data sets. Anything that changes one (a form, an agent event) invalidates its key. */
 export type PortalKey =
@@ -51,7 +52,7 @@ function asApiError(error: unknown): ApiError {
  * `invalidatePortal()` naming `key` (or no key), and when `args` changes (compared by value; pass
  * the inputs the fetcher closes over, e.g. a period). The previous `data` stays in place while a
  * refetch runs, so cards don't flash. A 401 means the portal session is gone: the browser goes
- * back to the persona picker at `/`.
+ * to /signin, keeping the current page as `next`.
  */
 export function usePortalQuery<T>(
   key: PortalKey,
@@ -91,7 +92,7 @@ export function usePortalQuery<T>(
         if (cancelled) return;
         const apiError = asApiError(error);
         if (apiError.status === 401) {
-          router.replace('/');
+          router.replace(signInHref(window.location.pathname + window.location.search));
           return;
         }
         setState((prev) => ({ data: prev.data, error: apiError, loading: false }));

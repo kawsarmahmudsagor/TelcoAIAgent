@@ -20,29 +20,35 @@ import { cn } from '@/lib/shadcn/utils';
 import { formatPlan, initials } from '@/lib/telco-format';
 
 /**
- * Ends the portal session and returns to the persona picker. "Switch persona" and "Log out" both
- * use it. The AI assistant's LiveKit session ends first, so the next persona never talks to an
+ * Ends the portal session, then goes to `to`: the home page for "Log out", the customer picker
+ * at /signin for "Switch persona". The AI assistant's LiveKit session ends first, so the next persona never talks to an
  * agent that still knows the last one.
  */
-export function usePortalLogout(): { logOut: () => Promise<void>; loggingOut: boolean } {
+export function usePortalLogout(): {
+  logOut: (to?: string) => Promise<void>;
+  loggingOut: boolean;
+} {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const endAssistantSession = useEndSessionOnLogout();
 
-  const logOut = useCallback(async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await endAssistantSession();
-      await portalApi.logout();
-      router.push('/');
-    } catch {
-      toast.error('Log out did not go through', {
-        description: 'Check your connection and try again.',
-      });
-      setLoggingOut(false);
-    }
-  }, [loggingOut, router, endAssistantSession]);
+  const logOut = useCallback(
+    async (to = '/') => {
+      if (loggingOut) return;
+      setLoggingOut(true);
+      try {
+        await endAssistantSession();
+        await portalApi.logout();
+        router.push(to);
+      } catch {
+        toast.error('Log out did not go through', {
+          description: 'Check your connection and try again.',
+        });
+        setLoggingOut(false);
+      }
+    },
+    [loggingOut, router, endAssistantSession]
+  );
 
   return { logOut, loggingOut };
 }
@@ -101,7 +107,7 @@ export function ProfileMenu({ variant }: { variant: 'avatar' | 'row' }) {
           <span className="text-muted-foreground block truncate text-xs">{meta}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={loggingOut} onSelect={() => void logOut()}>
+        <DropdownMenuItem disabled={loggingOut} onSelect={() => void logOut('/signin')}>
           <UsersRoundIcon aria-hidden="true" />
           Switch persona
         </DropdownMenuItem>

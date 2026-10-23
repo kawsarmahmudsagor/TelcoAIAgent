@@ -1,6 +1,6 @@
 # telco. design system
 
-The source of truth for the customer portal (`/portal/**`, entry at `/`), the admin portal
+The source of truth for the customer portal (`/portal/**`, public home page at `/`, log in at `/signin`), the admin portal
 (`/dashboard/**`) and `/login`. Tokens live in `styles/globals.css`; this file explains them and
 the patterns built on them. The voice/chat widget (the standalone `/chat` page and the chat
 bubble panel) deliberately keeps the original LiveKit starter look (see "Widget isolation").
