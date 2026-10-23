@@ -15,7 +15,7 @@ import { Bone, LoadError } from '@/components/portal/ui/query-states';
 import { adminApi } from '@/lib/admin-api';
 import { useAdminQuery } from '@/lib/admin-query';
 import { cn } from '@/lib/shadcn/utils';
-import { formatDay, formatPlan } from '@/lib/telco-format';
+import { formatJoinDate, formatPlan } from '@/lib/telco-format';
 import type { SubscriberItem, SubscriberListParams } from '@/lib/types/admin';
 import type { PlanType } from '@/lib/types/portal';
 
@@ -255,7 +255,7 @@ function SubscriberTable({
               <td className="py-3 pr-3">
                 <SubscriberStatusChip status={s.status} />
               </td>
-              <td className="py-3 pr-3 whitespace-nowrap">{formatDay(s.joined_on)}</td>
+              <td className="py-3 pr-3 whitespace-nowrap">{formatJoinDate(s.joined_on)}</td>
               <td className="py-3 text-right">
                 <ViewButton item={s} onView={onView} />
               </td>
@@ -277,7 +277,9 @@ function SubscriberTable({
               {s.msisdn_masked} · {formatPlan(s.plan_type)} · {balanceText(s)}
             </p>
             <div className="mt-1.5 flex items-center justify-between">
-              <p className="text-muted-foreground text-[10px]">Joined {formatDay(s.joined_on)}</p>
+              <p className="text-muted-foreground text-[10px]">
+                Joined {formatJoinDate(s.joined_on)}
+              </p>
               <ViewButton item={s} onView={onView} />
             </div>
           </li>

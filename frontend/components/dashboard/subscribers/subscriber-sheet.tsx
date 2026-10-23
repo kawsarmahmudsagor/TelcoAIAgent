@@ -18,7 +18,14 @@ import {
 } from '@/components/ui/sheet';
 import { adminApi } from '@/lib/admin-api';
 import { useAdminQuery } from '@/lib/admin-query';
-import { formatData, formatDay, formatDayTime, formatPlan, formatTaka } from '@/lib/telco-format';
+import {
+  formatData,
+  formatDay,
+  formatDayTime,
+  formatJoinDate,
+  formatPlan,
+  formatTaka,
+} from '@/lib/telco-format';
 import type { SubscriberDetail } from '@/lib/types/admin';
 
 /** A subscriber's account at a glance, in a side sheet. `id` null keeps it closed. */
@@ -126,7 +133,7 @@ function Detail({ d }: { d: SubscriberDetail }) {
     <>
       <div className="flex items-center gap-2 text-[11px]">
         <SubscriberStatusChip status={s.status} />
-        <span className="text-muted-foreground">Joined {formatDay(s.joined_on)}</span>
+        <span className="text-muted-foreground">Joined {formatJoinDate(s.joined_on)}</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">

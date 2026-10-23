@@ -42,6 +42,19 @@ export function formatDay(iso: string): string {
   return dayDhaka.format(new Date(iso));
 }
 
+const dayYearUtc = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** `"14 Mar 2024"` from an ISO date (read as a calendar day, no zone shift) or datetime. */
+export function formatJoinDate(iso: string): string {
+  if (DATE_ONLY.test(iso)) return dayYearUtc.format(new Date(`${iso}T00:00:00Z`));
+  return dayYearDhaka.format(new Date(iso));
+}
+
 /** `"SK"` from `"Samiha Khan"`: first and last initials, for avatars. */
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
