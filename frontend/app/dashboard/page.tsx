@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { OverviewView } from '@/components/dashboard/overview/overview-view';
+import { ControlCenter } from '@/components/dashboard/control/control-center';
 
 export const metadata: Metadata = { title: 'Control center' };
 
 export default function DashboardOverviewPage() {
-  return <OverviewView />;
+  return <ControlCenter />;
 }

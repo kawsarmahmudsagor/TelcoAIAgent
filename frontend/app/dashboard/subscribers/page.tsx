@@ -1,11 +1,14 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
-import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
+import { SubscribersView } from '@/components/dashboard/subscribers/subscribers-view';
 
-const HREF = '/dashboard/subscribers';
+export const metadata: Metadata = { title: 'Subscribers' };
 
-export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
-
-export default function AdminPlaceholderPage() {
-  return <ComingSoon href={HREF} />;
+export default function SubscribersPage() {
+  // useSearchParams (the ?id= that opens a subscriber) needs a Suspense boundary.
+  return (
+    <Suspense>
+      <SubscribersView />
+    </Suspense>
+  );
 }
