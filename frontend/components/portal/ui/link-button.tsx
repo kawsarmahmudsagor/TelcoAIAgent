@@ -5,10 +5,10 @@ export type LinkButtonVariant = 'primary' | 'soft' | 'outline' | 'white' | 'glas
 
 const VARIANTS: Record<LinkButtonVariant, string> = {
   primary: 'bg-primary text-primary-foreground shadow-[0_5px_12px_#4f46e522]',
-  soft: 'bg-tint-purple text-brand dark:text-[#a9a3ff]',
+  soft: 'bg-tint-purple text-brand-text',
   outline: 'border-line bg-surface text-foreground border',
   /** On the balance hero's indigo gradient. */
-  white: 'bg-white text-[#4038a5]',
+  white: 'bg-white text-promo-ink',
   /** On the balance hero's indigo gradient. */
   glass: 'border border-white/25 bg-white/10 text-white',
 };
@@ -51,7 +51,7 @@ export function SmallLink({ className, ...props }: React.ComponentProps<typeof L
   return (
     <Link
       className={cn(
-        'text-brand focus-visible:ring-ring/60 inline-flex shrink-0 items-center gap-1 rounded-md p-[3px] text-[11px] font-bold whitespace-nowrap outline-none hover:underline focus-visible:ring-[3px] dark:text-[#a9a3ff] [&_svg]:size-3',
+        'text-brand-text focus-visible:ring-ring/60 inline-flex shrink-0 items-center gap-1 rounded-md p-[3px] text-[11px] font-bold whitespace-nowrap outline-none hover:underline focus-visible:ring-[3px] [&_svg]:size-3',
         className
       )}
       {...props}

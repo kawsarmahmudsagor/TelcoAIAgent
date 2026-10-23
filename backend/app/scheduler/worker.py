@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.scheduler.jobs import (
     process_embedding_jobs,
+    run_nudges,
     sweep_stale_conversations,
 )
 
@@ -30,8 +31,19 @@ async def main() -> None:
         max_instances=1,
         coalesce=True,
     )
+    scheduler.add_job(
+        run_nudges,
+        "interval",
+        minutes=15,
+        id="run_nudges",
+        max_instances=1,
+        coalesce=True,
+    )
     scheduler.start()
-    logger.info("scheduler started: conversation sweep every 10m, embedding jobs every 5s")
+    logger.info(
+        "scheduler started: conversation sweep every 10m, embedding jobs every 5s, "
+        "nudges every 15m"
+    )
 
     try:
         await asyncio.Event().wait()

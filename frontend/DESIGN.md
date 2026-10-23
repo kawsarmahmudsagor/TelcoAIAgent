@@ -1,155 +1,83 @@
-# Horizon Realty — dashboard design system
+# telco. design system
 
-The source of truth for the staff dashboard (`/dashboard/**`), `/login` and the public entry
-(`/` persona picker, then the customer portal at `/portal`). Tokens live in `styles/globals.css`; this file explains them and the patterns built on
-them. The voice/chat widget (the public site's chat bubble and the standalone chat page at
-`/chat`, which also hosts answered scheduled calls) deliberately keeps the original LiveKit starter look (see "Widget
-isolation").
+The source of truth for the customer portal (`/portal/**`, entry at `/`), the admin portal
+(`/dashboard/**`) and `/login`. Tokens live in `styles/globals.css`; this file explains them and
+the patterns built on them. The voice/chat widget (the standalone `/chat` page and the chat
+bubble panel) deliberately keeps the original LiveKit starter look (see "Widget isolation").
 
 ## Direction
 
-Horizon Realty is a Dhaka agency whose AI agent answers buyers and renters by chat, voice and
-phone, and calls leads back. Staff use the dashboard all day to read conversations, manage
-listings and follow up on leads, so the interface is calm, dense and legible; the brand shows up
-in one place only.
+telco. is a Bangladeshi mobile operator whose AI agent answers customers by chat and voice. Customers check balance, buy
+packs and raise cases in the portal; staff run the network, support queue, offers and nudges
+from the admin portal. Both share one look: calm panels, one indigo brand colour, and the
+status accents carrying meaning.
 
-- **Evergreen** is the brand colour: the green of the river and the trees between the towers.
-  It is the primary action colour and the sidebar surface.
-- **Brass** is the sun sitting on the horizon. It is rare on purpose: the logo sun, the active
-  nav marker, "featured" listings and chart series 2. Never for buttons or body text.
-- Neutrals are **cool concrete** greys with a faint green cast. Not cream, not pure grey.
-- The one memorable element is the **evergreen sidebar with the brass horizon mark** (and, on
-  `/login`, the skyline brand panel). Everything else stays quiet: flat cards with hairline
-  borders, no gradients as decoration, no drop shadows on cards.
+- **Indigo** (`--brand` `#4f46e5`, `--brand2` `#756cf6` as the dark-mode primary) is the brand and
+  the primary action colour.
+- **Mint** (`#20b89a`), **orange** (`#ff9b55`) and **red** (`#e45b73`) are data and status accents,
+  also chart series 2 to 4.
+- Neutrals are cool blue-greys: page `#f5f7fb`, panels `--surface` white (dark `#141b2d`),
+  hairlines `--line`.
+- The memorable elements are the indigo gradient balance hero and the navy admin sidebar.
+  Everything else is quiet: panel radius 17px, soft panel shadow, no decorative gradients.
 
 ## Colour tokens
 
-shadcn variable names are kept so every `components/ui/*` file works unchanged. Values are oklch.
+Never hard-code a brand colour in a component; use a token class. shadcn names are kept so
+`components/ui/*` works unchanged, and the reference palette names are added beside them.
+Every token has a light value in `:root` and, where it differs, a dark value in `.dark`; each
+is exposed to Tailwind as `--color-<name>` in the `@theme inline` block.
 
-| Token                            | Light                               | Dark                                  | Use                                 |
-| -------------------------------- | ----------------------------------- | ------------------------------------- | ----------------------------------- |
-| `--background`                   | `0.975 0.004 175` concrete          | `0.17 0.012 200` night river          | page                                |
-| `--foreground`                   | `0.22 0.02 190` ink                 | `0.95 0.008 175`                      | body text                           |
-| `--card` / `--popover`           | white                               | `0.205 0.014 198` / `0.225 0.015 198` | panels, menus                       |
-| `--primary`                      | `0.42 0.07 185` evergreen           | `0.8 0.1 175` mint evergreen          | primary buttons, links, focus       |
-| `--primary-foreground`           | `0.985 0.005 175`                   | `0.2 0.03 190`                        | text on primary                     |
-| `--secondary`                    | `0.94 0.012 175`                    | `0.26 0.018 195`                      | secondary buttons, neutral pills    |
-| `--muted` / `--muted-foreground` | `0.955 0.006 175` / `0.5 0.018 190` | `0.24 0.014 198` / `0.72 0.015 185`   | table heads, hints                  |
-| `--accent`                       | `0.94 0.018 178`                    | `0.28 0.025 190`                      | hover / selected rows               |
-| `--destructive`                  | `0.55 0.2 27`                       | `0.7 0.17 25`                         | delete, errors                      |
-| `--border` / `--input`           | `0.905 0.008 180` / `0.88 0.01 180` | white 9% / 14%                        | hairlines, inputs                   |
-| `--ring`                         | `0.55 0.08 185`                     | `0.7 0.09 178`                        | focus ring (use at /50)             |
-| `--brass`                        | `0.7 0.125 75`                      | `0.8 0.12 78`                         | sun, featured, active marker        |
-| `--success`                      | `0.5 0.12 152`                      | `0.78 0.14 152`                       | completed, ready, confirmed         |
-| `--warning`                      | `0.52 0.13 60`                      | `0.8 0.13 70`                         | missed, stale, needs attention      |
-| `--info`                         | `0.5 0.12 245`                      | `0.76 0.1 240`                        | dispatched, in progress, processing |
+| Group | Tokens | Use |
+| --- | --- | --- |
+| Palette | `brand`, `brand2`, `mint`, `orange`, `red` | Brand and accents (`bg-brand`, `text-mint`) |
+| Surfaces | `background`, `surface`, `surface2`, `line`, `card`, `muted`, `accent` | Page, panels, hairlines, hover and selected rows |
+| Brand text | `brand-text` | Indigo text that stays readable in dark (`#a9a3ff`); use instead of `text-brand` for links and icons |
+| Tints | `tint-purple`, `tint-green`, `tint-orange`, `tint-pink`, `tint-selected` | Icon wells, soft badges, selected option backgrounds |
+| Status chips | `status-success`, `status-pending`, `status-failed`, `status-open` (+ `-foreground`) | Transaction and case statuses |
+| Featured | `featured-border`, `featured-from`, `featured-to`, `featured-fg`, `featured-muted`, `featured-chip`, `featured-chip-fg` | The highlighted package or offer card |
+| Hero | `hero-from`, `hero-via`, `hero-to`, `hero-soft`, `hero-muted`, `hero-dot` | Balance hero gradient and its text |
+| Promo | `promo-from`, `promo-to`, `promo-foreground`, `promo-ink` | Sidebar upgrade card and white link buttons |
+| Overlays | `scrim`, `toast`, `toast-foreground`, `chat-canvas`, `chip-border` | Dialog scrim, SMS toast, assistant canvas, suggestion chips |
+| Third party | `bkash`, `nagad` | Payment option marks |
+| Avatars | `persona-1-from` to `persona-5-to`, `brand-start` | Persona and logo gradients (same in both themes) |
+| Sidebar | `sidebar*` | Admin sidebar, dark in both themes |
 
-Tailwind classes: `bg-brass`, `text-success`, `bg-warning/12`, `text-info`, etc. Status
-colours are text-safe (≥4.5:1) on their own 12% tint over the card in both modes.
-
-### Sidebar
-
-| Token                  | Light                            | Dark                                 |
-| ---------------------- | -------------------------------- | ------------------------------------ |
-| `--sidebar`            | `0.285 0.045 190` deep evergreen | `0.145 0.012 200` (darker than page) |
-| `--sidebar-foreground` | `0.95 0.01 175`                  | `0.93 0.01 175`                      |
-| `--sidebar-primary`    | brass `0.8 0.12 78`              | same                                 |
-| `--sidebar-accent`     | white 9%                         | white 7%                             |
-| `--sidebar-border`     | white 10%                        | white 8%                             |
-
-The sidebar is dark in both themes.
-
-### Charts
-
-`--chart-1` evergreen (main series), `--chart-2` brass, `--chart-3` blue, `--chart-4` rose,
-`--chart-5` slate. Single-series charts use chart-1 only. Area fill: chart-1 at 28% → 0%.
-Gridlines `stroke-border`, axis labels `fill-muted-foreground` 10–11px.
+Only drop-shadow alpha literals such as `shadow-[0_25px_70px_#0003]` stay inline.
 
 ## Typography
 
-- **Bricolage Grotesque** (`font-display`, weights 500/600/700): page titles, KPI figures,
-  the wordmark, the login and landing headlines. Tracking `-0.02em` at 24px and up.
-- **Public Sans** (`font-sans`, default): everything else. Kept from the widget, so `/` is
-  unchanged.
-- **Commit Mono** (`font-mono`): only for IDs, room names and code-like values. Not for labels.
-- Numbers in tables and KPIs use `tabular-nums`.
-
-Scale (px): 12 caption · 13 table/meta · 14 UI body (`text-sm`, default in the dashboard) ·
-16 prose · 20 section title · 24 card headline · 30 page title (`text-3xl`, Bricolage 600) ·
-44–56 login/landing headline. Sentence case everywhere; no all-caps labels, no eyebrow
-labels above headings.
+**Inter** for everything (`font-sans`, `font-display`); Commit Mono (`font-mono`) only for IDs
+and code-like values. Numbers in tables and KPIs use `tabular-nums`. Sentence case, no all-caps
+labels.
 
 ## Shape, space, elevation
 
-- `--radius-base: 0.5rem`. Scale: `rounded-sm` 4px (tags), `rounded-md` 6px (buttons,
-  inputs), `rounded-lg` 8px (cards, panels, tables), `rounded-xl` 12px (dialogs, sheets),
-  `rounded-full` (status pills, avatars only).
-- Spacing on a 4px grid. Page padding `px-4 sm:px-8`, `py-6 sm:py-8`; page max width
-  `max-w-6xl`. Gaps: 8 inside controls, 16 between related fields, 24 between sections.
-- Elevation: cards are flat (`border`, no shadow). Only popovers, menus and dialogs get a
-  shadow. The topbar is `bg-background/85` with `backdrop-blur-sm`.
-- Density: table rows 44px (`h-11`), controls 36px (`h-9`), touch targets ≥ 40px on phones.
+- Radii: `rounded-panel` 17px, `rounded-metric` 16px, `rounded-hero` 20px, `rounded-button`
+  10px. `--shadow-panel` is the only card shadow; dialogs and menus use larger ones.
+- Breakpoints (custom variants): `tablet:` at 1100px and below, `phone:` at 760px and below
+  (the off-canvas sidebar), `narrow:` at 390px and below. No horizontal page scroll at 390px.
+- Touch targets at least 40px on phones.
 
 ## Layout
 
-```
-┌──────────┬──────────────────────────────────────────────┐
-│ ☀ Horizon│ Agent / Conversations          ◐  Sign out  │  topbar (h-14, sticky)
-│          ├──────────────────────────────────────────────┤
-│ Overview │ Page title (Bricolage 30)        [actions]   │  PageHeader
-│ Agent    │ description                                   │
-│  Chatbot │ ┌──────────────────────────────────────────┐ │
-│  ...     │ │ panel / table                            │ │
-│ CRM      │ └──────────────────────────────────────────┘ │
-│  Leads   │                                              │
-└──────────┴──────────────────────────────────────────────┘
-```
-
-- Sidebar 240px from `md`; a 56px icon rail below it (labels in `title` + `sr-only`, a short
-  rule in place of each group name). A rail rather than a drawer keeps every page one tap away
-  with no open/close state.
-- Content left-aligned; actions right-aligned in the PageHeader, wrapping under the title on a
-  phone. No horizontal page scroll at 320px: tables scroll inside their panel.
-- Hidden routes (`/dashboard/incoming/[id]`, `/dashboard/listen`) render in the shell but are
-  not in the nav. `/dashboard/voice` redirects to `/dashboard/chatbot?tab=model`.
-
-## Components (`components/dashboard/`)
-
-| Component              | Pattern                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `PageHeader`           | The page's single `<h1>` (same words as its nav label), optional description and actions.                                                        |
-| `StatusPill`           | Dot + word, tones `neutral success warning danger info accent brass muted`. Never colour alone. `pulse` for in-flight states (motion-safe).      |
-| `SwitchRow`            | Label + description on the left, `Switch` on the right; whole row is the label.                                                                  |
-| `ConfirmDialog`        | `role="alertdialog"`, Cancel first, confirm button names the action ("Delete call").                                                             |
-| `TableState` + `Panel` | Skeleton rows while loading, error + "Try again", or an empty state that says what to do next. `Panel` is the bordered card every table sits on. |
-| `SecretKeyField`       | Write-only key input: empty = keep, "Remove saved key" = clear on save.                                                                          |
-| `AreaChart`            | Inline SVG single-series area chart with hover tooltip; no chart library.                                                                        |
-| `SectionCard`          | Titled card for pages with several panels (Overview, Chatbot tabs); heading, optional action, body.                                              |
-| `FormField`            | Label, control, then hint or inline error (`aria-describedby`/`aria-invalid` wired through a render prop).                                       |
-| `KpiTile`              | Label, Bricolage figure, optional sublabel/link; skeleton and "unavailable" variants. A fetch failure shows "—", never a fake 0.                 |
-
-Status mapping (keep consistent across pages):
-
-- Calls: pending → neutral, dispatched/in progress → info (pulse), completed → success,
-  missed → warning, cancelled → muted, failed → danger.
-- Bookings: proposed → info, confirmed → success, cancelled → muted.
-- Leads: new → info, contacted → neutral, qualified → accent, booked → success,
-  closed → muted, lost → danger.
-- KB sources: pending/processing → info (pulse), ready → success, stale → warning,
-  failed → danger, disabled → muted.
-- Conversations: active → success (pulse), ended → muted.
+- Portal: left sidebar, topbar with the notification bell and profile menu, content panels in a
+  responsive grid. The assistant is a full page at `/portal/assistant` and a bubble elsewhere.
+- Admin: navy sidebar from `components/dashboard/shell/nav-items.ts`, page header with the
+  single `<h1>`, tables and panels reusing `components/portal/ui/*`. The Support queue item
+  carries an open-case badge.
 
 ## Writing
 
-Sentence case. Buttons say what happens ("Add lead", "Schedule call", "Delete call"), and the
-toast repeats the verb ("Lead added"). Errors say what failed and what to do; they don't
-apologise. Empty states invite the next action.
+Sentence case. Buttons say what happens ("Run nudges now", "Resolve case") and the toast
+repeats the verb. Money is shown as `৳ 486.50`. Errors say what failed and what to do; empty
+states invite the next action.
 
 ## Accessibility and motion
 
-Visible focus everywhere (`focus-visible:ring-ring/50 ring-[3px]`). Icon-only buttons have an
-`aria-label`. Motion only answers an action (dialog open, menu, row added); `motion-safe:` for
-pulses. Contrast ≥ 4.5:1 for text in both themes.
+Visible focus everywhere (`focus-visible:ring-ring/60 ring-[3px]`). Icon-only buttons have an
+`aria-label`. Motion answers an action and is wrapped in `motion-safe:`. Text contrast at least
+4.5:1 in both themes.
 
 ## Widget isolation
 
@@ -176,9 +104,9 @@ the configurable accent) inside the call only. It has two parts:
 
 The rules for this screen:
 
-- Brass is the agent's voice: avatar ripples, the waveform while the agent speaks and the
+- Orange is the agent's voice: avatar ripples, the waveform while the agent speaks and the
   thinking arc. It is never used on buttons.
-- Evergreen (`--primary`) is the caller: the halo and waveform while they speak, the open chat
+- Indigo (`--primary`) is the caller: the halo and waveform while they speak, the open chat
   bubble and Send.
 - The ripples and waveform are the only ambient motion, and they always mean that someone is
   speaking. With reduced motion, they change opacity only.

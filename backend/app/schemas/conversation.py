@@ -44,6 +44,7 @@ class ConversationMessageOut(BaseModel):
 
 
 class ConversationDetail(ConversationOut):
+    subscriber_name: str | None = None
     messages: list[ConversationMessageOut]
 
 

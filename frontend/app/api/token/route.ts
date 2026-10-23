@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-server-sdk';
 import { RoomAgentDispatch, RoomConfiguration } from '@livekit/protocol';
+import { isAdminSession } from '@/lib/admin-session';
 import { buildDispatchMetadata } from '@/lib/agent-dispatch';
 
 type ConnectionDetails = {
@@ -58,6 +59,15 @@ export async function POST(req: NextRequest) {
     const existingRoomName =
       typeof body?.room_name === 'string' && body.room_name.trim() ? body.room_name.trim() : null;
 
+    // Joining an existing room (listening in on a live conversation) is an admin act: without a
+    // valid admin session no token is issued, so a customer or guest can't enter someone else's room.
+    if (existingRoomName && !(await isAdminSession(req))) {
+      return new NextResponse('Joining an existing room requires an admin session.', {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
+
     // Every agent dispatch carries server-built metadata, tagged as an inbound customer chat
     // (as opposed to the outbound cold-call sessions the scheduler dispatches separately).
     // Whatever metadata the client sent is discarded: `subscriber_id` comes only from the
@@ -67,7 +77,7 @@ export async function POST(req: NextRequest) {
     const subscriberId = await resolveSubscriberId(req);
     const metadata = buildDispatchMetadata(subscriberId, {
       visitorId: body?.participant_attributes?.visitor_id,
-      nudgeId: body?.nudge_id,
+      nudgeId: body?.participant_attributes?.nudge_id ?? body?.nudge_id,
     });
     for (const agent of roomConfig.agents) {
       // useSession adds a bare dispatch when the app config names the agent.
@@ -146,8 +156,6 @@ function createParticipantToken(
     canPublish: true,
     canPublishData: true,
     canSubscribe: true,
-    // The public property page sets a `viewing_property_id` attribute so the agent knows which
-    // listing the customer has open.
     canUpdateOwnMetadata: true,
   };
   at.addGrant(grant);

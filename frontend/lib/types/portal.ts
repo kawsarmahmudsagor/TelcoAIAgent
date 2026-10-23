@@ -98,6 +98,8 @@ export interface TransactionView {
   failure_reason: string | null;
   created_at: DateTimeString;
   package_name: string | null;
+  /** The offer's points cost on a redeem row, else null. */
+  points_spent: number | null;
 }
 
 export interface TransactionParams {
@@ -234,4 +236,22 @@ export interface ActionResult {
   main_balance: number | null;
   postpaid_due: number | null;
   reward_points: number | null;
+}
+
+export type NotificationKind = 'pack_expiring' | 'low_balance' | 'low_data' | 'case_update';
+
+/** One proactive nudge (`GET /api/me/notifications`); `payload` keys depend on `kind`. */
+export interface NotificationView {
+  id: UUID;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  payload: Record<string, unknown>;
+  created_at: DateTimeString;
+  read_at: DateTimeString | null;
+}
+
+export interface NotificationList {
+  unread: number;
+  items: NotificationView[];
 }

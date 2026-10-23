@@ -17,10 +17,7 @@ function Mark({ value }: { value: TxnChannel }) {
     return (
       <span
         aria-hidden="true"
-        className={cn(
-          'size-3 shrink-0 rounded-[4px]',
-          value === 'bkash' ? 'bg-[#e2136e]' : 'bg-[#f6921e]'
-        )}
+        className={cn('size-3 shrink-0 rounded-[4px]', value === 'bkash' ? 'bg-bkash' : 'bg-nagad')}
       />
     );
   }
@@ -59,7 +56,7 @@ export function PayOptions({
             className={cn(
               'rounded-button bg-surface border-line has-focus-visible:ring-ring/60 flex min-h-11 cursor-pointer items-center justify-center gap-2 border px-2 py-2.5 text-center text-[11px] font-bold has-focus-visible:ring-[3px]',
               option.hint && 'justify-start text-left',
-              value === option.value && 'border-brand bg-tint-purple dark:bg-[#29274e]'
+              value === option.value && 'border-brand bg-tint-selected'
             )}
           >
             <input

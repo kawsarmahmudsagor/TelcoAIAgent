@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from app.models.telco import (
     Actor,
     Offer,
     OfferAudience,
+    OfferSubscriber,
     Package,
     Subscriber,
     Transaction,
@@ -48,7 +49,16 @@ def _eligible(db: Session, sub: Subscriber, now: datetime) -> list[Offer]:
             select(Offer)
             .where(
                 Offer.is_active.is_(True),
-                Offer.audience.in_([OfferAudience.all, OfferAudience(sub.plan_type.value)]),
+                or_(
+                    Offer.audience.in_([OfferAudience.all, OfferAudience(sub.plan_type.value)]),
+                    and_(
+                        Offer.audience == OfferAudience.specific,
+                        exists().where(
+                            OfferSubscriber.offer_id == Offer.id,
+                            OfferSubscriber.subscriber_id == sub.id,
+                        ),
+                    ),
+                ),
                 or_(Offer.starts_on.is_(None), Offer.starts_on <= today),
                 or_(Offer.ends_on.is_(None), Offer.ends_on >= today),
             )

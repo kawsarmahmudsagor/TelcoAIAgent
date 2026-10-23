@@ -12,13 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.api.bss_http import bss_http_error
 from app.api.deps import get_current_subscriber, get_db
-from app.api.schemas_me import PortalCaseCreate, PortalMe
-from app.bss import accounts, cases, network, packages, rewards, transactions
+from app.api.schemas_me import NotificationList, PortalCaseCreate, PortalMe, ReadAllResult
+from app.bss import accounts, cases, network, notifications, packages, rewards, transactions
 from app.bss.errors import BssError
 from app.bss.types import (
     AccountSummary,
     CaseView,
     IncidentView,
+    NotificationView,
     OffersAndPoints,
     PackageView,
     Recommendation,
@@ -152,9 +153,7 @@ def offers(
 def list_cases(
     subscriber_id: uuid.UUID = Depends(get_current_subscriber), db: Session = Depends(get_db)
 ):
-    rows = cases.get_case_status(db, subscriber_id, limit=_CASE_LIMIT)
-    # bss lists open cases first; the portal shows newest first.
-    return _json(sorted(rows, key=lambda c: c.created_at, reverse=True))
+    return _json(cases.list_recent(db, subscriber_id, limit=_CASE_LIMIT))
 
 
 @router.post("/cases", response_model=CaseView, status_code=201)
@@ -186,3 +185,31 @@ def network_status(
 ):
     sub = db.get(Subscriber, subscriber_id)
     return _json(network.check_network_status(db, sub.district))
+
+
+@router.get("/notifications", response_model=NotificationList)
+def list_notifications(
+    subscriber_id: uuid.UUID = Depends(get_current_subscriber), db: Session = Depends(get_db)
+):
+    unread, items = notifications.list_for(db, subscriber_id)
+    return _json({"unread": unread, "items": items})
+
+
+@router.post("/notifications/read-all", response_model=ReadAllResult)
+def read_all_notifications(
+    subscriber_id: uuid.UUID = Depends(get_current_subscriber), db: Session = Depends(get_db)
+):
+    return _json({"updated": notifications.mark_all_read(db, subscriber_id)})
+
+
+@router.post("/notifications/{notification_id}/read", response_model=NotificationView)
+def read_notification(
+    notification_id: uuid.UUID,
+    subscriber_id: uuid.UUID = Depends(get_current_subscriber),
+    db: Session = Depends(get_db),
+):
+    try:
+        return _json(notifications.mark_read(db, subscriber_id, notification_id))
+    except BssError as e:
+        db.rollback()
+        raise bss_http_error(e)

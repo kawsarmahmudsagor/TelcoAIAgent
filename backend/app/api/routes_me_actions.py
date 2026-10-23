@@ -4,10 +4,9 @@ Mirrors the agent's flow (app.agent.actions): same purposes and OTP payloads,
 so a code issued here is checked by the same `execute_*` guards."""
 
 import uuid
-from datetime import timedelta
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.bss_http import bss_http_error
@@ -21,9 +20,6 @@ from app.bss.types import PurchaseRequest, RechargeRequest
 from app.models.telco import Actor
 
 router = APIRouter(prefix="/api/me/actions", tags=["portal"])
-
-MAX_CODES_PER_WINDOW = 5
-CODE_WINDOW = timedelta(minutes=15)
 
 
 def _request(action: PortalAction) -> tuple[PurchaseRequest | RechargeRequest | uuid.UUID, dict]:
@@ -67,14 +63,6 @@ def start(
         else:
             o = rewards.preview_redeem(db, subscriber_id, req, now=now)
             fields.update(title=o.offer.title, pay_from="points", points_cost=o.offer.points_cost)
-        if otp.issued_since(db, subscriber_id, now - CODE_WINDOW) >= MAX_CODES_PER_WINDOW:
-            raise HTTPException(
-                429,
-                detail={
-                    "code": "too_many_codes",
-                    "message": "Too many verification codes requested",
-                },
-            )
         action_id = uuid.uuid4()
         masked = accounts.get_account_summary(db, subscriber_id).masked_msisdn
         code = otp.issue(
@@ -84,6 +72,8 @@ def start(
             purpose=body.kind,
             payload=payload,
             now=now,
+            actor=Actor.portal,
+            throttle=True,
         )
     except BssError as e:
         db.rollback()
@@ -118,6 +108,7 @@ def confirm(
             purpose=kind,
             payload=payload,
             code=otp.normalise_code(body.code),
+            actor=Actor.portal,
         )
         kw = {"action_id": action_id, "actor": Actor.portal}
         if kind == "purchase":

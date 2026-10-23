@@ -5,6 +5,7 @@ from datetime import timedelta
 from psycopg.errors import UndefinedTable
 from sqlalchemy.exc import ProgrammingError
 
+from app.bss import notifications
 from app.db.session import SessionLocal
 from app.rag import jobs as rag_jobs
 from app.repositories import conversation_repo
@@ -72,3 +73,22 @@ async def process_embedding_jobs() -> None:
         return
     if processed:
         logger.info("processed %d embedding job(s)", processed)
+
+
+def _run_nudges() -> dict[str, int]:
+    db = SessionLocal()
+    try:
+        return notifications.run_sweep(db)
+    finally:
+        db.close()
+
+
+async def run_nudges() -> None:
+    """Creates proactive notices (expiring pack, low balance, low data)."""
+    try:
+        counts = await asyncio.to_thread(_run_nudges)
+    except Exception:
+        logger.exception("nudge sweep failed")
+        return
+    if any(counts.values()):
+        logger.info("nudges created: %s", counts)

@@ -53,7 +53,7 @@ export function ProfileAvatar({ name, className }: { name: string; className?: s
     <span
       aria-hidden="true"
       className={cn(
-        'grid size-[34px] shrink-0 place-items-center rounded-full bg-linear-135 from-[#f4b58e] to-[#dd6c8d] text-xs font-extrabold text-white',
+        'from-persona-1-from to-persona-1-to grid size-[34px] shrink-0 place-items-center rounded-full bg-linear-135 text-xs font-extrabold text-white',
         className
       )}
     >

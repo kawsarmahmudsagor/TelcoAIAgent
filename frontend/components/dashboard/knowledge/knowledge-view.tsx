@@ -12,7 +12,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLoad } from '@/hooks/useLoad';
 import { type RagSource, type RagSourceType, api } from '@/lib/api-client';
 import { AddSourceDialog } from './add-source-dialog';
-import { PropertiesSyncCard } from './properties-sync-card';
 import { RetrievalTester } from './retrieval-tester';
 import { SourceDetailDialog } from './source-detail-dialog';
 import { SourceTable } from './source-table';
@@ -24,7 +23,6 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'document', label: 'Documents' },
   { value: 'link', label: 'Websites' },
   { value: 'text', label: 'Text' },
-  { value: 'properties', label: 'Listings' },
 ];
 
 const POLL_MS = 3000;
@@ -60,13 +58,11 @@ export function KnowledgeView() {
       document: 0,
       link: 0,
       text: 0,
-      properties: 0,
     };
     for (const s of all) result[s.source_type] = (result[s.source_type] ?? 0) + 1;
     return result;
   }, [all]);
   const shown = filter === 'all' ? all : all.filter((s) => s.source_type === filter);
-  const propertiesSource = all.find((s) => s.source_type === 'properties') ?? null;
   const embeddingReady = status.data?.embedding_ready ?? true;
 
   function refreshSoon() {
@@ -190,7 +186,7 @@ export function KnowledgeView() {
                     <>
                       <p className="text-foreground font-medium">The knowledge base is empty</p>
                       <p className="max-w-md">
-                        Add your FAQ, price lists or building rules so the agent can answer from
+                        Add your FAQ, plan sheets or support policies so the agent can answer from
                         them instead of guessing.
                       </p>
                       <Button
@@ -220,14 +216,8 @@ export function KnowledgeView() {
           </Panel>
         </section>
 
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-          <RetrievalTester className="lg:col-span-2" disabled={!embeddingReady} />
-          <PropertiesSyncCard
-            source={propertiesSource}
-            loading={sources.loading}
-            disabled={!embeddingReady}
-            onSynced={refreshSoon}
-          />
+        <div>
+          <RetrievalTester disabled={!embeddingReady} />
         </div>
       </div>
 

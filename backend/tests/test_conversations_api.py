@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.db.session import SessionLocal
+from app.models.telco import Subscriber
 from app.repositories import conversation_repo
 
 ROOM_PREFIX = "pytest-conv-api-"
@@ -79,6 +80,7 @@ def test_detail_has_ordered_transcript(api):
     assert [m["seq"] for m in body["messages"]] == [1, 2, 3]
     assert body["messages"][2]["tool_args"] == {"location": "Banani"}
     assert body["subscriber_id"] is None
+    assert body["subscriber_name"] is None
     assert api.get(f"/api/conversations/{uuid.uuid4()}").status_code == 404
 
 
@@ -111,3 +113,19 @@ def test_delete_and_bulk_delete(api):
 def test_conversation_routes_need_auth(anon_api, method, path):
     kwargs = {"json": {"ids": [str(uuid.uuid4())]}} if method == "post" else {}
     assert getattr(anon_api, method)(path, **kwargs).status_code == 401
+
+
+def test_detail_names_the_subscriber(api, db):
+    subscriber = db.execute(select(Subscriber)).scalars().first()
+    if subscriber is None:
+        pytest.skip("no seeded subscriber")
+    conversation = conversation_repo.create(
+        db,
+        channel="inbound_chat",
+        room_name=f"{ROOM_PREFIX}{uuid.uuid4().hex[:8]}",
+        subscriber_id=subscriber.id,
+    )
+    db.commit()
+    body = api.get(f"/api/conversations/{conversation.id}").json()
+    assert body["subscriber_id"] == str(subscriber.id)
+    assert body["subscriber_name"] == subscriber.full_name

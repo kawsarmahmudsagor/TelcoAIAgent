@@ -153,7 +153,8 @@ def test_redeem_concurrent_confirm_replays_after_lock(bss_world, db, monkeypatch
     assert second.transaction_ref == first.transaction_ref
     assert second.reward_points == 0 and _points(db, s) == 0
     for model in (Transaction, Subscription, AuditEvent):
-        n = db.scalar(
-            select(func.count()).select_from(model).where(model.subscriber_id == s.id)
-        )
+        q = select(func.count()).select_from(model).where(model.subscriber_id == s.id)
+        if model is AuditEvent:  # the OTP trail is audited too; count the writes only
+            q = q.where(AuditEvent.action.not_in(("otp_issue", "otp_verify")))
+        n = db.scalar(q)
         assert n == 1, model.__name__

@@ -7,7 +7,8 @@ from sqlalchemy import case, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.bss import audit
+from app.bss import audit, notifications
+from app.bss.clock import utc_now
 from app.bss.errors import CaseNotFound, InvalidRequest
 from app.bss.types import CaseView
 from app.models.telco import (
@@ -15,6 +16,9 @@ from app.models.telco import (
     CasePriority,
     CaseSource,
     CaseStatus,
+    NotificationKind,
+    Subscriber,
+    SubscriberStatus,
     SupportCase,
     case_ref_seq,
 )
@@ -130,3 +134,47 @@ def get_case_status(
         ).limit(limit)
     ).all()
     return [_view(r) for r in rows]
+
+
+def list_recent(db: Session, subscriber_id: uuid.UUID, *, limit: int = 20) -> list[CaseView]:
+    """Newest first across all statuses."""
+    rows = db.scalars(
+        select(SupportCase)
+        .where(SupportCase.subscriber_id == subscriber_id)
+        .order_by(SupportCase.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [_view(r) for r in rows]
+
+
+def set_case_status(
+    db: Session, ref: str, status: CaseStatus, *, actor: Actor = Actor.admin
+) -> CaseView:
+    """Moves a case to `status`; a real change is audited and tells the customer."""
+    ref = _normalise_ref(ref)
+    row = db.scalar(select(SupportCase).where(SupportCase.ref == ref))
+    if row is None:
+        raise CaseNotFound()
+    if row.status == status:
+        return _view(row)
+    old = row.status
+    row.status = status
+    row.resolved_at = utc_now() if status == CaseStatus.resolved else None
+    audit.record(
+        db,
+        actor=actor,
+        action="case_status",
+        subscriber_id=row.subscriber_id,
+        detail={"ref": ref, "from": old.value, "to": status.value},
+    )
+    sub = db.get(Subscriber, row.subscriber_id)
+    if sub is not None and sub.status == SubscriberStatus.active:
+        notifications.notify(
+            db,
+            row.subscriber_id,
+            NotificationKind.case_update,
+            f"{ref}:{status.value}",
+            {"case_ref": ref, "status": status.value},
+        )
+    db.commit()
+    return _view(row)

@@ -223,5 +223,7 @@ def test_purchase_concurrent_confirm_replays_after_lock(bss_world, db, monkeypat
         select(func.count()).select_from(Subscription).where(Subscription.subscriber_id == s.id)
     ) == 1
     assert db.scalar(
-        select(func.count()).select_from(AuditEvent).where(AuditEvent.subscriber_id == s.id)
+        select(func.count())
+        .select_from(AuditEvent)
+        .where(AuditEvent.subscriber_id == s.id, AuditEvent.action.not_in(("otp_issue", "otp_verify")))
     ) == 1

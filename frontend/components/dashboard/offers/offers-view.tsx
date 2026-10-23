@@ -1,338 +1,281 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import {
-  MoreHorizontalIcon,
-  PencilIcon,
-  PlusIcon,
-  PowerIcon,
-  PowerOffIcon,
-  SearchIcon,
-  Trash2Icon,
-} from 'lucide-react';
+import { useState } from 'react';
+import { PencilIcon, PlusIcon, TagIcon, Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { StatusPill, type StatusTone } from '@/components/dashboard/status-pill';
-import { Panel, TableState } from '@/components/dashboard/table-state';
-import { Button } from '@/components/ui/button';
+import { SegmentedFilter } from '@/components/dashboard/list-controls';
+import { OfferDialog } from '@/components/dashboard/offers/offer-dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { useLoad } from '@/hooks/useLoad';
-import { type Offer, api } from '@/lib/api-client';
-import { formatShortDay } from '@/lib/format';
-import { OFFER_TYPE_LABEL, offerHeadline } from '@/lib/offers';
-import { OfferDialog } from './offer-dialog';
+  AudienceChip,
+  KINDS,
+  KIND_LABEL,
+  KindChip,
+  validityText,
+  valueText,
+} from '@/components/dashboard/offers/offer-parts';
+import { useUrlParams } from '@/components/dashboard/use-url-param';
+import { PortalButton } from '@/components/portal/ui/link-button';
+import { Panel, PanelHeader } from '@/components/portal/ui/panel';
+import { Bone, LoadError } from '@/components/portal/ui/query-states';
+import { Switch } from '@/components/ui/switch';
+import { adminApi } from '@/lib/admin-api';
+import { invalidateAdmin, useAdminQuery } from '@/lib/admin-query';
+import { ApiError } from '@/lib/api-client';
+import { cn } from '@/lib/shadcn/utils';
+import type { AdminOffer, OfferKind } from '@/lib/types/admin';
 
-type Phase = 'running' | 'scheduled' | 'expired' | 'off';
-type Shown = Phase | 'all';
+type KindFilter = OfferKind | 'all';
+const FILTERS: { value: KindFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  ...KINDS.map((k) => ({ value: k, label: KIND_LABEL[k] })),
+];
 
-const PHASE: Record<Phase, { label: string; tone: StatusTone }> = {
-  running: { label: 'Running', tone: 'success' },
-  scheduled: { label: 'Scheduled', tone: 'info' },
-  expired: { label: 'Expired', tone: 'warning' },
-  off: { label: 'Off', tone: 'muted' },
-};
-
-/** Today as "YYYY-MM-DD" in the browser's timezone (the backend decides in the agency's). */
-function localToday(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function phaseOf(offer: Offer, today: string): Phase {
-  if (!offer.is_active) return 'off';
-  if (offer.starts_on && offer.starts_on > today) return 'scheduled';
-  if (offer.ends_on && offer.ends_on < today) return 'expired';
-  return 'running';
-}
-
-function windowLabel(offer: Offer): string {
-  if (!offer.starts_on && !offer.ends_on) return 'No end date';
-  if (!offer.starts_on) return `Until ${formatShortDay(offer.ends_on!)}`;
-  if (!offer.ends_on) return `From ${formatShortDay(offer.starts_on)}`;
-  return `${formatShortDay(offer.starts_on)} – ${formatShortDay(offer.ends_on)}`;
-}
-
-function AppliesTo({ offer }: { offer: Offer }) {
-  if (offer.applies_to_all_sale) return <span>All homes for sale</span>;
-  const count = offer.properties.length;
-  if (count === 0) return <span className="text-muted-foreground">No listings</span>;
-  const stale = offer.properties.filter((p) => !p.is_active || p.listing_type !== 'sale').length;
-  return (
-    <span className="block min-w-0" title={offer.properties.map((p) => p.title).join('\n')}>
-      <span className="block truncate">{offer.properties[0].title}</span>
-      <span className="text-muted-foreground block text-xs">
-        {count > 1 && `+${count - 1} more`}
-        {count > 1 && stale > 0 && ' · '}
-        {stale > 0 && `${stale} no longer for sale`}
-      </span>
-    </span>
-  );
-}
+const IN_USE = 'This offer has redemptions — deactivate it instead.';
 
 export function OffersView() {
-  const offers = useLoad(() => api.offers.list(), [], {
-    fallbackError: 'Could not load offers.',
-  });
-  const [shown, setShown] = useState<Shown>('all');
-  const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState<Offer | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleting, setDeleting] = useState<Offer | null>(null);
-  const [busy, setBusy] = useState(false);
-  const today = localToday();
+  const [params, setParams] = useUrlParams();
+  const kind = KINDS.find((k) => k === params.get('kind'));
+  const offers = useAdminQuery('offers', adminApi.offers);
+  const packages = useAdminQuery('packages', adminApi.packages);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (offers.data ?? []).filter(
-      (o) =>
-        (shown === 'all' || phaseOf(o, today) === shown) &&
-        (!q ||
-          o.title.toLowerCase().includes(q) ||
-          o.properties.some((p) => p.title.toLowerCase().includes(q)))
-    );
-  }, [offers.data, shown, query, today]);
+  // `undefined`: closed; `null`: creating; an offer: editing it.
+  const [editing, setEditing] = useState<AdminOffer | null | undefined>(undefined);
+  const [deleting, setDeleting] = useState<AdminOffer | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [toggling, setToggling] = useState<ReadonlySet<string>>(new Set());
+  const [notice, setNotice] = useState<string | null>(null);
 
-  function replace(saved: Offer) {
-    const list = offers.data ?? [];
-    const exists = list.some((o) => o.id === saved.id);
-    offers.setData(exists ? list.map((o) => (o.id === saved.id ? saved : o)) : [saved, ...list]);
-  }
+  const all = offers.data;
+  const items = all?.filter((o) => !kind || o.kind === kind);
 
-  async function setActive(o: Offer, active: boolean) {
-    setBusy(true);
+  async function toggle(o: AdminOffer, is_active: boolean) {
+    setNotice(null);
+    setToggling((s) => new Set(s).add(o.id));
     try {
-      replace(await api.offers.update(o.id, { is_active: active }));
-      toast.success(active ? 'Offer turned on' : 'Offer turned off', { description: o.title });
+      await adminApi.updateOffer(o.id, { is_active });
+      toast.success(is_active ? `${o.title} is active` : `${o.title} is inactive`);
+      invalidateAdmin(['offers']);
     } catch (err) {
-      toast.error('Could not update the offer', {
+      toast.error(`Could not update ${o.title}`, {
         description: err instanceof Error ? err.message : undefined,
       });
     } finally {
-      setBusy(false);
+      setToggling((s) => {
+        const next = new Set(s);
+        next.delete(o.id);
+        return next;
+      });
     }
   }
 
-  async function remove(o: Offer) {
-    setBusy(true);
+  async function remove() {
+    if (!deleting) return;
+    setDeleteBusy(true);
     try {
-      await api.offers.delete(o.id);
-      offers.setData((offers.data ?? []).filter((x) => x.id !== o.id));
-      toast.success('Offer deleted', { description: o.title });
+      await adminApi.deleteOffer(deleting.id);
+      toast.success('Offer deleted', { description: deleting.title });
+      invalidateAdmin(['offers']);
       setDeleting(null);
     } catch (err) {
-      toast.error('Could not delete the offer', {
-        description: err instanceof Error ? err.message : undefined,
-      });
+      setNotice(
+        err instanceof ApiError && (err.status === 409 || err.code === 'offer_in_use')
+          ? IN_USE
+          : err instanceof Error
+            ? err.message
+            : 'Could not delete the offer.'
+      );
+      setDeleting(null);
+      invalidateAdmin(['offers']);
     } finally {
-      setBusy(false);
+      setDeleteBusy(false);
     }
   }
 
-  function openEditor(o: Offer | null) {
-    setEditing(o);
-    setDialogOpen(true);
+  function actions(o: AdminOffer) {
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <PortalButton
+          variant="outline"
+          onClick={() => setEditing(o)}
+          aria-label={`Edit ${o.title}`}
+        >
+          <PencilIcon aria-hidden="true" /> Edit
+        </PortalButton>
+        <PortalButton
+          variant="outline"
+          onClick={() => {
+            setNotice(null);
+            setDeleting(o);
+          }}
+          aria-label={`Delete ${o.title}`}
+        >
+          <Trash2Icon aria-hidden="true" />
+        </PortalButton>
+      </div>
+    );
+  }
+
+  function activeSwitch(o: AdminOffer) {
+    return (
+      <Switch
+        checked={o.is_active}
+        disabled={toggling.has(o.id)}
+        onCheckedChange={(v) => void toggle(o, v)}
+        aria-label={`${o.title} active`}
+      />
+    );
   }
 
   return (
     <>
-      <PageHeader
-        title="Offers"
-        description="Discounts and payment perks on homes for sale. The agent quotes only offers that are running, and the website shows them on the home page and listings."
-        actions={
-          <Button onClick={() => openEditor(null)}>
-            <PlusIcon aria-hidden="true" />
-            Add offer
-          </Button>
-        }
-      />
-
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-64">
-          <SearchIcon
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-            aria-hidden="true"
-          />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search offer or listing"
-            aria-label="Search offers"
-            className="pl-8"
-            type="search"
-          />
-        </div>
-        <Select value={shown} onValueChange={(v) => setShown(v as Shown)}>
-          <SelectTrigger className="w-36" aria-label="Status">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All offers</SelectItem>
-            {(Object.keys(PHASE) as Phase[]).map((p) => (
-              <SelectItem key={p} value={p}>
-                {PHASE[p].label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {offers.data && (
-          <p className="text-muted-foreground ml-auto text-sm tabular-nums">
-            {filtered.length} {filtered.length === 1 ? 'offer' : 'offers'}
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="phone:text-[23px] text-[25px] font-bold tracking-[-0.8px]">Offers</h1>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Packs, points rewards and cashback that subscribers see on their Offers page.
           </p>
-        )}
+        </div>
+        <PortalButton onClick={() => setEditing(null)} disabled={!packages.data}>
+          <PlusIcon aria-hidden="true" /> New offer
+        </PortalButton>
       </div>
 
+      {notice && (
+        <p
+          role="alert"
+          className="bg-tint-pink text-red rounded-button mb-4 px-3.5 py-2.5 text-xs font-bold"
+        >
+          {notice}
+        </p>
+      )}
+
       <Panel>
-        {offers.loading || offers.error || filtered.length === 0 ? (
-          <TableState
-            loading={offers.loading}
-            error={offers.error}
-            onRetry={() => void offers.retry()}
-            empty={
-              (offers.data?.length ?? 0) === 0 ? (
-                <>
-                  <p className="text-foreground font-medium">No offers yet</p>
-                  <p>Add a discount or a payment perk on homes for sale.</p>
-                </>
-              ) : (
-                <>
-                  <p className="text-foreground font-medium">No offers match</p>
-                  <p>Try another status or clear the search.</p>
-                </>
-              )
-            }
-          />
+        <PanelHeader
+          title="All offers"
+          description={
+            all
+              ? `${all.length} ${all.length === 1 ? 'offer' : 'offers'}${kind ? `, ${items?.length ?? 0} of them ${KIND_LABEL[kind].toLowerCase()}` : ''}`
+              : 'Loading…'
+          }
+          action={
+            <SegmentedFilter<KindFilter>
+              label="Kind"
+              value={kind ?? 'all'}
+              options={FILTERS}
+              onChange={(v) => setParams({ kind: v === 'all' ? null : v })}
+            />
+          }
+          className="tablet:flex-col tablet:items-stretch"
+        />
+
+        {offers.error && !all ? (
+          <LoadError what="Offers" error={offers.error} onRetry={offers.reload} />
+        ) : !items ? (
+          <div className="space-y-3" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Bone key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="text-muted-foreground flex flex-col items-center gap-2 py-10 text-center text-xs">
+            <TagIcon className="size-6" aria-hidden="true" />
+            <p>
+              {kind
+                ? `No ${KIND_LABEL[kind].toLowerCase()} offers. Pick another kind or create one.`
+                : 'No offers yet. Create one to show on subscribers’ Offers page.'}
+            </p>
+          </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-full min-w-56">Offer</TableHead>
-                <TableHead>Deal</TableHead>
-                <TableHead className="min-w-44">Applies to</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((o) => {
-                const phase = PHASE[phaseOf(o, today)];
-                return (
-                  <TableRow key={o.id} className={o.is_active ? undefined : 'opacity-70'}>
-                    <TableCell className="max-w-0 py-2">
-                      <button
-                        type="button"
-                        onClick={() => openEditor(o)}
-                        className="group focus-visible:ring-ring/50 block w-full min-w-0 rounded-sm text-left outline-none focus-visible:ring-[3px]"
-                      >
-                        <span className="block truncate font-medium group-hover:underline group-hover:underline-offset-2">
-                          {o.title}
-                        </span>
-                        <span className="text-muted-foreground block truncate text-xs">
-                          {OFFER_TYPE_LABEL[o.offer_type]}
-                        </span>
-                      </button>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap tabular-nums">
-                      {offerHeadline(o)}
-                    </TableCell>
-                    <TableCell className="max-w-56">
-                      <AppliesTo offer={o} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">{windowLabel(o)}</TableCell>
-                    <TableCell>
-                      <StatusPill tone={phase.tone}>{phase.label}</StatusPill>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Actions for ${o.title}`}
-                          >
-                            <MoreHorizontalIcon aria-hidden="true" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem onSelect={() => openEditor(o)}>
-                            <PencilIcon aria-hidden="true" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => void setActive(o, !o.is_active)}
-                            disabled={busy}
-                          >
-                            {o.is_active ? (
-                              <PowerOffIcon aria-hidden="true" />
-                            ) : (
-                              <PowerIcon aria-hidden="true" />
-                            )}
-                            {o.is_active ? 'Turn off' : 'Turn on'}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(o)}>
-                            <Trash2Icon aria-hidden="true" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+          <div
+            className={cn(offers.loading && 'opacity-60 motion-safe:transition-opacity')}
+            aria-busy={offers.loading}
+          >
+            <table className="tablet:hidden w-full border-collapse text-left">
+              <caption className="sr-only">Offers, newest first</caption>
+              <thead>
+                <tr className="text-muted-foreground border-line border-b text-[11px]">
+                  {['Offer', 'Kind', 'Audience', 'Runs', 'Redeemed', 'Active'].map((h) => (
+                    <th key={h} scope="col" className="py-2.5 pr-3 font-semibold whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                  <th scope="col" className="py-2.5">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((o) => (
+                  <tr key={o.id} className="border-line border-b align-top text-xs last:border-b-0">
+                    <th scope="row" className="max-w-[300px] py-3 pr-3 text-left">
+                      <p className="truncate font-bold">{o.title}</p>
+                      <p className="text-muted-foreground truncate text-[11px] font-normal">
+                        {valueText(o)}
+                      </p>
+                    </th>
+                    <td className="py-3 pr-3">
+                      <KindChip kind={o.kind} />
+                    </td>
+                    <td className="py-3 pr-3">
+                      <AudienceChip offer={o} />
+                    </td>
+                    <td className="py-3 pr-3 whitespace-nowrap">{validityText(o)}</td>
+                    <td className="py-3 pr-3 tabular-nums">{o.redemptions}</td>
+                    <td className="py-3 pr-3">{activeSwitch(o)}</td>
+                    <td className="py-3">{actions(o)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ul className="tablet:block hidden">
+              {items.map((o) => (
+                <li
+                  key={o.id}
+                  className="border-line border-b py-3.5 first:pt-0 last:border-b-0 last:pb-0"
+                >
+                  <div className="mb-1.5 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold">{o.title}</p>
+                      <p className="text-muted-foreground text-[11px]">{valueText(o)}</p>
+                    </div>
+                    {activeSwitch(o)}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <KindChip kind={o.kind} />
+                    <AudienceChip offer={o} />
+                  </div>
+                  <p className="text-muted-foreground mt-1.5 text-[11px]">
+                    {validityText(o)} · {o.redemptions} redeemed
+                  </p>
+                  <div className="mt-2">{actions(o)}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </Panel>
 
-      <OfferDialog
-        open={dialogOpen}
-        offer={editing}
-        onOpenChange={setDialogOpen}
-        onSaved={(saved) => {
-          replace(saved);
-          setDialogOpen(false);
-        }}
-      />
+      {editing !== undefined && packages.data && (
+        <OfferDialog
+          key={editing?.id ?? 'new'}
+          offer={editing}
+          packages={packages.data}
+          onClose={() => setEditing(undefined)}
+        />
+      )}
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
         title="Delete this offer?"
         description={
-          <>
-            <span className="text-foreground font-medium">{deleting?.title}</span> disappears from
-            the website and the agent stops quoting it. To pause it instead, turn it off.
-          </>
+          deleting
+            ? `“${deleting.title}” will disappear from subscribers’ Offers pages. An offer with redemptions cannot be deleted; deactivate it instead.`
+            : ''
         }
         confirmLabel="Delete offer"
-        onConfirm={() => (deleting ? remove(deleting) : undefined)}
-        busy={busy}
+        onConfirm={remove}
+        busy={deleteBusy}
       />
     </>
   );

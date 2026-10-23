@@ -32,9 +32,12 @@ ERROR_TEXT: dict[str, str] = {
         "That package does not exist. Offer to search the available packages with search_packages."
     ),
     "limit_exceeded": (
-        "A limit was reached. A recharge must be between 20 and 1000 taka, and at most 5000 taka "
-        "can be recharged per day. This also applies when too many codes were requested. "
-        "Tell them what applies and ask them to try again later."
+        "A recharge limit was reached. A recharge must be between 20 and 1000 taka, and at most "
+        "5000 taka can be recharged per day. Tell them what applies and ask them to try again later."
+    ),
+    "too_many_codes": (
+        "Too many codes were requested. Please wait a few minutes and try again. "
+        "Tell the customer this and ask them to wait a few minutes before trying again."
     ),
     "invalid_msisdn": "That is not a valid mobile number. Ask for an 11-digit number starting with 01.",
     "otp_expired": "The code has expired and the action was cancelled. Offer to start again.",
@@ -53,6 +56,18 @@ ERROR_TEXT: dict[str, str] = {
     ),
     "case_not_found": (
         "That support case was not found. Ask them to check the case number or describe the problem."
+    ),
+    "incident_not_found": (
+        "That network incident was not found. It is not something the customer needs to act on."
+    ),
+    "notification_not_found": (
+        "That notification was not found. It is not something the customer needs to act on."
+    ),
+    "offer_not_found": (
+        "That offer was not found. It is not something the customer needs to act on."
+    ),
+    "offer_in_use": (
+        "That offer has already been used. It is not something the customer needs to act on."
     ),
     "subscriber_not_found": NOT_LOGGED_IN,
     "invalid_request": "That request could not be processed. Ask the customer to rephrase what they want.",

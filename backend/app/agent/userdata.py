@@ -46,6 +46,9 @@ class SessionUserdata:
     # drafted (types from app.agent.actions).
     pending_action: "PendingAction | None" = None
     pending_case: "CaseDraft | None" = None
+    # One action id for the whole session's human-agent handoff, so a repeat
+    # request returns the same case instead of opening another.
+    handoff_action_id: UUID | None = None
     # The last write confirmed: (action_id, code, result text), so a second
     # confirmer of it (voice and card at once) gets the same answer.
     done_action: tuple[UUID, str, str] | None = None

@@ -106,7 +106,7 @@ export function ConversationDetailView({ id }: { id: string }) {
   }
 
   const c = detail.data;
-  const name = c.client_name ?? 'Visitor';
+  const name = c.subscriber_name ?? 'Guest';
 
   return (
     <>
@@ -153,7 +153,7 @@ export function ConversationDetailView({ id }: { id: string }) {
         open={confirming}
         onOpenChange={setConfirming}
         title="Delete this conversation?"
-        description="The transcript is removed for good. The lead and any booking stay."
+        description="The transcript is removed for good. Any case or transaction it led to stays."
         confirmLabel="Delete conversation"
         onConfirm={remove}
         busy={deleting}
@@ -279,20 +279,16 @@ function MetaCard({ c, className }: { c: ConversationDetail; className?: string 
       </dl>
 
       <div className="mt-4 border-t pt-4">
-        <h3 className="mb-2 text-sm font-semibold">Lead</h3>
-        {c.client_id ? (
+        <h3 className="mb-2 text-sm font-semibold">Subscriber</h3>
+        {c.subscriber_id ? (
           <div className="grid gap-1 text-sm">
-            <p className="font-medium">{c.client_name ?? 'Unnamed lead'}</p>
-            {c.client_phone && (
-              <p className="text-muted-foreground tabular-nums">{c.client_phone}</p>
-            )}
-            {c.client_email && <p className="text-muted-foreground break-all">{c.client_email}</p>}
+            <p className="font-medium">{c.subscriber_name ?? 'Unnamed subscriber'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">
-                <Link href={`/dashboard/leads#lead-${c.client_id}`}>Open lead</Link>
+                <Link href={`/dashboard/subscribers?id=${c.subscriber_id}`}>Open subscriber</Link>
               </Button>
               <Button asChild size="sm" variant="ghost">
-                <Link href={`/dashboard/conversations?client_id=${c.client_id}`}>
+                <Link href={`/dashboard/conversations?subscriber_id=${c.subscriber_id}`}>
                   Their conversations
                 </Link>
               </Button>
@@ -300,7 +296,7 @@ function MetaCard({ c, className }: { c: ConversationDetail; className?: string 
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            Not linked to a lead. A lead is linked when the agent books a viewing.
+            Guest chat. It is linked to a subscriber when someone signs in to the portal first.
           </p>
         )}
       </div>

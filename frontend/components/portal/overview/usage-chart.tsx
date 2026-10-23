@@ -160,8 +160,8 @@ function Chart({
             </title>
             <defs>
               <linearGradient id={`${titleId}-area`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#655cf2" stopOpacity="0.22" />
-                <stop offset="1" stopColor="#655cf2" stopOpacity="0" />
+                <stop offset="0" stopColor="var(--brand2)" stopOpacity="0.22" />
+                <stop offset="1" stopColor="var(--brand2)" stopOpacity="0" />
               </linearGradient>
             </defs>
             {ticks.map((t) => (
@@ -192,7 +192,7 @@ function Chart({
             <path
               d={line}
               fill="none"
-              stroke="#655cf2"
+              stroke="var(--brand2)"
               strokeWidth={3}
               strokeLinecap="round"
               strokeLinejoin="round"

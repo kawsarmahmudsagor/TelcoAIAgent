@@ -148,7 +148,7 @@ export function ConfirmCard({ confirm }: { confirm: ConfirmState }) {
       aria-labelledby={`${labelId}-title`}
       className={cn(
         'bg-surface rounded-metric w-full max-w-[380px] border p-4 shadow-[0_10px_28px_#1822460f]',
-        awaiting ? 'border-[#d8d5ff] dark:border-[#3a3775]' : 'border-line'
+        awaiting ? 'border-featured-border' : 'border-line'
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -159,7 +159,7 @@ export function ConfirmCard({ confirm }: { confirm: ConfirmState }) {
             confirm.state === 'done'
               ? 'bg-tint-green text-mint'
               : awaiting
-                ? 'bg-tint-purple text-brand dark:text-[#a9a3ff]'
+                ? 'bg-tint-purple text-brand-text'
                 : 'bg-surface2 text-muted-foreground'
           )}
         >

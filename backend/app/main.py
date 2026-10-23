@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    routes_admin,
     routes_agent_config,
     routes_auth,
     routes_conversations,
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(routes_auth.router)
+    app.include_router(routes_admin.router)
     app.include_router(routes_dashboard.router)
     app.include_router(routes_agent_config.router)
     app.include_router(routes_conversations.router)

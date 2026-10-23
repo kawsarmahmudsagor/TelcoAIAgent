@@ -33,9 +33,14 @@ async def run_lookup_transactions(
             return "No matching transactions found."
         lines = [f"{len(rows)} transactions, newest first:"]
         for t in rows[:_DETAIL]:
-            what = t.package_name or t.type.value
+            # The type word appears once: "purchase <package>, ৳ 120" or
+            # "recharge of ৳ 200".
+            if t.package_name:
+                head = f"{t.type.value} {t.package_name}, {format_amount(t.amount)}"
+            else:
+                head = f"{t.type.value} of {format_amount(t.amount)}"
             line = (
-                f"- {t.ref}: {t.type.value} {what}, {format_amount(t.amount)} via "
+                f"- {t.ref}: {head} via "
                 f"{t.channel.value}, {t.status.value}, {format_day(t.created_at, with_time=True)}"
             )
             if t.target_msisdn:

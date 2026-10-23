@@ -5,9 +5,6 @@ persona sharing the same backend/tools across channels:
 
 1. **Inbound**: a customer talks/chats with the agent via the web frontend to check their
    account, buy packages, recharge, redeem rewards and raise support cases.
-2. **Outbound**: a scheduler dispatches the agent to call a subscriber at a scheduled time —
-   either ringing the dashboard's browser, or ringing a real phone through Twilio when the
-   call has a dial number (see "Real phone calls" below).
 
 All subscriber/BSS data is dummy data. Nothing is sent to real subscribers.
 
@@ -144,6 +141,50 @@ Demo script checklist:
 8. As Tanvir, ask about the network.
 9. Switch persona; the call ends.
 
+Admin steps (sign in at `/login` in a second window; scheduler running):
+
+10. Stage an outage: `/dashboard/network`, stage an incident for Tanvir's district. In the
+    portal ask the agent about the network; it reports the incident. Resolve it afterwards.
+11. Resolve a case: `/dashboard/cases`, open Farhana's case, start review then resolve. Her
+    portal bell shows a case update.
+12. Run nudges: on `/dashboard` choose "Run nudges now". Switch to Samiha, Rafi or Tanvir,
+    open the bell and click a notification; `/portal/assistant` opens and the agent greets
+    with that nudge.
+
+Demo prep:
+
+- `seed_all --reset` does not remove offers created in the admin UI. Delete them in
+  `/dashboard/offers` before a demo.
+- `LIVEKIT_URL` in `frontend/.env.local` must point at a reachable LiveKit server, or the
+  assistant and the admin listen page cannot connect.
+
+## Admin portal
+
+Sign in at `/login` (credentials from `.env`); routes under `/dashboard`:
+
+| Route | What it does |
+|---|---|
+| `/dashboard` | Control center: KPIs and "Run nudges now" |
+| `/dashboard/subscribers` | Subscriber list and detail (MSISDNs masked) |
+| `/dashboard/transactions` | Recharges, purchases and payments |
+| `/dashboard/cases` | Support queue: start review, resolve, reopen. Each change sends the customer a `case_update` notification |
+| `/dashboard/network` | Stage a network incident for a district, or resolve it; the agent's network answers follow it |
+| `/dashboard/ai-monitor` | Agent activity monitor |
+| `/dashboard/offers` | Create pack, points or cashback offers for all, prepaid, postpaid or specific subscribers |
+| `/dashboard/chatbot`, `knowledge`, `conversations`, `listen` | Agent settings, knowledge base, conversation history and live listen-in |
+
+**Nudges.** A scheduler sweep runs every 15 minutes (`run-local.bat` starts it) and "Run nudges
+now" triggers one on demand. It creates `pack_expiring`, `low_balance` and `low_data`
+notifications for active subscribers, at most once per subject. `case_update` notifications are
+not part of the sweep: they are created when an admin changes a case's status.
+
+**Notification bell.** The portal topbar bell lists the customer's notifications. Clicking one
+opens `/portal/assistant` and the agent greets the customer with that nudge.
+
+`/api/token` serves portal customers and guests (the subscriber is resolved server-side from the
+`portal_session` cookie); joining an existing room via `room_name` needs an admin session.
+`/api/listen-token` (dev-only listen-in) always needs an admin session.
+
 ## Docker Compose (once you're past active development)
 
 ```bash
@@ -179,6 +220,5 @@ Cloudflare quick tunnel so the dashboard is reachable from outside this machine 
 
 ## Known open items
 
-- Phase 4: the dashboard pages for the removed real-estate APIs (properties, bookings,
-  leads, schedule) still need replacing with telco ones.
-- Phase 4: auditing of OTP issue/verify and recharge-target events.
+- A case that is resolved, reopened and resolved again notifies the customer only for the first
+  resolution (the notification subject key is `ref:status`).

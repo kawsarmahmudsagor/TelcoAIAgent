@@ -1,7 +1,7 @@
 import type { DateTimeString, UUID } from './common';
 
 /** Serialized as a plain string by the backend; these are the values it writes. */
-export type ConversationChannel = 'inbound_chat' | 'outbound_coldcall';
+export type ConversationChannel = 'inbound_chat';
 
 export type ConversationStatus = 'active' | 'ended';
 
@@ -11,8 +11,7 @@ export interface Conversation {
   id: UUID;
   channel: ConversationChannel;
   room_name: string | null;
-  client_id: UUID | null;
-  call_schedule_id: UUID | null;
+  subscriber_id: UUID | null;
   is_phone_call: boolean;
   status: ConversationStatus;
   message_count: number;
@@ -21,7 +20,7 @@ export interface Conversation {
 }
 
 export interface ConversationListItem extends Conversation {
-  client_name: string | null;
+  subscriber_name: string | null;
   /** First thing the customer said, trimmed. */
   preview: string | null;
 }
@@ -44,16 +43,14 @@ export interface ConversationMessage {
 }
 
 export interface ConversationDetail extends Conversation {
-  client_name: string | null;
-  client_email: string | null;
-  client_phone: string | null;
+  subscriber_name: string | null;
   messages: ConversationMessage[];
 }
 
 export interface ConversationListParams {
   channel?: ConversationChannel;
   status?: ConversationStatus;
-  client_id?: UUID;
+  subscriber_id?: UUID;
   /** 1..200, default 50 */
   limit?: number;
   offset?: number;

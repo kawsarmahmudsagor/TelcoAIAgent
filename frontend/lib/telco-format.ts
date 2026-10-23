@@ -42,6 +42,19 @@ export function formatDay(iso: string): string {
   return dayDhaka.format(new Date(iso));
 }
 
+const dayYearUtc = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** `"14 Mar 2024"` from an ISO date (read as a calendar day, no zone shift) or datetime. */
+export function formatJoinDate(iso: string): string {
+  if (DATE_ONLY.test(iso)) return dayYearUtc.format(new Date(`${iso}T00:00:00Z`));
+  return dayYearDhaka.format(new Date(iso));
+}
+
 /** `"SK"` from `"Samiha Khan"`: first and last initials, for avatars. */
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -110,4 +123,50 @@ export function greeting(now: Date): string {
   if (hour >= 5 && hour < 12) return 'Good morning';
   if (hour >= 12 && hour < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+/** `"5m"`, `"3h"` or `"2d"`: how long ago the ISO datetime was, rounded down to one unit. */
+export function formatAge(iso: string, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+/** `"human_handoff"` becomes `"Human handoff"`: for a code the UI has no label for. */
+export function humanize(code: string): string {
+  const text = code.replace(/[_-]+/g, ' ').trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+const dhakaParts = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Dhaka',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Minutes Bangladesh time is ahead of UTC at `instant` (read from Intl, not hard-coded). */
+function dhakaOffsetMinutes(instant: number): number {
+  const p = Object.fromEntries(dhakaParts.formatToParts(instant).map((x) => [x.type, x.value]));
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute);
+  return Math.round((asUtc - Math.floor(instant / 60_000) * 60_000) / 60_000);
+}
+
+/**
+ * `"2026-10-23T14:30"` (a datetime-local value, read as Bangladesh time) becomes the ISO instant
+ * `"2026-10-23T08:30:00.000Z"`, so the backend never has to guess the zone. `null` when empty or
+ * not a valid date.
+ */
+export function dhakaLocalToIso(local: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local);
+  if (!m) return null;
+  const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  let instant = wall - dhakaOffsetMinutes(wall) * 60_000;
+  instant = wall - dhakaOffsetMinutes(instant) * 60_000;
+  return Number.isNaN(instant) ? null : new Date(instant).toISOString();
 }

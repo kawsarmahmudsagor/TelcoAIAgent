@@ -75,8 +75,6 @@ async def run_create_support_case(
                 "Read back the category and description and ask the customer to confirm; "
                 "then call again with confirmed=true."
             )
-        # The draft stays: a repeated confirmed call replays the same action
-        # and gets the same case back.
         sid = userdata.subscriber_id
         case = await run_db(
             lambda db: cases.create_case(
@@ -89,6 +87,7 @@ async def run_create_support_case(
                 action_id=draft.action_id,
             )
         )
+        userdata.pending_case = None
         await _publish_case(userdata, case)
         return (
             f"Opened support case {case.ref} ({case.priority.value} priority). "
@@ -101,9 +100,12 @@ async def run_create_support_case(
 async def run_request_human_agent(userdata: SessionUserdata, reason: str) -> str:
     async def call() -> str:
         sid = userdata.subscriber_id
+        if userdata.handoff_action_id is None:
+            userdata.handoff_action_id = uuid4()
+        action_id = userdata.handoff_action_id
         case = await run_db(
             lambda db: cases.request_human_agent(
-                db, sid, reason=reason, source=CaseSource.agent, action_id=uuid4()
+                db, sid, reason=reason, source=CaseSource.agent, action_id=action_id
             )
         )
         await _publish_case(userdata, case)

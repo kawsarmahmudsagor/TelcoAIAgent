@@ -11,6 +11,7 @@ from app.models.telco import (
     CaseStatus,
     IncidentKind,
     IncidentStatus,
+    NotificationKind,
     PackageKind,
     PlanType,
     TxnChannel,
@@ -153,6 +154,7 @@ class TransactionView(_Base):
     failure_reason: str | None
     created_at: datetime
     package_name: str | None
+    points_spent: int | None = None
 
 
 class OfferView(_Base):
@@ -205,3 +207,13 @@ class IncidentView(_Base):
     message: str
     starts_at: datetime
     ends_at: datetime | None
+
+
+class NotificationView(_Base):
+    id: UUID
+    kind: NotificationKind
+    title: str
+    body: str
+    payload: dict
+    created_at: datetime
+    read_at: datetime | None

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.bss import _txn, audit, otp
+from app.bss.accounts import mask_msisdn
 from app.bss.clock import local_day_bounds, local_tz, utc_now
 from app.bss.errors import InvalidMsisdn, InvalidRequest, LimitExceeded, SubscriberNotFound
 from app.bss.types import RechargeQuote, RechargeRequest, RechargeResult
@@ -198,11 +199,24 @@ def execute_recharge(
         detail={
             "amount": str(req.amount),
             "channel": req.channel.value,
-            "target": target,
+            "target_masked": mask_msisdn(target),
             "cashback": str(cashback),
             "ref": ref,
         },
     )
+    if not own:
+        audit.record(
+            db,
+            actor=actor,
+            action="target_credit",
+            subscriber_id=target_sub.id if target_sub else None,
+            action_id=action_id,
+            detail={
+                "ref": ref,
+                "amount": str(req.amount),
+                "from_masked": mask_msisdn(caller.msisdn),
+            },
+        )
     try:
         db.commit()
     except IntegrityError:

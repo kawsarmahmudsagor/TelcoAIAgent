@@ -5,7 +5,7 @@ export type IconTileTone = 'purple' | 'green' | 'orange' | 'pink';
 
 // The reference's tint pairs: a soft well with the matching accent for the glyph.
 const TONES: Record<IconTileTone, string> = {
-  purple: 'bg-tint-purple text-brand dark:text-[#a9a3ff]',
+  purple: 'bg-tint-purple text-brand-text',
   green: 'bg-tint-green text-mint',
   orange: 'bg-tint-orange text-orange',
   pink: 'bg-tint-pink text-red',

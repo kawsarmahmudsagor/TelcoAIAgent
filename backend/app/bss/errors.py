@@ -51,6 +51,11 @@ class OtpAttemptsExceeded(BssError):
     default_message = "Too many incorrect code attempts"
 
 
+class TooManyCodes(BssError):
+    code = "too_many_codes"
+    default_message = "Too many verification codes requested"
+
+
 class NoPendingAction(BssError):
     code = "no_pending_action"
     default_message = "No pending action to confirm"
@@ -74,3 +79,23 @@ class CaseNotFound(BssError):
 class InvalidRequest(BssError):
     code = "invalid_request"
     default_message = "Invalid request"
+
+
+class NotificationNotFound(BssError):
+    code = "notification_not_found"
+    default_message = "Notification not found"
+
+
+class IncidentNotFound(BssError):
+    code = "incident_not_found"
+    default_message = "Network incident not found"
+
+
+class OfferNotFound(BssError):
+    code = "offer_not_found"
+    default_message = "Offer not found"
+
+
+class OfferInUse(BssError):
+    code = "offer_in_use"
+    default_message = "Offer has transactions and cannot be deleted"

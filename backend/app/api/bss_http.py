@@ -8,6 +8,10 @@ _STATUS_BY_CODE: dict[str, int] = {
     "subscriber_not_found": 404,
     "package_not_found": 404,
     "case_not_found": 404,
+    "incident_not_found": 404,
+    "notification_not_found": 404,
+    "offer_not_found": 404,
+    "offer_in_use": 409,
     "no_pending_action": 404,
     "insufficient_balance": 409,
     "insufficient_points": 409,
@@ -18,6 +22,7 @@ _STATUS_BY_CODE: dict[str, int] = {
     "otp_invalid": 400,
     "otp_expired": 410,
     "otp_attempts_exceeded": 429,
+    "too_many_codes": 429,
 }
 
 

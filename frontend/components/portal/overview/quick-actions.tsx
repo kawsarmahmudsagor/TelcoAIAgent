@@ -32,11 +32,11 @@ export function QuickActions() {
           <li key={href} className="min-w-0">
             <Link
               href={href}
-              className="bg-surface border-line text-foreground focus-visible:ring-ring/60 phone:gap-[9px] phone:p-3 flex h-full items-center gap-3 rounded-[15px] border p-4 outline-none hover:border-[#b7b2ff] focus-visible:ring-[3px] motion-safe:transition-[border-color,transform] motion-safe:duration-150 motion-safe:hover:-translate-y-0.5"
+              className="bg-surface border-line text-foreground focus-visible:ring-ring/60 phone:gap-[9px] phone:p-3 hover:border-chip-border flex h-full items-center gap-3 rounded-[15px] border p-4 outline-none focus-visible:ring-[3px] motion-safe:transition-[border-color,transform] motion-safe:duration-150 motion-safe:hover:-translate-y-0.5"
             >
               <span
                 aria-hidden="true"
-                className="bg-tint-purple text-brand phone:size-[34px] grid size-10 shrink-0 place-items-center rounded-xl dark:text-[#a9a3ff] [&_svg]:size-[19px]"
+                className="bg-tint-purple text-brand-text phone:size-[34px] grid size-10 shrink-0 place-items-center rounded-xl [&_svg]:size-[19px]"
               >
                 <Icon />
               </span>

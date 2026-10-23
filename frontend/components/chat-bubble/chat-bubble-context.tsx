@@ -1,6 +1,14 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ConnectionState, type Room } from 'livekit-client';
 import { toast } from 'sonner';
 import { type UseSessionReturn, useSession } from '@livekit/components-react';
@@ -28,6 +36,11 @@ interface ChatBubbleContextValue {
    * connected, or false when the connect failed (already toasted).
    */
   startSession: (options: StartSessionOptions) => Promise<boolean>;
+  /**
+   * Starts a text session whose agent opens with the greeting for this notification: a live
+   * session is ended first. Resolves once connected, or false when the connect failed.
+   */
+  startNudgeSession: (nudgeId: string) => Promise<boolean>;
   /** A voice call that shows the panel: `startSession({ voice: true, openPanel: true })`. */
   startCall: () => void;
   /** A session started by startSession() is connecting. */
@@ -69,7 +82,11 @@ export function ChatBubbleProvider({
 }) {
   const tokenSource = useAppTokenSource(appConfig);
   const visitorId = useVisitorId();
-  const sessionOptions = useVisitorSessionOptions(appConfig.agentName, visitorId);
+  // The notification a session is being started for; cleared once connected so the next session
+  // is a normal one.
+  const [nudgeId, setNudgeId] = useState<string | null>(null);
+  const pendingNudgeRef = useRef<((ok: boolean) => void) | null>(null);
+  const sessionOptions = useVisitorSessionOptions(appConfig.agentName, visitorId, nudgeId);
   const session = useSession(tokenSource, sessionOptions);
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -107,6 +124,40 @@ export function ChatBubbleProvider({
     [startSession]
   );
 
+  const startNudgeSession = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (session.connectionState !== ConnectionState.Disconnected) {
+        try {
+          await session.end();
+        } catch (error) {
+          console.warn('Could not end the assistant session:', error);
+        }
+      }
+      return new Promise<boolean>((resolve) => {
+        pendingNudgeRef.current?.(false);
+        pendingNudgeRef.current = resolve;
+        setNudgeId(id);
+      });
+    },
+    [session]
+  );
+
+  // The session options carry the nudge by now and the old session is gone: connect.
+  const connectionState = session.connectionState;
+  useEffect(() => {
+    const resolve = pendingNudgeRef.current;
+    if (!resolve || !nudgeId || connectionState !== ConnectionState.Disconnected) return;
+    pendingNudgeRef.current = null;
+    void startSession({ voice: false, openPanel: false }).then((ok) => {
+      if (!ok) setNudgeId(null);
+      resolve(ok);
+    });
+  }, [nudgeId, connectionState, startSession]);
+
+  useEffect(() => {
+    if (isConnected && nudgeId && !pendingNudgeRef.current) setNudgeId(null);
+  }, [isConnected, nudgeId]);
+
   // Connected: show the panel if the start asked for it. Disconnected: leave fullscreen.
   useEffect(() => {
     if (!isConnected) {
@@ -127,6 +178,7 @@ export function ChatBubbleProvider({
       isOpen,
       open,
       startSession,
+      startNudgeSession,
       startCall,
       autoConnecting,
       voiceRequested,
@@ -143,6 +195,7 @@ export function ChatBubbleProvider({
       isOpen,
       open,
       startSession,
+      startNudgeSession,
       startCall,
       autoConnecting,
       voiceRequested,

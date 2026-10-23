@@ -258,9 +258,10 @@ def test_recharge_concurrent_confirm_replays_after_lock(bss_world, db, monkeypat
     db.expire_all()
     assert db.get(Balance, s.id).postpaid_due == Decimal("1000")
     for model in (Transaction, AuditEvent):
-        n = db.scalar(
-            select(func.count()).select_from(model).where(model.subscriber_id == s.id)
-        )
+        q = select(func.count()).select_from(model).where(model.subscriber_id == s.id)
+        if model is AuditEvent:  # the OTP trail is audited too; count the writes only
+            q = q.where(AuditEvent.action.not_in(("otp_issue", "otp_verify")))
+        n = db.scalar(q)
         assert n == 5, model.__name__
 
 

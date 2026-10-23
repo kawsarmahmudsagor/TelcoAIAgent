@@ -47,7 +47,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     'flex w-full items-center gap-3 rounded-[11px] px-3 py-[11px] text-sm motion-safe:transition-colors motion-safe:duration-150',
                     FOCUS,
                     active
-                      ? 'bg-[#eeedff] font-bold text-[#4f46e5] dark:bg-[#25244d] dark:text-[#a9a3ff]'
+                      ? 'bg-accent text-brand-text font-bold'
                       : 'text-muted-foreground hover:bg-surface2 hover:text-foreground font-semibold'
                   )}
                 >
@@ -69,19 +69,19 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="mt-auto">
-        <div className="relative overflow-hidden rounded-[15px] bg-linear-145 from-[#252b63] to-[#4942a5] p-[15px] text-white">
+        <div className="from-promo-from to-promo-to relative overflow-hidden rounded-[15px] bg-linear-145 p-[15px] text-white">
           <SparklesIcon
             aria-hidden="true"
             className="pointer-events-none absolute -right-3 -bottom-4 size-[84px] opacity-[0.12]"
           />
           <p className="relative mb-[5px] text-[13px] font-bold">Need a hand?</p>
-          <p className="relative mb-[13px] text-[11px] text-[#d9dcff]">
+          <p className="text-promo-foreground relative mb-[13px] text-[11px]">
             Get quick answers from Telco AI, any time.
           </p>
           <Link
             href="/portal/assistant"
             onClick={onNavigate}
-            className="relative inline-flex items-center gap-1 rounded-lg bg-white px-[11px] py-2 text-[11px] font-extrabold text-[#39358c] outline-none focus-visible:ring-[3px] focus-visible:ring-white/60"
+            className="text-promo-ink relative inline-flex items-center gap-1 rounded-lg bg-white px-[11px] py-2 text-[11px] font-extrabold outline-none focus-visible:ring-[3px] focus-visible:ring-white/60"
           >
             Chat with Telco AI
             <ArrowUpRightIcon className="size-3.5" aria-hidden="true" />

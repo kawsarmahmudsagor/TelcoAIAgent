@@ -434,7 +434,7 @@ export function AddSourceDialog({
                     value={textName}
                     onChange={(e) => setTextName(e.target.value)}
                     maxLength={255}
-                    placeholder="Viewing and booking FAQ"
+                    placeholder="Roaming and recharge FAQ"
                   />
                 )}
               </FormField>

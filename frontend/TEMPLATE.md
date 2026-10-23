@@ -1,17 +1,13 @@
 ## Overview
 
-A Next.js frontend for a simple AI voice assistant using LiveKit's official [JavaScript SDK](https://github.com/livekit/client-sdk-js) and [React Components](https://github.com/livekit/components-js). The application implements its own token server, and supports [voice](https://docs.livekit.io/agents/start/voice-ai/), [transcription](https://docs.livekit.io/agents/build/text/), and [virtual avatars](https://docs.livekit.io/agents/integrations/avatar/).
+The Next.js frontend for the telco. voice and chat agent, built on LiveKit's [JavaScript SDK](https://github.com/livekit/client-sdk-js) and [React Components](https://github.com/livekit/components-js). It started from the `agent-starter-react` template and now has three surfaces:
 
-## Sandbox
+- `/` persona picker, then the customer portal at `/portal` (overview, packages, recharge, offers, support, and the assistant page with its chat bubble and notification bell).
+- `/login` then `/dashboard`: the admin portal (control center, subscribers, transactions, support cases, network incidents, AI monitor, offers, chatbot, knowledge, conversations, listen).
+- `/chat`: the standalone full-screen voice/chat widget, which keeps the original LiveKit starter look.
 
-When deployed in a sandbox, LiveKit will host an instance of this application for you, providing a unique, shareable URL through which you can access it. Any agents running with the same LiveKit project credentials will join, meaning that you can rapidly iterate on your agent prototypes, and share the results instantly with friends and colleagues. To begin testing your agent, deploy this app in sandbox then set up an agent on your local machine using the [Voice AI Quickstart](https://docs.livekit.io/start/voice-ai):
+The app implements its own token server. `/api/token` serves portal customers and guests (the subscriber is resolved server-side from the `portal_session` cookie); joining an existing room via `room_name` needs an admin session. `/api/listen-token` (dev-only listen-in) always needs an admin session.
 
-## Installation
+## Running locally
 
-To run this application locally, clone the repo or use the [LiveKit CLI](https://docs.livekit.io/home/cli/cli-setup/):
-
-```console
-lk app create --template agent-starter-react
-```
-
-For more information on prototyping using LiveKit Sandbox, see the [documentation](https://docs.livekit.io/home/cloud/sandbox/).
+Set `LIVEKIT_URL` in `.env.local` to a reachable LiveKit server, then run the backend, the agent worker and `pnpm dev` as described in the repository README. Design tokens and patterns: [DESIGN.md](DESIGN.md).

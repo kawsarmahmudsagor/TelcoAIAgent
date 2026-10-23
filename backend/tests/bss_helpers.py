@@ -9,9 +9,10 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.models.telco import (
+    AuditEvent,
     Balance,
     IncidentKind,
     IncidentStatus,
@@ -140,6 +141,9 @@ class BssWorld:
 
     def cleanup(self) -> None:
         self.db.rollback()
+        # Audit rows outlive their subscriber (SET NULL), so clear the test ones first.
+        test_ids = select(Subscriber.id).where(Subscriber.msisdn.like("01999%"))
+        self.db.execute(delete(AuditEvent).where(AuditEvent.subscriber_id.in_(test_ids)))
         self.db.execute(delete(Subscriber).where(Subscriber.msisdn.like("01999%")))
         self.db.execute(delete(Offer).where(Offer.title.like("PYTEST%")))
         self.db.execute(delete(Package).where(Package.code.like("PT-%")))

@@ -34,7 +34,7 @@ export function NewCaseDialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 fixed inset-0 z-50 bg-[#0b102077]" />
+        <DialogPrimitive.Overlay className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 bg-scrim fixed inset-0 z-50" />
         {/* Mounted per opening, so each opening gets a fresh form and request id. */}
         {open && <CaseForm onClose={() => onOpenChange(false)} />}
       </DialogPrimitive.Portal>
@@ -88,7 +88,7 @@ function CaseForm({ onClose }: { onClose(): void }) {
       <div className="mb-[7px] flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="bg-tint-purple text-brand grid size-9 shrink-0 place-items-center rounded-[11px] dark:text-[#a9a3ff]"
+          className="bg-tint-purple text-brand-text grid size-9 shrink-0 place-items-center rounded-[11px]"
         >
           <LifeBuoyIcon className="size-[17px]" />
         </span>
@@ -161,8 +161,7 @@ function CaseForm({ onClose }: { onClose(): void }) {
                   key={value}
                   className={cn(
                     'rounded-button bg-surface border-line has-focus-visible:ring-ring/60 grid min-h-11 cursor-pointer place-items-center border px-1 py-2.5 text-xs font-extrabold has-focus-visible:ring-[3px]',
-                    selected &&
-                      'border-brand text-brand bg-tint-purple dark:bg-[#29274e] dark:text-[#a9a3ff]'
+                    selected && 'border-brand text-brand-text bg-tint-selected'
                   )}
                 >
                   <input

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.telco_format import format_amount, format_data, format_day
 from app.bss import accounts, network
+from app.bss.notifications import case_status_words
 from app.bss.clock import utc_now
 from app.bss.errors import SubscriberNotFound
 from app.bss.types import AccountSummary
@@ -162,7 +163,7 @@ def _case_update(p: dict[str, Any]) -> str:
     ref = p.get("case_ref")
     case = f"support case {ref}" if ref else "their support case"
     status = p.get("status")
-    news = f" is now {status}" if status else " has an update"
+    news = f" is {case_status_words(status)}" if status else " has an update"
     return f"{case}{news}; offer to go through it with them"
 
 

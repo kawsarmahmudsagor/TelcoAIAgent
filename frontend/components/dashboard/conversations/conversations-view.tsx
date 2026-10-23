@@ -70,12 +70,12 @@ export function ChannelLabel({
   );
 }
 
-/** /dashboard/conversations. `?client_id=` (from a lead's link) narrows it to one lead. */
+/** /dashboard/conversations. `?subscriber_id=` (from a subscriber's link) narrows it to one subscriber. */
 export function ConversationsView() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const clientId = searchParams.get('client_id');
+  const subscriberId = searchParams.get('subscriber_id');
 
   const [channel, setChannel] = useState<ConversationChannel | 'all'>('all');
   const [status, setStatus] = useState<ConversationStatus | 'all'>('all');
@@ -89,16 +89,16 @@ export function ConversationsView() {
       api.conversations.list({
         channel: channel === 'all' ? undefined : channel,
         status: status === 'all' ? undefined : status,
-        client_id: clientId ?? undefined,
+        subscriber_id: subscriberId ?? undefined,
         limit: PAGE_SIZE,
         offset,
       }),
-    [channel, status, clientId, offset],
+    [channel, status, subscriberId, offset],
     { fallbackError: 'Could not load conversations.' }
   );
   const items = page.data?.items ?? [];
   const total = page.data?.total ?? 0;
-  const filtered = channel !== 'all' || status !== 'all' || clientId !== null;
+  const filtered = channel !== 'all' || status !== 'all' || subscriberId !== null;
   const allOnPage = items.length > 0 && items.every((c) => selected.has(c.id));
   const someOnPage = items.some((c) => selected.has(c.id));
 
@@ -147,7 +147,7 @@ export function ConversationsView() {
     }
   }
 
-  const leadName = clientId ? items[0]?.client_name : null;
+  const subscriberName = subscriberId ? items[0]?.subscriber_name : null;
 
   return (
     <>
@@ -167,7 +167,6 @@ export function ConversationsView() {
           <SelectContent>
             <SelectItem value="all">All channels</SelectItem>
             <SelectItem value="inbound_chat">Inbound chat</SelectItem>
-            <SelectItem value="outbound_coldcall">Outbound call</SelectItem>
           </SelectContent>
         </Select>
         <Select
@@ -183,13 +182,13 @@ export function ConversationsView() {
             <SelectItem value="ended">Ended</SelectItem>
           </SelectContent>
         </Select>
-        {clientId && (
+        {subscriberId && (
           <Button
             variant="secondary"
             size="sm"
             onClick={() => changeFilter(() => router.replace(pathname, { scroll: false }))}
           >
-            {leadName ? `Only ${leadName}` : 'One lead only'}
+            {subscriberName ? `Only ${subscriberName}` : 'One subscriber only'}
             <XIcon aria-hidden="true" />
             <span className="sr-only">Show everyone</span>
           </Button>
@@ -263,7 +262,7 @@ export function ConversationsView() {
                       <Checkbox
                         checked={selected.has(c.id)}
                         onCheckedChange={() => toggle(c.id)}
-                        aria-label={`Select conversation with ${c.client_name ?? 'visitor'}`}
+                        aria-label={`Select conversation with ${c.subscriber_name ?? 'Guest'}`}
                       />
                     </TableCell>
                     <TableCell className="max-w-0 py-2.5">
@@ -272,7 +271,7 @@ export function ConversationsView() {
                         className="group focus-visible:ring-ring/50 block min-w-0 rounded-sm outline-none focus-visible:ring-[3px]"
                       >
                         <span className="block truncate font-medium group-hover:underline group-hover:underline-offset-2">
-                          {c.client_name ?? 'Visitor'}
+                          {c.subscriber_name ?? 'Guest'}
                         </span>
                         <span className="text-muted-foreground block truncate text-xs">
                           {c.preview ?? 'No messages'}
@@ -344,7 +343,7 @@ export function ConversationsView() {
             ? 'Delete this conversation?'
             : `Delete ${selected.size} conversations?`
         }
-        description="Their transcripts are removed for good. Leads and bookings they created stay."
+        description="Their transcripts are removed for good. Cases and transactions stay."
         confirmLabel={selected.size === 1 ? 'Delete conversation' : 'Delete conversations'}
         onConfirm={bulkDelete}
         busy={deleting}

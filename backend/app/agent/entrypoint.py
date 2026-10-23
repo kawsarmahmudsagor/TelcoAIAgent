@@ -51,7 +51,7 @@ logger = logging.getLogger("agent.entrypoint")
 GREETING_DONE_ATTRIBUTE = "greeting_done"
 
 # How long the gate's OpenRouter connections (Jev, the router) stay open idle.
-_GATE_KEEPALIVE_S = 300.0
+_GATE_KEEPALIVE_S = 200.0
 
 
 async def _log_if_failed(handle) -> None:
