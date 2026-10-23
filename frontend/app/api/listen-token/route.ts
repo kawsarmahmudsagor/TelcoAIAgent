@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { AccessToken, type VideoGrant } from 'livekit-server-sdk';
+import { isAdminSession } from '@/lib/admin-session';
 
 // Dev-only helper: issues a join token for an EXISTING room by name (e.g. a
 // cold-call room the scheduler already created), so the dashboard can be used
@@ -14,10 +15,18 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL;
 
 export const revalidate = 0;
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   if (process.env.NODE_ENV !== 'development' && process.env.IS_VERCEL_PREVIEW !== 'true') {
     return new NextResponse('This dev-only listen endpoint is disabled outside development.', {
       status: 403,
+    });
+  }
+
+  // This token is the listen-in credential for any existing room: admins only.
+  if (!(await isAdminSession(req))) {
+    return new NextResponse('Listening in requires an admin session.', {
+      status: 403,
+      headers: { 'Cache-Control': 'no-store' },
     });
   }
 
