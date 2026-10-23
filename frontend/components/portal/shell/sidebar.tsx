@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowUpRightIcon, SparklesIcon } from 'lucide-react';
+import { ArrowLeftIcon, ArrowUpRightIcon, SparklesIcon } from 'lucide-react';
 import { PORTAL_NAV, isPortalNavActive } from '@/components/portal/shell/nav-items';
 import { ProfileMenu } from '@/components/portal/shell/profile-menu';
 import { TelcoBrand } from '@/components/portal/telco-brand';
@@ -69,6 +69,17 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="mt-auto">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className={cn(
+            'text-muted-foreground hover:text-foreground mb-3 inline-flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold',
+            FOCUS
+          )}
+        >
+          <ArrowLeftIcon className="size-3.5" aria-hidden="true" />
+          telco. home page
+        </Link>
         <div className="from-promo-from to-promo-to relative overflow-hidden rounded-[15px] bg-linear-145 p-[15px] text-white">
           <SparklesIcon
             aria-hidden="true"

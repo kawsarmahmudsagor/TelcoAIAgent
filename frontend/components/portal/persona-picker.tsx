@@ -29,9 +29,10 @@ function errorText(error: unknown): string {
 
 /**
  * The demo's front door: the five seeded subscribers as cards. Picking one signs in as that
- * persona (FastAPI sets the `portal_session` cookie) and opens the portal.
+ * persona (FastAPI sets the `portal_session` cookie) and opens `next` (a portal path, already
+ * checked by the caller).
  */
-export function PersonaPicker() {
+export function PersonaPicker({ next = '/portal' }: { next?: string }) {
   const router = useRouter();
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [signingIn, setSigningIn] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export function PersonaPicker() {
     setLoginError(null);
     try {
       await portalApi.login(persona.msisdn);
-      router.push('/portal');
+      router.push(next);
     } catch (error) {
       setLoginError(`Could not sign in as ${persona.full_name}. ${errorText(error)}`);
       setSigningIn(null);

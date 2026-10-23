@@ -109,15 +109,19 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:3001 for the persona picker (see "Customer portal" below),
+Open http://localhost:3001 for the public home page (see "Customer portal" below),
 http://localhost:3001/chat for the standalone full-screen chat page, and http://localhost:3001/login for the
 admin dashboard (credentials from `.env`). `run-local.bat` starts the API, agent worker,
 scheduler and frontend together.
 
 ## Customer portal
 
-`/` is a persona picker; choosing one sets the `portal_session` cookie and lands on `/portal`
-(overview, packages, recharge, support, and the assistant page and chat bubble). The admin
+`/` is the public home page: live pack catalog (`GET /api/catalog/packages`, no sign-in),
+recharge shortcut, Telco AI and help links. "Log in" opens `/signin`, the persona picker;
+choosing one sets the `portal_session` cookie and lands on `/portal` (or the `?next=` portal page
+the visitor was heading to). Signed in, the home page header shows "My dashboard" instead of
+"Log in". The portal has the overview, packages, recharge, support, and the assistant page and
+chat bubble. The admin
 dashboard is unchanged: `/login` then `/dashboard`. Run the backend, the agent worker and the
 frontend as in "Local dev setup"; the assistant needs all three, and `seed_all --reset` first.
 
@@ -131,7 +135,7 @@ frontend as in "Local dev setup"; the assistant needs all three, and `seed_all -
 
 Demo script checklist:
 
-1. Persona login from `/`, landing on `/portal`.
+1. From `/`, Log in, pick a persona, landing on `/portal`; back on `/`, "My dashboard" shows.
 2. Overview figures match the persona's scenario.
 3. Portal recharge: the OTP arrives as an SMS toast; enter it to complete.
 4. Ask the assistant for the balance in Bangla.

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { SparklesIcon } from 'lucide-react';
 import { RecentRecharges } from '@/components/portal/recharge/recent-recharges';
@@ -25,7 +26,10 @@ export default function PortalRechargePage() {
       </div>
 
       <div className="phone:grid-cols-1 grid grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] items-start gap-[18px]">
-        <RechargeForm />
+        {/* RechargeForm reads ?amount= (useSearchParams needs a Suspense boundary). */}
+        <Suspense>
+          <RechargeForm />
+        </Suspense>
         <div className="flex min-w-0 flex-col gap-[18px]">
           <RecentRecharges />
           <Panel>

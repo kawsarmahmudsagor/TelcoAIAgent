@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ArrowUpRightIcon, Loader2Icon } from 'lucide-react';
 import { type PayOption, PayOptions } from '@/components/portal/actions/pay-options';
 import { usePortalAction } from '@/components/portal/actions/use-portal-action';
@@ -47,7 +48,8 @@ const FIELD =
 
 /**
  * "Make a recharge" (prepaid) or "Pay your bill" (postpaid, prefilled with the amount due):
- * number, amount, payment method, then the OTP flow.
+ * number, amount, payment method, then the OTP flow. `?amount=` (one of the chips, as the home
+ * page links it) preselects that chip.
  */
 export function RechargeForm() {
   const me = usePortalMe();
@@ -55,13 +57,16 @@ export function RechargeForm() {
   const summary = usePortalQuery('summary', portalApi.summary);
   const { start, dialog } = usePortalAction();
   const ids = useId();
+  const linked = Number(useSearchParams().get('amount'));
 
   const due = postpaid ? (summary.data?.postpaid_due ?? 0) : 0;
   const billPrefill = due > 0 ? String(Math.round(Math.min(due, MAX) * 100) / 100) : null;
 
   const [msisdn, setMsisdn] = useState(me.msisdn);
   // `undefined` until the customer picks: then a bill's due amount, otherwise the default chip.
-  const [chip, setChip] = useState<number | null | undefined>(undefined);
+  const [chip, setChip] = useState<number | null | undefined>(
+    CHIPS.includes(linked) ? linked : undefined
+  );
   const [custom, setCustom] = useState<string | undefined>(undefined);
   const [channel, setChannel] = useState<TxnChannel>('bkash');
   const [touched, setTouched] = useState({ msisdn: false, amount: false });
