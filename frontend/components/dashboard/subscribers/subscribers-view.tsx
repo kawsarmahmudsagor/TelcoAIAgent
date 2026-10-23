@@ -15,7 +15,7 @@ import { Bone, LoadError } from '@/components/portal/ui/query-states';
 import { adminApi } from '@/lib/admin-api';
 import { useAdminQuery } from '@/lib/admin-query';
 import { cn } from '@/lib/shadcn/utils';
-import { formatDate, formatPlan } from '@/lib/telco-format';
+import { formatDay, formatPlan } from '@/lib/telco-format';
 import type { SubscriberItem, SubscriberListParams } from '@/lib/types/admin';
 import type { PlanType } from '@/lib/types/portal';
 
@@ -229,7 +229,7 @@ function SubscriberTable({
 }) {
   return (
     <>
-      <table className="phone:hidden w-full border-collapse text-left">
+      <table className="tablet:hidden w-full border-collapse text-left">
         <caption className="sr-only">Subscribers, sorted by name</caption>
         <thead>
           <tr className="text-muted-foreground border-line border-b text-[11px]">
@@ -255,9 +255,7 @@ function SubscriberTable({
               <td className="py-3 pr-3">
                 <SubscriberStatusChip status={s.status} />
               </td>
-              <td className="py-3 pr-3 whitespace-nowrap">
-                {formatDate(`${s.joined_on}T00:00:00+06:00`)}
-              </td>
+              <td className="py-3 pr-3 whitespace-nowrap">{formatDay(s.joined_on)}</td>
               <td className="py-3 text-right">
                 <ViewButton item={s} onView={onView} />
               </td>
@@ -265,7 +263,7 @@ function SubscriberTable({
           ))}
         </tbody>
       </table>
-      <ul className="phone:block hidden">
+      <ul className="tablet:block hidden">
         {items.map((s) => (
           <li
             key={s.id}
@@ -279,9 +277,7 @@ function SubscriberTable({
               {s.msisdn_masked} · {formatPlan(s.plan_type)} · {balanceText(s)}
             </p>
             <div className="mt-1.5 flex items-center justify-between">
-              <p className="text-muted-foreground text-[10px]">
-                Joined {formatDate(`${s.joined_on}T00:00:00+06:00`)}
-              </p>
+              <p className="text-muted-foreground text-[10px]">Joined {formatDay(s.joined_on)}</p>
               <ViewButton item={s} onView={onView} />
             </div>
           </li>
