@@ -20,6 +20,7 @@ const AGENT_NAME = process.env.AGENT_NAME || 'telco_agent';
 // Server-to-server: this route asks FastAPI directly who the portal cookie belongs to.
 const FASTAPI_INTERNAL_URL = process.env.FASTAPI_INTERNAL_URL || 'http://localhost:8011';
 const PORTAL_COOKIE = 'portal_session';
+const ADMIN_COOKIE = 'session';
 
 // don't cache the results
 export const revalidate = 0;
@@ -57,6 +58,15 @@ export async function POST(req: NextRequest) {
     // dispatch on top of it.
     const existingRoomName =
       typeof body?.room_name === 'string' && body.room_name.trim() ? body.room_name.trim() : null;
+
+    // Joining an existing room (listening in on a live conversation) is an admin act: without a
+    // valid admin session no token is issued, so a customer or guest can't enter someone else's room.
+    if (existingRoomName && !(await isAdminSession(req))) {
+      return new NextResponse('Joining an existing room requires an admin session.', {
+        status: 403,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
     // Every agent dispatch carries server-built metadata, tagged as an inbound customer chat
     // (as opposed to the outbound cold-call sessions the scheduler dispatches separately).
@@ -110,6 +120,26 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * True when the admin `session` cookie is accepted by FastAPI's `GET /api/auth/me` (200). Any
+ * other answer, a missing cookie, or an unreachable backend is false: fail closed.
+ */
+async function isAdminSession(req: NextRequest): Promise<boolean> {
+  const session = req.cookies.get(ADMIN_COOKIE)?.value;
+  if (!session) return false;
+  try {
+    const res = await fetch(`${FASTAPI_INTERNAL_URL}/api/auth/me`, {
+      headers: { cookie: `${ADMIN_COOKIE}=${session}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.status === 200;
+  } catch (error) {
+    console.error('Could not verify the admin session; refusing the room join.', error);
+    return false;
+  }
+}
+
+/**
  * The signed-in customer's subscriber id, verified by FastAPI's `GET /api/me` against the
  * `portal_session` cookie; null (a guest) without the cookie or on any non-200 answer.
  */
@@ -146,8 +176,6 @@ function createParticipantToken(
     canPublish: true,
     canPublishData: true,
     canSubscribe: true,
-    // The public property page sets a `viewing_property_id` attribute so the agent knows which
-    // listing the customer has open.
     canUpdateOwnMetadata: true,
   };
   at.addGrant(grant);

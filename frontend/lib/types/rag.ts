@@ -2,20 +2,14 @@ import type { EmbeddingMigrationStatus } from './agent-config';
 import type { DateTimeString, UUID } from './common';
 
 /** The backend serializes these as plain strings; these are the values it writes. */
-export type RagSourceType = 'document' | 'link' | 'text' | 'properties';
+export type RagSourceType = 'document' | 'link' | 'text';
 
 /** `stale`: embedded with chunk settings that have since changed; still searchable. */
 export type RagSourceStatus = 'pending' | 'processing' | 'ready' | 'stale' | 'failed' | 'disabled';
 
 export type RagPageStatus = 'processing' | 'ready' | 'failed';
 
-export type EmbeddingJobType =
-  | 'ingest'
-  | 'crawl'
-  | 'reindex'
-  | 'delete'
-  | 'sync_properties'
-  | 'migrate_embedding';
+export type EmbeddingJobType = 'ingest' | 'crawl' | 'reindex' | 'delete' | 'migrate_embedding';
 
 export type EmbeddingJobStatus = 'pending' | 'processing' | 'succeeded' | 'failed';
 

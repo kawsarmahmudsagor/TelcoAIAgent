@@ -13,7 +13,6 @@ const PLACEHOLDER_HELP: Record<string, string> = {
   operator_name: 'the operator’s name',
   customer_name: 'the customer’s name',
   nudge_text: 'the reminder the agent is nudging the customer about',
-  client_name: 'the lead’s name',
   current_date: 'today’s date',
   timezone: 'the agency timezone',
   knowledge_scope: 'what the agent may answer from (added automatically if missing)',

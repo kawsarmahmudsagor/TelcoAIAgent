@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
-import { OffersView } from '@/components/dashboard/offers/offers-view';
+import { ComingSoon } from '@/components/dashboard/shell/coming-soon';
+import { adminNavItemFor } from '@/components/dashboard/shell/nav-items';
 
-export const metadata: Metadata = { title: 'Offers' };
+const HREF = '/dashboard/offers';
 
-export default function OffersPage() {
-  return <OffersView />;
+export const metadata: Metadata = { title: adminNavItemFor(HREF).label };
+
+export default function AdminPlaceholderPage() {
+  return <ComingSoon href={HREF} />;
 }

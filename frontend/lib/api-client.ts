@@ -2,19 +2,7 @@ import type {
   AgentConfig,
   AgentConfigOptions,
   AgentConfigUpdate,
-  Booking,
-  BookingCreate,
-  BookingDetail,
-  BookingListParams,
   BulkDeleteResult,
-  CallDeclineReason,
-  CallScheduleCreate,
-  CallScheduleEntry,
-  CallScheduleOut,
-  CallScheduleUpdate,
-  Client,
-  ClientCreate,
-  ClientUpdate,
   ConversationDetail,
   ConversationListItem,
   ConversationListParams,
@@ -24,32 +12,16 @@ import type {
   DashboardSummary,
   EmbeddingJob,
   EmbeddingJobListParams,
-  ImportClientsResult,
-  IncomingCall,
-  LeadListParams,
   LinkSourceCreate,
   MeResponse,
-  Offer,
-  OfferCreate,
-  OfferUpdate,
   OkResponse,
-  Property,
-  PropertyCreate,
-  PropertyListParams,
-  PropertyUpdate,
-  PublicListing,
-  PublicListingParams,
-  PublicOffer,
   RagSearchRequest,
   RagSearchResponse,
   RagSourceDetail,
   RagSourceList,
   RagSourceListParams,
   RagStatus,
-  RecentBooking,
   ReindexAllResponse,
-  ScheduleLead,
-  ScheduleListParams,
   SeriesRange,
   TextSourceCreate,
   UUID,
@@ -165,84 +137,21 @@ async function postForBlob(path: string, body: unknown): Promise<Blob> {
   return res.blob();
 }
 
-const get = <T>(path: string) => apiFetch<T>(path);
-const post = <T>(path: string, body?: unknown) =>
+export const get = <T>(path: string) => apiFetch<T>(path);
+export const post = <T>(path: string, body?: unknown) =>
   apiFetch<T>(path, {
     method: 'POST',
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-const patch = <T>(path: string, body: unknown) =>
+export const patch = <T>(path: string, body: unknown) =>
   apiFetch<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
-const del = (path: string) => apiFetch<void>(path, { method: 'DELETE' });
+export const del = (path: string) => apiFetch<void>(path, { method: 'DELETE' });
 
 const auth = {
   login: (username: string, password: string) =>
     post<OkResponse>('/api/auth/login', { username, password }),
   logout: () => post<OkResponse>('/api/auth/logout'),
   me: () => get<MeResponse>('/api/auth/me'),
-};
-
-const leads = {
-  list: (params?: LeadListParams) => get<Client[]>(`/api/leads${qs(params)}`),
-  get: (id: UUID) => get<Client>(`/api/leads/${id}`),
-  create: (payload: ClientCreate) => post<Client>('/api/leads', payload),
-  update: (id: UUID, payload: ClientUpdate) => patch<Client>(`/api/leads/${id}`, payload),
-  /** Upload an .xlsx of clients. */
-  import: (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return apiFetch<ImportClientsResult>('/api/import/clients', {
-      method: 'POST',
-      body: formData,
-    });
-  },
-};
-
-const schedule = {
-  list: (params?: ScheduleListParams) => get<CallScheduleEntry[]>(`/api/schedule${qs(params)}`),
-  /** Every lead a call can be scheduled for, with their upcoming viewing if any. */
-  leads: () => get<ScheduleLead[]>('/api/schedule/leads'),
-  create: (payload: CallScheduleCreate) => post<CallScheduleOut>('/api/schedule', payload),
-  update: (id: UUID, payload: CallScheduleUpdate) =>
-    patch<CallScheduleOut>(`/api/schedule/${id}`, payload),
-  delete: (id: UUID) => del(`/api/schedule/${id}`),
-  /** Ends a ringing or live call (browser or phone). */
-  hangUp: (id: UUID) => post<CallScheduleOut>(`/api/schedule/${id}/hangup`),
-  /** Browser calls only; 409 for phone calls. */
-  incoming: (id: UUID) => get<IncomingCall>(`/api/schedule/${id}/incoming`),
-  decline: (id: UUID, reason: CallDeclineReason) =>
-    post<CallScheduleOut>(`/api/schedule/${id}/decline`, { reason }),
-};
-
-const bookings = {
-  list: (params?: BookingListParams) => get<Booking[]>(`/api/bookings${qs(params)}`),
-  get: (id: UUID) => get<BookingDetail>(`/api/bookings/${id}`),
-  /** Books a viewing by hand; 400 for a past time or one outside viewing hours. */
-  create: (payload: BookingCreate) => post<Booking>('/api/bookings', payload),
-};
-
-const properties = {
-  list: (params?: PropertyListParams) => get<Property[]>(`/api/properties${qs(params)}`),
-  // No GET /api/properties/{id} on the backend: find it in the list.
-  get: async (id: UUID) => {
-    const all = await get<Property[]>(`/api/properties${qs({ limit: 1000 })}`);
-    const found = all.find((property) => property.id === id);
-    if (!found) throw new ApiError(404, 'Property not found');
-    return found;
-  },
-  create: (payload: PropertyCreate) => post<Property>('/api/properties', payload),
-  update: (id: UUID, payload: PropertyUpdate) => patch<Property>(`/api/properties/${id}`, payload),
-  /** Soft delete: sets is_active = false. */
-  delete: (id: UUID) => del(`/api/properties/${id}`),
-};
-
-const offers = {
-  list: () => get<Offer[]>('/api/offers'),
-  get: (id: UUID) => get<Offer>(`/api/offers/${id}`),
-  create: (payload: OfferCreate) => post<Offer>('/api/offers', payload),
-  update: (id: UUID, payload: OfferUpdate) => patch<Offer>(`/api/offers/${id}`, payload),
-  /** Hard delete. */
-  delete: (id: UUID) => del(`/api/offers/${id}`),
 };
 
 const agentConfig = {
@@ -272,8 +181,6 @@ const dashboard = {
     get<ConversationSeries>(`/api/dashboard/conversation-series${qs({ range })}`),
   recentConversations: (limit?: number) =>
     get<ConversationListItem[]>(`/api/dashboard/recent-conversations${qs({ limit })}`),
-  recentBookings: (limit?: number) =>
-    get<RecentBooking[]>(`/api/dashboard/recent-bookings${qs({ limit })}`),
   ragStatus: () => get<RagStatus>('/api/dashboard/rag-status'),
 };
 
@@ -296,8 +203,6 @@ const rag = {
     post<CreateSourceResponse>('/api/rag/sources/links', payload),
   addText: (payload: TextSourceCreate) =>
     post<CreateSourceResponse>('/api/rag/sources/text', payload),
-  /** Creates the property-listings source on first use and queues a sync. */
-  syncProperties: () => post<CreateSourceResponse>('/api/rag/sources/properties/sync'),
   reindexSource: (id: UUID) => post<CreateSourceResponse>(`/api/rag/sources/${id}/reindex`),
   reindexAll: () => post<ReindexAllResponse>('/api/rag/reindex-all'),
   jobs: (params?: EmbeddingJobListParams) => get<EmbeddingJob[]>(`/api/rag/jobs${qs(params)}`),
@@ -305,51 +210,16 @@ const rag = {
   search: (payload: RagSearchRequest) => post<RagSearchResponse>('/api/rag/search', payload),
 };
 
-const publicApi = {
-  /** Unauthenticated. */
-  listings: (params?: PublicListingParams) =>
-    get<PublicListing[]>(`/api/public/listings${qs(params)}`),
-  /** Unauthenticated: live offers. */
-  offers: () => get<PublicOffer[]>('/api/public/offers'),
-};
-
 export const api = {
-  // Nested, per domain.
   auth,
-  leads: Object.assign(
-    // Legacy: `api.leads()` lists leads (args ignored, so it is safe as a callback).
-    () => leads.list(),
-    leads
-  ),
-  schedule: Object.assign(
-    // Legacy: `api.schedule()` lists schedule entries.
-    () => schedule.list(),
-    schedule
-  ),
-  bookings: Object.assign(
-    // Legacy: `api.bookings()` lists bookings.
-    () => bookings.list(),
-    bookings
-  ),
-  properties,
-  offers,
   agentConfig,
   conversations,
   dashboard,
   rag,
-  public: publicApi,
 
   // Legacy flat names, kept for existing pages.
   login: auth.login,
   logout: auth.logout,
   me: auth.me,
   dashboardSummary: dashboard.summary,
-  createLead: leads.create,
-  createSchedule: schedule.create,
-  deleteSchedule: schedule.delete,
-  scheduleLeads: schedule.leads,
-  hangUpCall: schedule.hangUp,
-  incomingCall: schedule.incoming,
-  declineCall: schedule.decline,
-  importClients: leads.import,
 };

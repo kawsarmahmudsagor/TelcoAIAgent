@@ -19,8 +19,8 @@ export default function LoginPage() {
               Every enquiry answered. Every viewing booked.
             </p>
             <p className="text-sidebar-foreground/75 mt-5 text-base leading-relaxed">
-              Your AI agent chats with buyers and renters, takes their calls and rings leads back
-              across Dhaka. This is where you see what it said and what happens next.
+              Your AI agent answers subscribers about balances, packs and network issues. This is
+              where you see what it said and what happens next.
             </p>
           </div>
         </div>

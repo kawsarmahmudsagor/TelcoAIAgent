@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  BuildingIcon,
   EyeIcon,
   FileTextIcon,
   GlobeIcon,
@@ -37,7 +36,6 @@ export const SOURCE_ICON: Record<RagSourceType, LucideIcon> = {
   document: FileTextIcon,
   link: GlobeIcon,
   text: NotebookPenIcon,
-  properties: BuildingIcon,
 };
 
 /** Where a source came from, in one line under its name. */
@@ -47,7 +45,6 @@ export function sourceOrigin(source: RagSource): string | null {
     const size = source.size_bytes ? formatBytes(source.size_bytes) : null;
     return [source.filename, size].filter(Boolean).join(', ') || null;
   }
-  if (source.source_type === 'properties') return 'Active listings from the Properties page';
   return null;
 }
 

@@ -1,15 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  BuildingIcon,
-  CalendarCheckIcon,
-  LibraryBigIcon,
-  MessagesSquareIcon,
-  PhoneIcon,
-  PhoneOutgoingIcon,
-  UsersIcon,
-} from 'lucide-react';
+import { LibraryBigIcon, MessagesSquareIcon, PhoneIcon } from 'lucide-react';
 import { KpiTile, KpiTileSkeleton } from '@/components/dashboard/kpi-tile';
 import { ConversationsChartPanel } from '@/components/dashboard/overview/conversations-chart-panel';
 import { KbStatusPanel } from '@/components/dashboard/overview/kb-status-panel';
@@ -17,7 +9,6 @@ import { PageHeader } from '@/components/dashboard/page-header';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusPill } from '@/components/dashboard/status-pill';
 import {
-  BOOKING_STATUS,
   CONVERSATION_CHANNEL,
   CONVERSATION_STATUS,
   styleOf,
@@ -25,22 +16,22 @@ import {
 import { TableState } from '@/components/dashboard/table-state';
 import { useLoad } from '@/hooks/useLoad';
 import { api } from '@/lib/api-client';
-import { formatDateTime, formatRelative } from '@/lib/format';
+import { formatRelative } from '@/lib/format';
 
 export function OverviewView() {
   return (
     <>
-      <PageHeader title="Overview" description="What the agent and your team have on today." />
+      <PageHeader
+        title="Control center"
+        description="What the agent and your team have on today."
+      />
       <div className="space-y-4 sm:space-y-6">
         <KpiRow />
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
           <ConversationsChartPanel className="lg:col-span-2" />
           <KbStatusPanel />
         </div>
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-          <RecentConversationsPanel />
-          <RecentBookingsPanel />
-        </div>
+        <RecentConversationsPanel />
       </div>
     </>
   );
@@ -58,8 +49,8 @@ function KpiRow() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {Array.from({ length: 2 }).map((_, i) => (
           <KpiTileSkeleton key={i} />
         ))}
       </div>
@@ -71,36 +62,12 @@ function KpiRow() {
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-        <KpiTile
-          label="Leads"
-          icon={UsersIcon}
-          value={value((s) => s.total_leads)}
-          href="/dashboard/leads"
-        />
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <KpiTile
           label="Conversations today"
           icon={MessagesSquareIcon}
           value={value((s) => s.conversations_today)}
           href="/dashboard/conversations"
-        />
-        <KpiTile
-          label="Calls left today"
-          icon={PhoneOutgoingIcon}
-          value={value((s) => s.pending_calls_today)}
-          href="/dashboard/schedule"
-        />
-        <KpiTile
-          label="Bookings this week"
-          icon={CalendarCheckIcon}
-          value={value((s) => s.bookings_this_week)}
-          href="/dashboard/bookings"
-        />
-        <KpiTile
-          label="Active listings"
-          icon={BuildingIcon}
-          value={value((s) => s.active_listings)}
-          href="/dashboard/properties"
         />
         <KpiTile
           label="Knowledge sources"
@@ -171,7 +138,7 @@ function RecentConversationsPanel() {
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium">
-                        {c.client_name ?? 'Visitor'}
+                        {c.subscriber_name ?? 'Guest'}
                       </span>
                       {c.status === 'active' && (
                         <StatusPill tone={status.tone} pulse={status.pulse}>
@@ -188,59 +155,6 @@ function RecentConversationsPanel() {
                     <span className="block">{CONVERSATION_CHANNEL[c.channel] ?? c.channel}</span>
                   </span>
                 </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </SectionCard>
-  );
-}
-
-function RecentBookingsPanel() {
-  const { data, error, loading, retry } = useLoad(() => api.dashboard.recentBookings(6), [], {
-    fallbackError: 'Could not load recent bookings.',
-  });
-
-  return (
-    <SectionCard
-      title="Recent bookings"
-      action={<ViewAll href="/dashboard/bookings" label="View all bookings" />}
-      bodyClassName="px-0 sm:px-0 pb-1 sm:pb-1"
-    >
-      {loading || error || !data || data.length === 0 ? (
-        <TableState
-          loading={loading}
-          error={error}
-          onRetry={() => void retry()}
-          rows={4}
-          empty={
-            <>
-              <p className="text-foreground font-medium">No viewings booked yet</p>
-              <p>When a lead agrees to a viewing, the agent records it here.</p>
-            </>
-          }
-        />
-      ) : (
-        <ul className="divide-y">
-          {data.map((b) => {
-            const status = styleOf(BOOKING_STATUS, b.status);
-            return (
-              <li key={b.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {b.client_name ?? 'Unknown lead'}
-                  </span>
-                  <span className="text-muted-foreground block truncate text-sm">
-                    {b.property_title ?? 'No listing picked'}
-                  </span>
-                </span>
-                <span className="flex shrink-0 flex-col items-end gap-1">
-                  <StatusPill tone={status.tone}>{status.label}</StatusPill>
-                  <span className="text-muted-foreground text-xs tabular-nums">
-                    {formatDateTime(b.proposed_datetime)}
-                  </span>
-                </span>
               </li>
             );
           })}
