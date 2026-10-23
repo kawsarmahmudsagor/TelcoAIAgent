@@ -14,7 +14,17 @@ async def run_verify_otp(userdata: SessionUserdata, code: str) -> str:
 
 
 async def run_cancel_pending_action(userdata: SessionUserdata) -> str:
-    return await run_write(userdata, lambda: actions.cancel_action(userdata))
+    async def call() -> str:
+        had_case = userdata.pending_case is not None
+        userdata.pending_case = None
+        if userdata.pending_action is None and had_case:
+            return "The drafted support case was cancelled; nothing was opened."
+        text = await actions.cancel_action(userdata)
+        if had_case:
+            text += " The drafted support case was cancelled too."
+        return text
+
+    return await run_write(userdata, call)
 
 
 @function_tool(name="verify_otp")
@@ -30,6 +40,6 @@ async def verify_otp(ctx: RunContext[SessionUserdata], code: str) -> str:
 
 @function_tool(name="cancel_pending_action")
 async def cancel_pending_action(ctx: RunContext[SessionUserdata]) -> str:
-    """Cancel the purchase, recharge or redemption waiting for a code, when
-    the customer says they do not want it."""
+    """Cancel the purchase, recharge or redemption waiting for a code, or a
+    support case being drafted, when the customer says they do not want it."""
     return await run_cancel_pending_action(ctx.userdata)

@@ -9,7 +9,11 @@ import pytest
 from livekit.agents.llm import ToolError
 from sqlalchemy import func, select
 
+from app.agent.quick_reply import route
 from app.agent.tools import packages, recharge, rewards, support, verify
+from app.agent.turn_judge import Judgement
+from app.config import Settings
+from app.services.agent_config_service import resolve
 from app.agent.tools._common import ERROR_TEXT, NOT_LOGGED_IN
 from app.agent.topics import ACCOUNT_CHANGED, CASE_CREATED, OTP_SMS
 from app.agent.userdata import Channel, SessionUserdata
@@ -194,6 +198,25 @@ def test_pending_case_cleared_after_create(bss_world):
 
     asyncio.run(go())
     assert ud.pending_case is None and len(_cases(bss_world, sub)) == 1
+
+
+def test_cancel_clears_pending_case(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    settings = Settings(_env_file=None)
+    config = resolve(None, settings)
+    config.quick_reply_enabled = True
+    judgement = Judgement(0.9, "none", 0.99)
+
+    async def go():
+        await support.run_create_support_case(ud, "slow_data", "Data is slow.")
+        assert route(judgement, ud, config, settings) is None
+        return await verify.run_cancel_pending_action(ud)
+
+    out = asyncio.run(go())
+    assert "support case was cancelled" in out and _cases(bss_world, sub) == []
+    assert ud.pending_case is None
+    assert route(judgement, ud, config, settings) is not None
 
 
 def test_human_agent_publishes_case_created(bss_world):
