@@ -14,7 +14,8 @@ export type PortalKey =
   | 'recommendations'
   | 'offers'
   | 'cases'
-  | 'network';
+  | 'network'
+  | 'notifications';
 
 const INVALIDATE = 'portal:invalidate';
 

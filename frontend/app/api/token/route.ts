@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     const subscriberId = await resolveSubscriberId(req);
     const metadata = buildDispatchMetadata(subscriberId, {
       visitorId: body?.participant_attributes?.visitor_id,
-      nudgeId: body?.nudge_id,
+      nudgeId: body?.participant_attributes?.nudge_id ?? body?.nudge_id,
     });
     for (const agent of roomConfig.agents) {
       // useSession adds a bare dispatch when the app config names the agent.

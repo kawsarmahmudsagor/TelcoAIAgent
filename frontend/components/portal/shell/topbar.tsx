@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { MenuIcon } from 'lucide-react';
 import { ThemeMenu } from '@/components/dashboard/theme-menu';
 import { portalNavItem } from '@/components/portal/shell/nav-items';
+import { NotificationBell } from '@/components/portal/shell/notification-bell';
 import { ProfileMenu } from '@/components/portal/shell/profile-menu';
 import { cn } from '@/lib/shadcn/utils';
 
@@ -41,6 +42,7 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
       </div>
 
       <div className="phone:gap-[7px] flex shrink-0 items-center gap-[11px]">
+        <NotificationBell buttonClassName={ICON_BUTTON} />
         <ThemeMenu triggerClassName={ICON_BUTTON} />
         <ProfileMenu variant="avatar" />
       </div>

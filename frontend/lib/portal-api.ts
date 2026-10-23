@@ -5,6 +5,8 @@ import type {
   ActionStart,
   CaseView,
   IncidentView,
+  NotificationList,
+  NotificationView,
   OffersAndPoints,
   PackageKind,
   PackageView,
@@ -49,6 +51,11 @@ export const portalApi = {
   cases: () => get<CaseView[]>('/api/me/cases'),
   createCase: (body: PortalCaseCreate) => post<CaseView>('/api/me/cases', body),
   network: () => get<IncidentView[]>('/api/me/network'),
+
+  notifications: () => get<NotificationList>('/api/me/notifications'),
+  markNotificationRead: (id: string) =>
+    post<NotificationView>(`/api/me/notifications/${encodeURIComponent(id)}/read`),
+  markAllNotificationsRead: () => post<{ updated: number }>('/api/me/notifications/read-all'),
 
   /** Validates the action and sends the OTP (returned in `otp` for the demo SMS toast). */
   startAction: (action: PortalAction) => post<ActionStart>('/api/me/actions/start', action),

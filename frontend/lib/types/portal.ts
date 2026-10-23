@@ -237,3 +237,21 @@ export interface ActionResult {
   postpaid_due: number | null;
   reward_points: number | null;
 }
+
+export type NotificationKind = 'pack_expiring' | 'low_balance' | 'low_data' | 'case_update';
+
+/** One proactive nudge (`GET /api/me/notifications`); `payload` keys depend on `kind`. */
+export interface NotificationView {
+  id: UUID;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  payload: Record<string, unknown>;
+  created_at: DateTimeString;
+  read_at: DateTimeString | null;
+}
+
+export interface NotificationList {
+  unread: number;
+  items: NotificationView[];
+}
