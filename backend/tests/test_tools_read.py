@@ -248,6 +248,13 @@ def test_transactions_cap_detail(bss_world):
     assert out.count("- TXN-") == 3 and "2 more" in out
 
 
+def test_transaction_text_no_repeated_type(bss_world):
+    sub = bss_world.subscriber()
+    row = _txn(bss_world, sub)
+    out = asyncio.run(transactions.run_lookup_transactions(_ud(sub)))
+    assert f"{row.ref}: recharge of 100 taka" in out and "recharge recharge" not in out
+
+
 def test_registry_lists_read_tools():
     names = [t.info.name for t in registry.telco_tools()]
     assert len(names) == 16

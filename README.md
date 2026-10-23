@@ -5,9 +5,6 @@ persona sharing the same backend/tools across channels:
 
 1. **Inbound**: a customer talks/chats with the agent via the web frontend to check their
    account, buy packages, recharge, redeem rewards and raise support cases.
-2. **Outbound**: a scheduler dispatches the agent to call a subscriber at a scheduled time —
-   either ringing the dashboard's browser, or ringing a real phone through Twilio when the
-   call has a dial number (see "Real phone calls" below).
 
 All subscriber/BSS data is dummy data. Nothing is sent to real subscribers.
 

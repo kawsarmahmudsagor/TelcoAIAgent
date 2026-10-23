@@ -203,7 +203,7 @@ def test_code_throttle(bss_world):
             await package_tools.run_purchase_package(ud, pkg.code)
         with pytest.raises(ToolError) as e:
             await package_tools.run_purchase_package(ud, pkg.code)
-        assert str(e.value) == ERROR_TEXT["limit_exceeded"]
+        assert str(e.value) == ERROR_TEXT["too_many_codes"]
         # Outside the window the codes no longer count.
         later = utc_now() + otp.CODE_WINDOW + timedelta(seconds=1)
         await actions.start_action(ud, "purchase", _purchase(pkg), now=later)
@@ -321,3 +321,11 @@ def test_done_action_not_replayed_after_a_new_action(bss_world):
             await actions.confirm_action(ud, a_code)
 
     asyncio.run(go())
+
+
+def test_throttle_text_differs_from_limit_text():
+    assert ERROR_TEXT["too_many_codes"] != ERROR_TEXT["limit_exceeded"]
+    assert "codes" not in ERROR_TEXT["limit_exceeded"].lower()
+    assert "Too many codes were requested. Please wait a few minutes and try again." in (
+        ERROR_TEXT["too_many_codes"]
+    )

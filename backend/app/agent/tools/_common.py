@@ -32,13 +32,12 @@ ERROR_TEXT: dict[str, str] = {
         "That package does not exist. Offer to search the available packages with search_packages."
     ),
     "limit_exceeded": (
-        "A limit was reached. A recharge must be between 20 and 1000 taka, and at most 5000 taka "
-        "can be recharged per day. This also applies when too many codes were requested. "
-        "Tell them what applies and ask them to try again later."
+        "A recharge limit was reached. A recharge must be between 20 and 1000 taka, and at most "
+        "5000 taka can be recharged per day. Tell them what applies and ask them to try again later."
     ),
     "too_many_codes": (
-        "Too many verification codes were requested recently. Ask them to wait a few minutes "
-        "before trying again."
+        "Too many codes were requested. Please wait a few minutes and try again. "
+        "Tell the customer this and ask them to wait a few minutes before trying again."
     ),
     "invalid_msisdn": "That is not a valid mobile number. Ask for an 11-digit number starting with 01.",
     "otp_expired": "The code has expired and the action was cancelled. Offer to start again.",

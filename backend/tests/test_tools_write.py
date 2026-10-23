@@ -125,8 +125,9 @@ def test_support_case_needs_confirmation(bss_world):
         first = await support.run_create_support_case(ud, *args, confirmed=True)
         rows = _cases(bss_world, sub)
         assert len(rows) == 1 and rows[0].ref in first
+        # The draft is cleared after the case is created: a repeat asks again.
         again = await support.run_create_support_case(ud, *args, confirmed=True)
-        assert len(_cases(bss_world, sub)) == 1 and rows[0].ref in again
+        assert len(_cases(bss_world, sub)) == 1 and "confirmed=true" in again
         assert (ACCOUNT_CHANGED, {"kind": "case", "ref": rows[0].ref}) in _sent(ud)
 
     asyncio.run(go())
@@ -164,6 +165,35 @@ def test_human_agent_opens_high_priority_case(bss_world):
     rows = _cases(bss_world, sub)
     assert len(rows) == 1 and rows[0].priority == CasePriority.high
     assert rows[0].ref in out and "no live transfer" in out
+
+
+def test_handoff_is_idempotent_per_session(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+
+    async def go():
+        first = await support.run_request_human_agent(ud, "Customer asked for a person.")
+        again = await support.run_request_human_agent(ud, "Customer asked again.")
+        return first, again
+
+    first, again = asyncio.run(go())
+    rows = _cases(bss_world, sub)
+    assert len(rows) == 1 and rows[0].ref in first and rows[0].ref in again
+    assert ud.handoff_action_id is not None
+
+
+def test_pending_case_cleared_after_create(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    args = ("slow_data", "Data is slow in Dhanmondi since morning.")
+
+    async def go():
+        await support.run_create_support_case(ud, *args)
+        assert ud.pending_case is not None
+        await support.run_create_support_case(ud, *args, confirmed=True)
+
+    asyncio.run(go())
+    assert ud.pending_case is None and len(_cases(bss_world, sub)) == 1
 
 
 def test_human_agent_publishes_case_created(bss_world):

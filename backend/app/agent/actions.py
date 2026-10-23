@@ -28,12 +28,12 @@ from app.agent.userdata import SessionUserdata
 from app.bss import accounts, otp, packages, recharge, rewards
 from app.bss.clock import utc_now
 from app.bss.errors import (
-    LimitExceeded,
     NoPendingAction,
     OtpAttemptsExceeded,
     OtpExpired,
     OtpInvalid,
     SubscriberNotFound,
+    TooManyCodes,
 )
 from app.bss.types import PurchaseRequest, RechargeRequest
 from app.models.telco import Actor, CasePriority, PlanType, TxnChannel
@@ -154,7 +154,7 @@ async def _start(userdata: SessionUserdata, kind: ActionKind, request, now: date
     async with userdata.action_lock:
         recent = [t for t in userdata.otp_issued_at if now - t < otp.CODE_WINDOW]
         if len(recent) >= otp.MAX_CODES_PER_WINDOW:
-            raise LimitExceeded("Too many verification codes requested")
+            raise TooManyCodes()
         summary, text, card, code = await run_db(prepare)
         userdata.otp_issued_at = recent + [now]
         expires_at = (now + otp.OTP_TTL).isoformat()

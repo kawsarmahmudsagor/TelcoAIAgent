@@ -168,6 +168,38 @@ def test_rpc_and_voice_confirm_race_creates_one_transaction(bss_world):
     asyncio.run(go())
 
 
+def test_rpc_replay_does_not_speak(bss_world):
+    t = _setup(bss_world)
+
+    async def go():
+        aid = await _pending(t)
+        code = _code(t)
+        first = await _call(t, RPC_CONFIRM, {"action_id": aid, "code": code})
+        again = await _call(t, RPC_CONFIRM, {"action_id": aid, "code": code})
+        assert first == again == {"ok": True, "error": None}
+        assert len(t.session.replies) == 1 and _txns(bss_world, t) == 1
+
+    asyncio.run(go())
+
+
+def test_rpc_internal_error(bss_world, monkeypatch):
+    t = _setup(bss_world)
+
+    async def boom(*a, **k):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(actions, "confirm_action", boom)
+
+    async def go():
+        aid = await _pending(t)
+        r = await _call(t, RPC_CONFIRM, {"action_id": aid, "code": "123456"})
+        assert r == {"ok": False, "error": "internal"}
+        (said,) = t.session.replies
+        assert "apolog" in said.lower() and "db down" not in said
+
+    asyncio.run(go())
+
+
 def test_rpc_cancel(bss_world):
     t = _setup(bss_world)
 

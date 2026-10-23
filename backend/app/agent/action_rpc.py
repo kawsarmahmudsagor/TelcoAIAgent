@@ -70,7 +70,11 @@ class ActionRpc:
             return _reply(False, text)
         except Exception:
             logger.exception("confirm card RPC failed")
-            return _reply(False, "Something went wrong. Please try again.")
+            self._say(
+                "The customer used the confirm card, but something went wrong on our side. "
+                "Apologise in one short line and ask them to try again."
+            )
+            return _reply(False, "internal")
 
     def _say(self, instructions: str) -> None:
         # Not awaited: the reply plays after the RPC has answered.
@@ -79,7 +83,15 @@ class ActionRpc:
         except RuntimeError:
             logger.warning("session closed; confirm card reply dropped")
 
+    def _already_done(self, action_id: UUID) -> bool:
+        ud = self._userdata
+        done = ud.done_action
+        return done is not None and done[0] == action_id and ud.pending_action is None
+
     async def _confirm(self, action_id: UUID, payload: dict) -> str:
+        if self._already_done(action_id):
+            # A replayed confirm: the result was already spoken.
+            return _reply(True)
         text = await actions.confirm_action(
             self._userdata, str(payload.get("code") or ""), action_id=action_id
         )
