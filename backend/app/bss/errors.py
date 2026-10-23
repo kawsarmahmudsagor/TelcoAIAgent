@@ -79,3 +79,8 @@ class InvalidRequest(BssError):
 class NotificationNotFound(BssError):
     code = "notification_not_found"
     default_message = "Notification not found"
+
+
+class IncidentNotFound(BssError):
+    code = "incident_not_found"
+    default_message = "Network incident not found"

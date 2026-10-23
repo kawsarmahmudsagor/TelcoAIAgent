@@ -5,16 +5,17 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.bss import accounts, monitor, notifications
+from app.bss import accounts, monitor, network, notifications
 from app.bss.clock import local_day_bounds, local_day_start, local_tz, utc_now
 from app.bss.errors import SubscriberNotFound
 from app.bss.types import CaseView, TransactionView
 from app.models.telco import (
     Balance,
     CasePriority,
+    CaseSource,
     CaseStatus,
     IncidentKind,
     IncidentStatus,
@@ -352,3 +353,111 @@ def list_transactions(
         ],
         total,
     )
+
+
+def list_cases(
+    db: Session,
+    *,
+    status: CaseStatus | None = None,
+    priority: CasePriority | None = None,
+    limit: int = 25,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    """High priority first, then open before resolved, oldest first."""
+    base: Select = select(SupportCase, Subscriber.full_name, Subscriber.msisdn).join(
+        Subscriber, Subscriber.id == SupportCase.subscriber_id
+    )
+    if status is not None:
+        base = base.where(SupportCase.status == status)
+    if priority is not None:
+        base = base.where(SupportCase.priority == priority)
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    rows = db.execute(
+        base.order_by(
+            case((SupportCase.priority == CasePriority.high, 0), else_=1),
+            case((SupportCase.status == CaseStatus.resolved, 1), else_=0),
+            SupportCase.created_at,
+            SupportCase.id,
+        )
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return (
+        [
+            {
+                **CaseView.model_validate(c).model_dump(),
+                "subscriber_name": name,
+                "msisdn_masked": accounts.mask_msisdn(msisdn),
+            }
+            for c, name, msisdn in rows
+        ],
+        total,
+    )
+
+
+def case_stats(db: Session, *, now: datetime | None = None) -> dict[str, Any]:
+    now = now or utc_now()
+    since = now - timedelta(days=7)
+    open_cases = SupportCase.status != CaseStatus.resolved
+    n_open = db.scalar(select(func.count()).select_from(SupportCase).where(open_cases)) or 0
+    n_high = (
+        db.scalar(
+            select(func.count())
+            .select_from(SupportCase)
+            .where(open_cases, SupportCase.priority == CasePriority.high)
+        )
+        or 0
+    )
+    avg_s = db.scalar(
+        select(
+            func.avg(func.extract("epoch", SupportCase.resolved_at - SupportCase.created_at))
+        ).where(SupportCase.status == CaseStatus.resolved, SupportCase.resolved_at >= since)
+    )
+    created, by_agent = db.execute(
+        select(
+            func.count(),
+            func.count().filter(SupportCase.source == CaseSource.agent),
+        ).where(SupportCase.created_at >= since)
+    ).one()
+    return {
+        "open": n_open,
+        "high_open": n_high,
+        "avg_resolution_hours_7d": round(float(avg_s) / 3600, 1) if avg_s is not None else None,
+        "ai_assisted_share_7d": round(by_agent / created, 3) if created else 0.0,
+    }
+
+
+def network_overview(db: Session, *, now: datetime | None = None) -> dict[str, Any]:
+    now = now or utc_now()
+    cutoff = now - timedelta(days=7)
+    live = (NetworkIncident.status != IncidentStatus.resolved) & (
+        NetworkIncident.ends_at.is_(None) | (NetworkIncident.ends_at > now)
+    )
+    current = db.scalars(
+        select(NetworkIncident)
+        .where(live)
+        .order_by(NetworkIncident.starts_at, NetworkIncident.area)
+    ).all()
+    past = db.scalars(
+        select(NetworkIncident)
+        .where(~live, func.coalesce(NetworkIncident.ends_at, NetworkIncident.updated_at) >= cutoff)
+        .order_by(NetworkIncident.ends_at.desc().nulls_last(), NetworkIncident.area)
+    ).all()
+
+    health: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    for inc in current:
+        counts[inc.district] = counts.get(inc.district, 0) + 1
+        if network.is_active(inc, now) and inc.kind != IncidentKind.maintenance:
+            health[inc.district] = "degraded"
+        elif inc.kind == IncidentKind.maintenance and health.get(inc.district) != "degraded":
+            health[inc.district] = "maintenance"
+    names = {d for (d,) in db.execute(select(Subscriber.district).distinct()).all()}
+    names |= {i.district for i in (*current, *past)}
+    return {
+        "districts": [
+            {"district": d, "health": health.get(d, "normal"), "incidents": counts.get(d, 0)}
+            for d in sorted(names)
+        ],
+        "incidents": [network.admin_view(i, now) for i in (*current, *past)],
+    }

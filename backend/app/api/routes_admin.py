@@ -15,16 +15,23 @@ from app.api.bss_http import bss_http_error
 from app.api.deps import get_current_admin, get_db
 from app.api.schemas_admin import (
     AiMonitor,
+    CaseList,
+    CaseStats,
+    CaseStatusIn,
+    IncidentIn,
+    NetworkOverview,
     Overview,
     SubscriberDetail,
     SubscriberList,
     TransactionList,
     TransactionStats,
 )
-from app.bss import monitor, ops
+from app.bss import cases, monitor, network, ops
 from app.bss.clock import utc_now
 from app.bss.errors import BssError
-from app.models.telco import PlanType, SubscriberStatus, TxnStatus, TxnType
+from app.bss.network import IncidentAdminView
+from app.bss.types import CaseView
+from app.models.telco import CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
 
 router = APIRouter(
     prefix="/api/admin", tags=["admin"], dependencies=[Depends(get_current_admin)]
@@ -108,3 +115,50 @@ def ai_monitor(window: Literal["24h", "7d"] = "24h", db: Session = Depends(get_d
             "audit_trail": monitor.audit_trail(db),
         }
     )
+
+
+@router.get("/cases", response_model=CaseList)
+def case_list(
+    status: CaseStatus | None = None,
+    priority: CasePriority | None = None,
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    items, total = ops.list_cases(db, status=status, priority=priority, limit=limit, offset=offset)
+    return _json({"items": items, "total": total})
+
+
+@router.get("/cases/stats", response_model=CaseStats)
+def case_stats(db: Session = Depends(get_db)):
+    return _json(ops.case_stats(db))
+
+
+@router.patch("/cases/{ref}", response_model=CaseView)
+def set_case_status(ref: str, body: CaseStatusIn, db: Session = Depends(get_db)):
+    try:
+        return _json(cases.set_case_status(db, ref, body.status))
+    except BssError as e:
+        raise bss_http_error(e)
+
+
+@router.get("/network", response_model=NetworkOverview)
+def network_overview(db: Session = Depends(get_db)):
+    return _json(ops.network_overview(db))
+
+
+@router.post("/network/incidents", response_model=IncidentAdminView, status_code=201)
+def create_incident(body: IncidentIn, db: Session = Depends(get_db)):
+    try:
+        view = network.create_incident(db, **body.model_dump())
+    except BssError as e:
+        raise bss_http_error(e)
+    return JSONResponse(jsonable_encoder(_dump(view)), status_code=201, headers=_NO_STORE)
+
+
+@router.post("/network/incidents/{incident_id}/resolve", response_model=IncidentAdminView)
+def resolve_incident(incident_id: uuid.UUID, db: Session = Depends(get_db)):
+    try:
+        return _json(network.resolve_incident(db, incident_id))
+    except BssError as e:
+        raise bss_http_error(e)

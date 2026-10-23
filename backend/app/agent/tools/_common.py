@@ -54,6 +54,9 @@ ERROR_TEXT: dict[str, str] = {
     "case_not_found": (
         "That support case was not found. Ask them to check the case number or describe the problem."
     ),
+    "incident_not_found": (
+        "That network incident was not found. It is not something the customer needs to act on."
+    ),
     "notification_not_found": (
         "That notification was not found. It is not something the customer needs to act on."
     ),

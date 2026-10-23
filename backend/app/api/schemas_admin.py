@@ -2,12 +2,20 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.bss.types import AccountSummary, CaseView, NotificationView, TransactionView
-from app.models.telco import PlanType, SubscriberStatus
+from app.bss.network import IncidentAdminView
+from app.models.telco import (
+    CaseStatus,
+    IncidentKind,
+    IncidentStatus,
+    PlanType,
+    SubscriberStatus,
+)
 
 
 class SubscriberCounts(BaseModel):
@@ -148,3 +156,45 @@ class AiMonitor(BaseModel):
     metrics: MonitorMetrics
     review_queue: list[ReviewItem]
     audit_trail: list[AuditItem]
+
+
+class AdminCase(CaseView):
+    subscriber_name: str
+    msisdn_masked: str
+
+
+class CaseList(BaseModel):
+    items: list[AdminCase]
+    total: int
+
+
+class CaseStats(BaseModel):
+    open: int
+    high_open: int
+    avg_resolution_hours_7d: float | None
+    ai_assisted_share_7d: float
+
+
+class CaseStatusIn(BaseModel):
+    status: CaseStatus
+
+
+class DistrictHealth(BaseModel):
+    district: str
+    health: Literal["normal", "degraded", "maintenance"]
+    incidents: int
+
+
+class NetworkOverview(BaseModel):
+    districts: list[DistrictHealth]
+    incidents: list[IncidentAdminView]
+
+
+class IncidentIn(BaseModel):
+    district: str = Field(min_length=1, max_length=60)
+    area: str = Field(min_length=1, max_length=120)
+    kind: IncidentKind
+    status: IncidentStatus
+    message: str = Field(min_length=1, max_length=1000)
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
