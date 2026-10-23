@@ -10,6 +10,8 @@ _STATUS_BY_CODE: dict[str, int] = {
     "case_not_found": 404,
     "incident_not_found": 404,
     "notification_not_found": 404,
+    "offer_not_found": 404,
+    "offer_in_use": 409,
     "no_pending_action": 404,
     "insufficient_balance": 409,
     "insufficient_points": 409,

@@ -89,3 +89,13 @@ class NotificationNotFound(BssError):
 class IncidentNotFound(BssError):
     code = "incident_not_found"
     default_message = "Network incident not found"
+
+
+class OfferNotFound(BssError):
+    code = "offer_not_found"
+    default_message = "Offer not found"
+
+
+class OfferInUse(BssError):
+    code = "offer_in_use"
+    default_message = "Offer has transactions and cannot be deleted"

@@ -13,6 +13,7 @@ from app.models.telco import (
     CaseStatus,
     IncidentKind,
     IncidentStatus,
+    OfferAudience,
     PlanType,
     SubscriberStatus,
 )
@@ -198,3 +199,64 @@ class IncidentIn(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
+
+
+class OfferSubscriberRef(BaseModel):
+    id: UUID
+    full_name: str
+    msisdn_masked: str
+
+
+class AdminOffer(BaseModel):
+    id: UUID
+    title: str
+    description: str | None
+    terms: str | None
+    kind: Literal["points", "cashback", "pack"]
+    package_id: UUID | None
+    package_name: str | None
+    points_cost: int | None
+    cashback_percent: Decimal | None
+    cashback_cap: Decimal | None
+    min_recharge: Decimal | None
+    audience: OfferAudience
+    subscriber_ids: list[UUID]
+    subscribers: list[OfferSubscriberRef]
+    starts_on: date | None
+    ends_on: date | None
+    is_active: bool
+    redemptions: int
+
+
+class OfferIn(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    terms: str | None = None
+    package_id: UUID | None = None
+    points_cost: int | None = None
+    cashback_percent: Decimal | None = None
+    cashback_cap: Decimal | None = None
+    min_recharge: Decimal | None = None
+    audience: OfferAudience = OfferAudience.all
+    subscriber_ids: list[UUID] = []
+    starts_on: date | None = None
+    ends_on: date | None = None
+    is_active: bool = True
+
+
+class OfferPatch(BaseModel):
+    """Partial update; only the fields sent are changed, then the offer is re-validated."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = None
+    terms: str | None = None
+    package_id: UUID | None = None
+    points_cost: int | None = None
+    cashback_percent: Decimal | None = None
+    cashback_cap: Decimal | None = None
+    min_recharge: Decimal | None = None
+    audience: OfferAudience | None = None
+    subscriber_ids: list[UUID] | None = None
+    starts_on: date | None = None
+    ends_on: date | None = None
+    is_active: bool | None = None

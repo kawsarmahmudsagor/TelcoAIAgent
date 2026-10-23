@@ -25,7 +25,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampedBase
 
@@ -119,6 +119,7 @@ class OfferAudience(str, enum.Enum):
     all = "all"
     prepaid = "prepaid"
     postpaid = "postpaid"
+    specific = "specific"
 
 
 class Actor(str, enum.Enum):
@@ -351,6 +352,19 @@ class AuditEvent(TimestampedBase):
     detail: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
+class OfferSubscriber(Base):
+    """Audience list for offers with audience=specific."""
+
+    __tablename__ = "offer_subscribers"
+
+    offer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("offers.id", ondelete="CASCADE"), primary_key=True
+    )
+    subscriber_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("subscribers.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
 class Offer(TimestampedBase):
     """A promotion: a discounted pack, a points redemption or recharge cashback."""
 
@@ -374,3 +388,6 @@ class Offer(TimestampedBase):
     starts_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    subscribers: Mapped[list[Subscriber]] = relationship(
+        secondary="offer_subscribers", order_by="Subscriber.full_name"
+    )

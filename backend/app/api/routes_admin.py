@@ -5,7 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -19,18 +19,21 @@ from app.api.schemas_admin import (
     CaseStats,
     CaseStatusIn,
     IncidentIn,
+    AdminOffer,
     NetworkOverview,
+    OfferIn,
+    OfferPatch,
     Overview,
     SubscriberDetail,
     SubscriberList,
     TransactionList,
     TransactionStats,
 )
-from app.bss import audit, cases, monitor, network, notifications, ops
+from app.bss import audit, cases, monitor, network, notifications, offers, ops, packages
 from app.bss.clock import utc_now
 from app.bss.errors import BssError
 from app.bss.network import IncidentAdminView
-from app.bss.types import CaseView
+from app.bss.types import CaseView, PackageView
 from app.models.telco import Actor, CasePriority, CaseStatus, PlanType, SubscriberStatus, TxnStatus, TxnType
 
 router = APIRouter(
@@ -50,10 +53,10 @@ def _dump(x: Any) -> Any:
     return x
 
 
-def _json(payload: Any) -> JSONResponse:
+def _json(payload: Any, status_code: int = 200) -> JSONResponse:
     """JSON with Decimals as numbers (pydantic's JSON mode makes them strings)."""
     body = jsonable_encoder(_dump(payload), custom_encoder={Decimal: float})
-    return JSONResponse(body, headers=_NO_STORE)
+    return JSONResponse(body, status_code=status_code, headers=_NO_STORE)
 
 
 @router.get("/overview", response_model=Overview)
@@ -153,7 +156,7 @@ def create_incident(body: IncidentIn, db: Session = Depends(get_db)):
         view = network.create_incident(db, **body.model_dump())
     except BssError as e:
         raise bss_http_error(e)
-    return JSONResponse(jsonable_encoder(_dump(view)), status_code=201, headers=_NO_STORE)
+    return _json(view, 201)
 
 
 @router.post("/network/incidents/{incident_id}/resolve", response_model=IncidentAdminView)
@@ -172,3 +175,43 @@ def run_nudges(db: Session = Depends(get_db)):
     )
     db.commit()
     return _json({"created": created})
+
+
+@router.get("/packages", response_model=list[PackageView])
+def active_packages(db: Session = Depends(get_db)):
+    return _json(packages.search(db))
+
+
+@router.get("/offers", response_model=list[AdminOffer])
+def offer_list(db: Session = Depends(get_db)):
+    return _json(offers.list_offers(db))
+
+
+@router.post("/offers", response_model=AdminOffer, status_code=201)
+def offer_create(body: OfferIn, db: Session = Depends(get_db)):
+    fields = body.model_dump(exclude={"subscriber_ids"})
+    try:
+        return _json(offers.create_offer(db, fields, body.subscriber_ids), 201)
+    except BssError as e:
+        db.rollback()
+        raise bss_http_error(e)
+
+
+@router.patch("/offers/{offer_id}", response_model=AdminOffer)
+def offer_update(offer_id: uuid.UUID, body: OfferPatch, db: Session = Depends(get_db)):
+    changes = body.model_dump(exclude_unset=True, exclude={"subscriber_ids"})
+    try:
+        return _json(offers.update_offer(db, offer_id, changes, body.subscriber_ids))
+    except BssError as e:
+        db.rollback()
+        raise bss_http_error(e)
+
+
+@router.delete("/offers/{offer_id}", status_code=204)
+def offer_delete(offer_id: uuid.UUID, db: Session = Depends(get_db)):
+    try:
+        offers.delete_offer(db, offer_id)
+    except BssError as e:
+        db.rollback()
+        raise bss_http_error(e)
+    return Response(status_code=204, headers=_NO_STORE)

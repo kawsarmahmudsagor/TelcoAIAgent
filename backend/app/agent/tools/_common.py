@@ -64,6 +64,12 @@ ERROR_TEXT: dict[str, str] = {
     "notification_not_found": (
         "That notification was not found. It is not something the customer needs to act on."
     ),
+    "offer_not_found": (
+        "That offer was not found. It is not something the customer needs to act on."
+    ),
+    "offer_in_use": (
+        "That offer has already been used. It is not something the customer needs to act on."
+    ),
     "subscriber_not_found": NOT_LOGGED_IN,
     "invalid_request": "That request could not be processed. Ask the customer to rephrase what they want.",
 }
