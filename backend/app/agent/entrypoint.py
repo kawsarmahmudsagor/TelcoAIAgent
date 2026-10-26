@@ -26,6 +26,7 @@ from app.agent import (
     run_log,
     sentence_tokenizer,
     session_context,
+    snapshot_refresh,
     usage_log,
 )
 from app.agent.persona import build_system_prompt
@@ -747,5 +748,14 @@ async def entrypoint(ctx: JobContext) -> None:
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent):
         # A filler is said outside the chat context, so the recorder never sees it.
         agent.gate.on_filler_store = recorder.record_assistant_after
+    if userdata.subscriber_id is not None:
+        refresher = snapshot_refresh.SnapshotRefresher(
+            session=session,
+            agent=agent,
+            userdata=userdata,
+            interval_s=settings.snapshot_refresh_s,
+        )
+        refresher.attach()
+        refresher.start()
     idle = _idle_checkin(ctx, settings, session)
     _greet(session, agent, userdata, config, room=ctx.room, on_done=idle.start if idle else None)

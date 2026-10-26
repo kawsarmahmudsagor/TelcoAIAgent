@@ -168,6 +168,10 @@ class Settings(BaseSettings):
     # anything else, and ends the call if they say no or stay quiet for
     # idle_end_s more (see app.agent.idle_checkin). 0 turns it off.
     idle_checkin_s: float = Field(300.0, ge=0.0)
+    # Seconds between background re-reads of the prompt's account snapshot
+    # while the agent is listening (app.agent.snapshot_refresh); 0 = only on
+    # turn boundaries.
+    snapshot_refresh_s: float = Field(15.0, ge=0.0)
     idle_end_s: float = Field(30.0, gt=0.0)
 
     # Real phone calls (Twilio Elastic SIP Trunk -> self-hosted livekit-sip). A

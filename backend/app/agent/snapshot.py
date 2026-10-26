@@ -1,6 +1,8 @@
-"""The per-session context loaded once when a conversation starts: the account
+"""The per-session context loaded when a conversation starts: the account
 snapshot placed in the system prompt, the customer's first name for the
 greeting, and the wording of the proactive nudge that opened the session.
+load_snapshot re-reads the snapshot alone during the session
+(app.agent.snapshot_refresh).
 
 English facts for the LLM, like tool output. A missing or unknown subscriber is
 a guest; a nudge counts only when it belongs to the session's subscriber.
@@ -33,8 +35,9 @@ about their own account (balance, packs, recharge, offers and reward points, tra
 cases), ask them to log in first; never ask for their number or any code to identify them."""
 
 _SNAPSHOT_HEAD = """\
-ACCOUNT SNAPSHOT — sample demo data, taken when this conversation started. Use it for quick
-answers; call a tool for details, and after any change trust the tool's figures over these."""
+ACCOUNT SNAPSHOT — sample demo data, refreshed from the account during this conversation. Use it
+for quick answers; call a tool for details, and right after a change trust the tool's figures
+over these."""
 
 
 @dataclass(frozen=True)
@@ -57,23 +60,44 @@ def load_session_context(
     now = now or utc_now()
     db = SessionLocal()
     try:
-        try:
-            summary = accounts.get_account_summary(db, subscriber_id, now=now)
-        except SubscriberNotFound:
+        read = _read_snapshot(db, subscriber_id, now)
+        if read is None:
             return GUEST
-        try:
-            incidents = network.check_network_status(db, summary.district, now=now)
-        except Exception:
-            logger.exception("network status lookup failed; keeping the customer logged in")
-            incidents = None
+        summary, snapshot = read
         return SessionContext(
             subscriber_id=summary.subscriber_id,
             customer_name=_first_name(summary.full_name),
-            snapshot=_snapshot_text(summary, incidents),
+            snapshot=snapshot,
             nudge_text=_nudge_text(db, subscriber_id, nudge_id),
         )
     finally:
         db.close()
+
+
+def load_snapshot(subscriber_id: UUID, *, now: datetime | None = None) -> str | None:
+    """The account snapshot as the DB has it now; None for an unknown
+    subscriber. Sync (own DB session), for a worker thread."""
+    db = SessionLocal()
+    try:
+        read = _read_snapshot(db, subscriber_id, now or utc_now())
+        return read[1] if read is not None else None
+    finally:
+        db.close()
+
+
+def _read_snapshot(
+    db: Session, subscriber_id: UUID, now: datetime
+) -> tuple[AccountSummary, str] | None:
+    try:
+        summary = accounts.get_account_summary(db, subscriber_id, now=now)
+    except SubscriberNotFound:
+        return None
+    try:
+        incidents = network.check_network_status(db, summary.district, now=now)
+    except Exception:
+        logger.exception("network status lookup failed; keeping the customer logged in")
+        incidents = None
+    return summary, _snapshot_text(summary, incidents)
 
 
 def _first_name(full_name: str) -> str | None:
