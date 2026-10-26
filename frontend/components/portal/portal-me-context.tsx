@@ -5,8 +5,17 @@ import type { PortalMe } from '@/lib/types/portal';
 
 const PortalMeContext = createContext<PortalMe | null>(null);
 
-/** Hands the signed-in customer (loaded once by the portal layout) to everything inside it. */
-export function PortalMeProvider({ me, children }: { me: PortalMe; children: React.ReactNode }) {
+/**
+ * Hands the signed-in customer (loaded once by the portal layout) to everything inside it. The
+ * home page passes null for a guest, so its assistant bubble can run signed out.
+ */
+export function PortalMeProvider({
+  me,
+  children,
+}: {
+  me: PortalMe | null;
+  children: React.ReactNode;
+}) {
   return <PortalMeContext.Provider value={me}>{children}</PortalMeContext.Provider>;
 }
 

@@ -6,7 +6,8 @@ import {
   SignalIcon,
   WalletIcon,
 } from 'lucide-react';
-import { LinkButton } from '@/components/portal/ui/link-button';
+import { useChatBubble } from '@/components/chat-bubble/chat-bubble-context';
+import { Button } from '@/components/ui/button';
 
 const CAN_DO: { icon: LucideIcon; text: string }[] = [
   { icon: WalletIcon, text: 'Tell you your balance, usage and when a pack runs out' },
@@ -16,8 +17,9 @@ const CAN_DO: { icon: LucideIcon; text: string }[] = [
   { icon: MicIcon, text: 'Talk it through by voice, in Bangla or English' },
 ];
 
-/** What Telco AI does, in plain words, and a way in. */
+/** What Telco AI does, in plain words, and a way in: the chat bubble, signed in or not. */
 export function AssistantBand() {
+  const { open } = useChatBubble();
   return (
     <section
       id="assistant"
@@ -35,9 +37,9 @@ export function AssistantBand() {
           It knows your account, so you don’t repeat yourself. Anything that spends money waits for
           a code sent to your phone.
         </p>
-        <LinkButton href="/portal/assistant" className="mt-6 min-h-11 px-5 text-sm">
+        <Button onClick={open} className="mt-6 min-h-11 px-5 text-sm">
           Ask Telco AI
-        </LinkButton>
+        </Button>
       </div>
       <ul className="flex flex-col gap-4 self-center">
         {CAN_DO.map(({ icon: Icon, text }) => (

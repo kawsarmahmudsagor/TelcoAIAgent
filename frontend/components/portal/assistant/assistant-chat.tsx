@@ -21,8 +21,12 @@ import { useAssistant } from '@/components/portal/assistant/assistant-provider';
 import { CaseCard } from '@/components/portal/assistant/cards/case-card';
 import { ConfirmCard } from '@/components/portal/assistant/cards/confirm-card';
 import { PackageCards, buyMessage } from '@/components/portal/assistant/cards/package-cards';
-import { QuestionChips } from '@/components/portal/assistant/suggested-questions';
-import { usePortalMe } from '@/components/portal/portal-me-context';
+import {
+  GUEST_QUESTIONS,
+  POPULAR_QUESTIONS,
+  QuestionChips,
+} from '@/components/portal/assistant/suggested-questions';
+import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
 import { cn } from '@/lib/shadcn/utils';
 import { placeAfterTurn } from '@/lib/telco-topics';
 
@@ -207,7 +211,8 @@ function QueuedRow({ text }: { text: string }) {
 }
 
 function EmptyState({ compact }: { compact: boolean }) {
-  const me = usePortalMe();
+  // Null for a guest on the home page.
+  const me = useOptionalPortalMe();
   const { connecting, isConnected, sendText, toggleMic } = useAssistant();
 
   if (connecting || isConnected) {
@@ -226,14 +231,26 @@ function EmptyState({ compact }: { compact: boolean }) {
       <div className="flex max-w-[86%] items-end gap-2">
         <BotAvatar size="sm" />
         <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
-          <p>
-            Hi {me.first_name}! I’m your telco. assistant. I can check your balance, explain your
-            usage, find a package or sort out a recharge.
-          </p>
+          {me ? (
+            <p>
+              Hi {me.first_name}! I’m your telco. assistant. I can check your balance, explain your
+              usage, find a package or sort out a recharge.
+            </p>
+          ) : (
+            <p>
+              Hi! I’m the telco. assistant. I can help you find a package, check the network in your
+              area, or answer questions about SIMs, stores and our policies. Log in to check your
+              own balance or buy a pack.
+            </p>
+          )}
           <p lang="bn" className="mt-2">
             কীভাবে সাহায্য করতে পারি?
           </p>
-          <QuestionChips onAsk={sendText} className="mt-2.5" />
+          <QuestionChips
+            onAsk={sendText}
+            questions={me ? POPULAR_QUESTIONS : GUEST_QUESTIONS}
+            className="mt-2.5"
+          />
         </div>
       </div>
       <button

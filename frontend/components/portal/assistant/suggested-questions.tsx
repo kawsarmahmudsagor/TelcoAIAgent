@@ -18,6 +18,15 @@ export const POPULAR_QUESTIONS: SuggestedQuestion[] = [
   { text: 'আমার ব্যালেন্স কত?', lang: 'bn' },
 ];
 
+/** The same for a guest on the home page: nothing that needs their account. */
+export const GUEST_QUESTIONS: SuggestedQuestion[] = [
+  { text: 'Which monthly data packs do you have?' },
+  { text: 'How do I get a new SIM?' },
+  { text: 'Where is your nearest store?' },
+  { text: 'Is there a network problem in Dhaka?' },
+  { text: 'নতুন সিম কীভাবে নেব?', lang: 'bn' },
+];
+
 /** The reference's "Popular questions" list: full-width rows with a brand arrow. */
 export function PopularQuestionList({ onAsk }: { onAsk(text: string): void }) {
   return (
@@ -42,14 +51,16 @@ export function PopularQuestionList({ onAsk }: { onAsk(text: string): void }) {
 /** The reference's quick-reply chips, for the chat's empty state. */
 export function QuestionChips({
   onAsk,
+  questions = POPULAR_QUESTIONS,
   className,
 }: {
   onAsk(text: string): void;
+  questions?: SuggestedQuestion[];
   className?: string;
 }) {
   return (
     <div className={cn('flex flex-wrap gap-[7px]', className)}>
-      {POPULAR_QUESTIONS.map((q) => (
+      {questions.map((q) => (
         <button
           key={q.text}
           type="button"

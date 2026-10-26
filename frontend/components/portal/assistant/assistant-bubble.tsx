@@ -12,6 +12,7 @@ import {
   BotAvatar,
 } from '@/components/portal/assistant/assistant-chat';
 import { useAssistant } from '@/components/portal/assistant/assistant-provider';
+import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
 import { cn } from '@/lib/shadcn/utils';
 
 const ASSISTANT_PATH = '/portal/assistant';
@@ -21,12 +22,14 @@ const INPUT_ID = 'assistant-bubble-input';
  * The floating assistant on every portal page but the full assistant page: a launcher in the
  * bottom-right corner and the chat panel it opens (a full-screen sheet on phones). It never
  * connects on its own; the session starts when the customer types, picks a question or turns
- * the mic on. "Open full view" goes to /portal/assistant, which shows the same conversation.
+ * the mic on. "Open full view" goes to /portal/assistant, which shows the same conversation;
+ * a guest on the home page doesn't get it, since that page needs a login.
  */
 export function AssistantBubble() {
   const pathname = usePathname();
   const { isOpen, open, close } = useChatBubble();
   const { isConnected, micEnabled } = useAssistant();
+  const signedIn = useOptionalPortalMe() !== null;
   const reduceMotion = useReducedMotion();
   const hidden = pathname === ASSISTANT_PATH || pathname.startsWith(`${ASSISTANT_PATH}/`);
 
@@ -69,14 +72,16 @@ export function AssistantBubble() {
               className="px-4 py-3.5"
               actions={
                 <>
-                  <Link
-                    href={ASSISTANT_PATH}
-                    aria-label="Open full view"
-                    title="Open full view"
-                    className="text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] [&_svg]:size-4"
-                  >
-                    <Maximize2Icon aria-hidden="true" />
-                  </Link>
+                  {signedIn && (
+                    <Link
+                      href={ASSISTANT_PATH}
+                      aria-label="Open full view"
+                      title="Open full view"
+                      className="text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] [&_svg]:size-4"
+                    >
+                      <Maximize2Icon aria-hidden="true" />
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={close}
