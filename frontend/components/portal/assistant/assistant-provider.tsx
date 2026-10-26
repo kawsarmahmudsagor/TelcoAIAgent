@@ -27,18 +27,35 @@ import {
   useChatBubble,
   useOptionalChatBubble,
 } from '@/components/chat-bubble/chat-bubble-context';
+import { type VoiceMode, useVoiceMode } from '@/components/customer/use-voice-mode';
 import { useAgentEndCall } from '@/hooks/useAgentEndCall';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { turnOnMicrophone, useMicOnConnect } from '@/hooks/useMicOnConnect';
 import { useGreetingDone, useVisibleMessages } from '@/lib/livekit-text-streams';
+import { getVisitorConversation, toReceivedMessages } from '@/lib/public-conversations';
 import { type ConfirmState, type TelcoCard, useTelcoTopics } from '@/lib/telco-topics';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 
 export interface AssistantContextValue {
-  /** The conversation so far (accepted voice turns, typed messages, the agent's replies). */
+  /**
+   * The conversation so far (accepted voice turns, typed messages, the agent's replies), after
+   * the stored messages of an earlier chat being carried on.
+   */
   messages: ReceivedMessage[];
+  /** The chat history list is showing in place of the transcript. */
+  historyOpen: boolean;
+  setHistoryOpen(open: boolean): void;
+  /** The earlier chat being carried on (its id), if any. */
+  resumedId: string | null;
+  /**
+   * Loads an earlier chat from the history and carries it on: a live session is ended first,
+   * and the next one reopens that conversation. Resolves false when it couldn't be loaded.
+   */
+  openConversation(id: string): Promise<boolean>;
+  /** Ends any live session and clears the panel for a new conversation. */
+  newChat(): void;
   /** Package and case cards, oldest first. */
   cards: TelcoCard[];
   /** The agent's latest confirm card. */
@@ -57,8 +74,10 @@ export interface AssistantContextValue {
    */
   sendText(text: string): void;
   micEnabled: boolean;
-  /** Mic on/off; with no session it starts a voice one. */
+  /** Mic on/off; with no session it starts a voice one. Does nothing when voiceMode is `off`. */
   toggleMic(): void;
+  /** Whether this session may use the mic (`off`: a guest, text only) and hears replies. */
+  voiceMode: VoiceMode;
   /** Ends the session. */
   end(): void;
 }
@@ -89,19 +108,36 @@ function AssistantAudio({ children }: { children: React.ReactNode }) {
 }
 
 function AssistantSession({ children }: { children: React.ReactNode }) {
-  const { startSession, autoConnecting, voiceRequested } = useChatBubble();
+  const { startSession, autoConnecting, voiceRequested, visitorId, resumed, setResumed } =
+    useChatBubble();
   const session = useSessionContext();
   const { room, isConnected, connectionState } = session;
 
   useDebugMode({ enabled: IN_DEVELOPMENT });
   useAgentErrors();
-  useMicOnConnect(voiceRequested);
+  const voiceMode = useVoiceMode();
+  useMicOnConnect(voiceRequested && voiceMode !== 'off');
   // The agent ends the session after its goodbye.
   useAgentEndCall(() => void session.end());
 
   const { state: agentState } = useVoiceAssistant();
   const { messages: sessionMessages } = useSessionMessages(session);
-  const messages = useVisibleMessages(sessionMessages);
+  const liveMessages = useVisibleMessages(sessionMessages);
+  // Live messages from before the panel switched conversation (history pick, new chat): the
+  // ended session's transcript can linger in the room's state, and isn't this conversation's.
+  const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const liveMessagesRef = useRef(liveMessages);
+  liveMessagesRef.current = liveMessages;
+  const hideCurrentLive = useCallback(
+    () => setHiddenIds(new Set(liveMessagesRef.current.map((m) => m.id))),
+    []
+  );
+  const messages = useMemo(() => {
+    const live =
+      hiddenIds.size > 0 ? liveMessages.filter((m) => !hiddenIds.has(m.id)) : liveMessages;
+    return resumed ? [...resumed.messages, ...live] : live;
+  }, [resumed, liveMessages, hiddenIds]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { cards, confirm } = useTelcoTopics(room, agentState);
   const greetingDone = useGreetingDone();
   const ready = isConnected && greetingDone;
@@ -163,6 +199,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
   );
 
   const toggleMic = useCallback(() => {
+    if (voiceMode === 'off') return;
     if (connectionState === ConnectionState.Disconnected) {
       if (!autoConnecting) void startSession({ voice: true, openPanel: false });
       return;
@@ -173,13 +210,83 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     } else {
       void turnOnMicrophone(room);
     }
-  }, [connectionState, autoConnecting, startSession, isConnected, isMicrophoneEnabled, room]);
+  }, [
+    voiceMode,
+    connectionState,
+    autoConnecting,
+    startSession,
+    isConnected,
+    isMicrophoneEnabled,
+    room,
+  ]);
 
   const end = useCallback(() => void session.end(), [session]);
+
+  const endLive = useCallback(async () => {
+    if (session.connectionState === ConnectionState.Disconnected) return;
+    try {
+      await session.end();
+    } catch (error) {
+      console.warn('Could not end the assistant session:', error);
+    }
+  }, [session]);
+
+  const openConversation = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (!visitorId) return false;
+      let detail;
+      try {
+        detail = await getVisitorConversation(visitorId, id);
+      } catch (error) {
+        console.error('Failed to load the conversation:', error);
+        toast.error('Couldn’t open that chat', { description: 'Please try again.' });
+        return false;
+      }
+      await endLive();
+      setQueued([]);
+      hideCurrentLive();
+      setResumed({ id, messages: toReceivedMessages(detail) });
+      setHistoryOpen(false);
+      return true;
+    },
+    [visitorId, endLive, hideCurrentLive, setResumed]
+  );
+
+  const newChat = useCallback(() => {
+    void endLive().then(() => {
+      setQueued([]);
+      hideCurrentLive();
+      setResumed(null);
+      setHistoryOpen(false);
+    });
+  }, [endLive, hideCurrentLive, setResumed]);
+
+  // A carried-on chat whose session ends: the room drops the live transcript, so what was said
+  // joins the stored messages (the next session reopens the same conversation).
+  const resumedId = resumed?.id ?? null;
+  useEffect(() => {
+    if (!resumedId) return;
+    const keep = () => {
+      const said = liveMessagesRef.current;
+      if (said.length === 0) return;
+      setResumed((prev) =>
+        prev?.id === resumedId ? { id: prev.id, messages: [...prev.messages, ...said] } : prev
+      );
+    };
+    room.on(RoomEvent.Disconnected, keep);
+    return () => {
+      room.off(RoomEvent.Disconnected, keep);
+    };
+  }, [room, resumedId, setResumed]);
 
   const value = useMemo<AssistantContextValue>(
     () => ({
       messages,
+      historyOpen,
+      setHistoryOpen,
+      resumedId,
+      openConversation,
+      newChat,
       cards,
       confirm,
       agentState,
@@ -191,10 +298,15 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       sendText,
       micEnabled: isConnected && isMicrophoneEnabled,
       toggleMic,
+      voiceMode,
       end,
     }),
     [
       messages,
+      historyOpen,
+      resumedId,
+      openConversation,
+      newChat,
       cards,
       confirm,
       agentState,
@@ -206,6 +318,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       sendText,
       isMicrophoneEnabled,
       toggleMic,
+      voiceMode,
       end,
     ]
   );

@@ -4,6 +4,7 @@ import { type ReactNode, useMemo, useState } from 'react';
 import {
   ArrowUpIcon,
   AsteriskIcon,
+  HistoryIcon,
   Loader2Icon,
   MicIcon,
   MicOffIcon,
@@ -21,6 +22,7 @@ import { useAssistant } from '@/components/portal/assistant/assistant-provider';
 import { CaseCard } from '@/components/portal/assistant/cards/case-card';
 import { ConfirmCard } from '@/components/portal/assistant/cards/confirm-card';
 import { PackageCards, buyMessage } from '@/components/portal/assistant/cards/package-cards';
+import { ConversationHistory } from '@/components/portal/assistant/conversation-history';
 import {
   GUEST_QUESTIONS,
   POPULAR_QUESTIONS,
@@ -51,8 +53,9 @@ export function BotAvatar({ size = 'md', className }: { size?: 'sm' | 'md'; clas
 }
 
 /**
- * The chat panel's header: the assistant's name, its live status, and the session controls
- * (speaker, end) while connected. `actions` go on the right (e.g. the bubble's buttons).
+ * The chat panel's header: the assistant's name, its live status, the chat history toggle, and
+ * the session controls (speaker, end) while connected. `actions` go on the right (e.g. the
+ * bubble's buttons).
  */
 export function AssistantChatHeader({
   titleAs: Title = 'h2',
@@ -63,7 +66,8 @@ export function AssistantChatHeader({
   actions?: ReactNode;
   className?: string;
 }) {
-  const { isConnected, connecting, micEnabled, agentState, end } = useAssistant();
+  const { isConnected, connecting, micEnabled, agentState, end, historyOpen, setHistoryOpen } =
+    useAssistant();
   const { muted, toggleMuted } = useCallAudio();
 
   let status = 'Usually replies instantly';
@@ -86,6 +90,13 @@ export function AssistantChatHeader({
         </p>
       </div>
       <StartAudioButton label="Allow audio" size="sm" />
+      <HeaderButton
+        label={historyOpen ? 'Back to the chat' : 'Chat history'}
+        onClick={() => setHistoryOpen(!historyOpen)}
+        pressed={historyOpen}
+      >
+        <HistoryIcon aria-hidden="true" />
+      </HeaderButton>
       {isConnected && (
         <>
           <HeaderButton
@@ -213,7 +224,7 @@ function QueuedRow({ text }: { text: string }) {
 function EmptyState({ compact }: { compact: boolean }) {
   // Null for a guest on the home page.
   const me = useOptionalPortalMe();
-  const { connecting, isConnected, sendText, toggleMic } = useAssistant();
+  const { connecting, isConnected, sendText, toggleMic, voiceMode } = useAssistant();
 
   if (connecting || isConnected) {
     return (
@@ -253,22 +264,24 @@ function EmptyState({ compact }: { compact: boolean }) {
           />
         </div>
       </div>
-      <button
-        type="button"
-        onClick={toggleMic}
-        className="border-line bg-surface text-foreground hover:border-mint focus-visible:ring-ring/60 mx-auto inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-xs font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
-      >
-        <span className="bg-tint-green text-mint grid size-6 place-items-center rounded-full">
-          <MicIcon className="size-3.5" aria-hidden="true" />
-        </span>
-        Talk instead of typing
-      </button>
+      {voiceMode !== 'off' && (
+        <button
+          type="button"
+          onClick={toggleMic}
+          className="border-line bg-surface text-foreground hover:border-mint focus-visible:ring-ring/60 mx-auto inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-xs font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
+        >
+          <span className="bg-tint-green text-mint grid size-6 place-items-center rounded-full">
+            <MicIcon className="size-3.5" aria-hidden="true" />
+          </span>
+          Talk instead of typing
+        </button>
+      )}
     </div>
   );
 }
 
 function Composer({ initialText, inputId }: { initialText?: string; inputId: string }) {
-  const { sendText, toggleMic, micEnabled, isConnected, connecting } = useAssistant();
+  const { sendText, toggleMic, micEnabled, isConnected, connecting, voiceMode } = useAssistant();
   const [text, setText] = useState(initialText ?? '');
 
   const micLabel = !isConnected
@@ -287,33 +300,35 @@ function Composer({ initialText, inputId }: { initialText?: string; inputId: str
       }}
       className="bg-surface phone:p-3 flex gap-2 p-3.5"
     >
-      <button
-        type="button"
-        onClick={toggleMic}
-        disabled={connecting}
-        aria-label={micLabel}
-        title={micLabel}
-        aria-pressed={isConnected ? micEnabled : undefined}
-        className={cn(
-          'focus-visible:ring-ring/60 relative grid w-[43px] shrink-0 place-items-center rounded-[10px] border outline-none focus-visible:ring-[3px] disabled:opacity-55 motion-safe:transition-colors [&_svg]:size-[18px]',
-          micEnabled
-            ? 'bg-mint border-mint text-white'
-            : 'border-line bg-surface2 text-muted-foreground hover:text-foreground'
-        )}
-      >
-        {micEnabled && (
-          <span
-            aria-hidden="true"
-            className="border-mint absolute inset-0 rounded-[10px] border-2 motion-safe:animate-ping motion-reduce:hidden"
-            style={{ animationDuration: '1.8s' }}
-          />
-        )}
-        {micEnabled || !isConnected ? (
-          <MicIcon aria-hidden="true" />
-        ) : (
-          <MicOffIcon aria-hidden="true" />
-        )}
-      </button>
+      {voiceMode !== 'off' && (
+        <button
+          type="button"
+          onClick={toggleMic}
+          disabled={connecting}
+          aria-label={micLabel}
+          title={micLabel}
+          aria-pressed={isConnected ? micEnabled : undefined}
+          className={cn(
+            'focus-visible:ring-ring/60 relative grid w-[43px] shrink-0 place-items-center rounded-[10px] border outline-none focus-visible:ring-[3px] disabled:opacity-55 motion-safe:transition-colors [&_svg]:size-[18px]',
+            micEnabled
+              ? 'bg-mint border-mint text-white'
+              : 'border-line bg-surface2 text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {micEnabled && (
+            <span
+              aria-hidden="true"
+              className="border-mint absolute inset-0 rounded-[10px] border-2 motion-safe:animate-ping motion-reduce:hidden"
+              style={{ animationDuration: '1.8s' }}
+            />
+          )}
+          {micEnabled || !isConnected ? (
+            <MicIcon aria-hidden="true" />
+          ) : (
+            <MicOffIcon aria-hidden="true" />
+          )}
+        </button>
+      )}
       <label htmlFor={inputId} className="sr-only">
         Message the assistant
       </label>
@@ -355,7 +370,7 @@ export function AssistantConversation({
   compact?: boolean;
   inputId: string;
 }) {
-  const { messages, cards, confirm, agentState, queued, sendText } = useAssistant();
+  const { messages, cards, confirm, agentState, queued, sendText, historyOpen } = useAssistant();
 
   const placed = useMemo<Placed[]>(() => {
     const items: Placed[] = cards.map((card) => ({
@@ -402,7 +417,9 @@ export function AssistantConversation({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="bg-chat-canvas min-h-0 flex-1">
-        {empty ? (
+        {historyOpen ? (
+          <ConversationHistory compact={compact} />
+        ) : empty ? (
           <EmptyState compact={compact} />
         ) : (
           <AgentChatTranscript
