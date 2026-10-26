@@ -45,6 +45,9 @@ export interface AgentConfig {
   /** In stt_tts_provider's id format; unused with deepgram. */
   elevenlabs_tts_model: string;
 
+  /** Logged-in customers hear the agent's replies; off, they read them (and can still speak).
+   * Guests always chat in text. */
+  voice_replies_enabled: boolean;
   /** Quick replies on gated voice calls: a small model answers turns that need no lookup
    * (quick_fast_answer) and speaks a short line while a lookup runs (quick_filler). */
   quick_reply_enabled: boolean;
@@ -101,6 +104,8 @@ export interface AgentConfigUpdate {
   /** Reset to the default when stt_tts_provider changes, unless sent with it. */
   elevenlabs_tts_model?: string | null;
 
+  /** Null is ignored. */
+  voice_replies_enabled?: boolean | null;
   /** Null is ignored for the three switches. */
   quick_reply_enabled?: boolean | null;
   quick_fast_answer?: boolean | null;

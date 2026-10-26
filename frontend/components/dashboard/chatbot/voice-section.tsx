@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2Icon, PlayIcon, SquareIcon } from 'lucide-react';
 import { FormField } from '@/components/dashboard/form-field';
 import { SectionCard } from '@/components/dashboard/section-card';
+import { SwitchRow } from '@/components/dashboard/switch-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -63,6 +64,13 @@ export function VoiceSection({
       title="Voice"
       description="Speech recognition and the voice the agent speaks with on calls. Applies from the next call; no restart needed."
     >
+      <SwitchRow
+        label="Voice responses"
+        description="Off: logged-in customers can still speak; the assistant replies in text. Guests always chat in text. Applies to new chats."
+        checked={draft.voice_replies_enabled}
+        onCheckedChange={(value) => set('voice_replies_enabled', value)}
+        className="mb-2 border-b pt-0 pb-3"
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField
           id="stt_tts_provider"

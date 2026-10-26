@@ -34,6 +34,7 @@ export interface ConfigDraft {
   deepgram_tts_model: string;
   elevenlabs_voice_id: string;
   elevenlabs_tts_model: string;
+  voice_replies_enabled: boolean;
 
   quick_reply_enabled: boolean;
   quick_fast_answer: boolean;
@@ -70,6 +71,7 @@ export const FIELD_TAB: Record<DraftKey, ChatbotTab> = {
   deepgram_tts_model: 'model',
   elevenlabs_voice_id: 'model',
   elevenlabs_tts_model: 'model',
+  voice_replies_enabled: 'model',
   quick_reply_enabled: 'model',
   quick_fast_answer: 'model',
   quick_filler: 'model',
@@ -104,6 +106,7 @@ export function draftFrom(config: AgentConfig): ConfigDraft {
     deepgram_tts_model: config.deepgram_tts_model,
     elevenlabs_voice_id: config.elevenlabs_voice_id,
     elevenlabs_tts_model: config.elevenlabs_tts_model,
+    voice_replies_enabled: config.voice_replies_enabled,
     quick_reply_enabled: config.quick_reply_enabled,
     quick_fast_answer: config.quick_fast_answer,
     quick_filler: config.quick_filler,
