@@ -74,7 +74,7 @@ class _StubSession:
 
 
 def _build(monkeypatch, *, gate_key: str, room):
-    monkeypatch.setattr(entrypoint.silero.VAD, "load", staticmethod(lambda: None))
+    monkeypatch.setattr(entrypoint.silero.VAD, "load", staticmethod(lambda **_: None))
     monkeypatch.setattr(entrypoint, "_build_stt_and_tts", lambda *a: (None, None))
     monkeypatch.setattr(entrypoint, "_build_llm", lambda *a: None)
     monkeypatch.setattr(entrypoint, "AgentSession", _StubSession)

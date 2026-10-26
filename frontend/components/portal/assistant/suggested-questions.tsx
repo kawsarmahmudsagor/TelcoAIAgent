@@ -11,20 +11,20 @@ export interface SuggestedQuestion {
 
 /** The questions the assistant page and the bubble offer; each sends its text as is. */
 export const POPULAR_QUESTIONS: SuggestedQuestion[] = [
-  { text: 'How much data do I have left?' },
-  { text: 'Which package is best for me?' },
-  { text: 'Why was my balance deducted?' },
-  { text: 'Create a support case' },
   { text: 'আমার ব্যালেন্স কত?', lang: 'bn' },
+  { text: 'আমার কত ডাটা বাকি আছে?', lang: 'bn' },
+  { text: 'আমার জন্য কোন প্যাকটা ভালো হবে?', lang: 'bn' },
+  { text: 'ব্যালেন্স থেকে টাকা কাটল কেন?', lang: 'bn' },
+  { text: 'একটা কমপ্লেইন করতে চাই', lang: 'bn' },
 ];
 
 /** The same for a guest on the home page: nothing that needs their account. */
 export const GUEST_QUESTIONS: SuggestedQuestion[] = [
-  { text: 'Which monthly data packs do you have?' },
-  { text: 'How do I get a new SIM?' },
-  { text: 'Where is your nearest store?' },
-  { text: 'Is there a network problem in Dhaka?' },
-  { text: 'নতুন সিম কীভাবে নেব?', lang: 'bn' },
+  { text: 'মান্থলি ডাটা প্যাক কী কী আছে?', lang: 'bn' },
+  { text: '৩০০ টাকার মধ্যে কোনো ইন্টারনেট প্যাক আছে?', lang: 'bn' },
+  { text: 'নতুন সিম কীভাবে নেবো?', lang: 'bn' },
+  { text: 'কাছের কেয়ার সেন্টার কোথায়?', lang: 'bn' },
+  { text: 'ঢাকায় কি নেটওয়ার্কে কোনো সমস্যা হচ্ছে?', lang: 'bn' },
 ];
 
 /** The reference's "Popular questions" list: full-width rows with a brand arrow. */

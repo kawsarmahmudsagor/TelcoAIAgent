@@ -83,7 +83,8 @@ def build_search_knowledge_base(config: ResolvedAgentConfig):
     async def search_knowledge_base(ctx: RunContext[SessionUserdata], query: str) -> str:
         """Look up the operator's policies and FAQs in its knowledge base: terms,
         charges, data rollover, SIM replacement, roaming, coverage, contact
-        channels and hotline, stores and care centres, buying a new SIM or eSIM,
+        channels and hotline, stores and care centres (also asked as customer care,
+        service centre, office, branch, shop; কাস্টমার কেয়ার, অফিস), buying a new SIM or eSIM,
         moving a number from another operator (MNP), SIM ownership and inactive
         numbers, and privacy. Use it
         before answering any such question, not for the customer's own account.

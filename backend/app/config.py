@@ -50,14 +50,24 @@ class Settings(BaseSettings):
     elevenlabs_tts_voice_id: str = ""
     # eleven_v4_turbo or eleven_v3: both speak Bengali; v4 Turbo is the faster one.
     elevenlabs_tts_model: str = "eleven_v4_turbo"
-    elevenlabs_stt_model: str = "scribe_v2_realtime"
-    # Seconds of silence after which ElevenLabs commits (finalizes) a realtime
-    # transcript. Lower replies faster; too low answers callers who pause mid-sentence.
+    # scribe_v2 transcribes each turn whole once the caller stops: it detects Bangla
+    # reliably. scribe_v2_realtime streams and replies sooner, but guesses the
+    # language from the first moments of speech (Bangla written as Turkish).
+    elevenlabs_stt_model: str = "scribe_v2"
+    # scribe_v2_realtime only: seconds of silence after which ElevenLabs commits
+    # (finalizes) a transcript. Lower replies faster; too low answers callers who
+    # pause mid-sentence.
     elevenlabs_stt_silence_secs: float = Field(0.8, ge=0.3, le=3.0)
-    # Batch STT only (OpenRouter's per-turn transcription): seconds after the caller
+    # Batch STT only (OpenRouter's, or ElevenLabs' scribe_v2): seconds after the caller
     # goes quiet before the turn may close, so a mid-sentence pause doesn't split
     # the turn. See entrypoint._endpoint_min_delay.
     batch_stt_endpoint_min_delay_s: float = Field(2.0, ge=0.3, le=3.0)
+    # Silero VAD sensitivity: higher activation_threshold requires clearer vocal energy
+    # (default 0.50; 0.76 rejects background room noise/whispers).
+    # min_speech_duration: minimum duration of continuous speech required before triggering
+    # (default 0.05s / 50ms; 0.25s ignores coughs, keyboard taps, paper rustling).
+    vad_activation_threshold: float = Field(0.76, ge=0.1, le=1.0)
+    vad_min_speech_duration: float = Field(0.25, ge=0.02, le=2.0)
     default_language: str = "bn"
 
     # Deepgram
@@ -112,6 +122,14 @@ class Settings(BaseSettings):
     turn_pause_max_s: float = Field(8.0, ge=1.0, le=30.0)
     turn_min_confidence: float = Field(0.4, ge=0.0, le=1.0)
     turn_other_language_cooldown_s: float = Field(180.0, ge=0.0)
+    # Voice isolation (the customer sits nearest the mic): a turn quieter than
+    # turn_speech_floor_dbfs, or more than turn_speech_margin_db below the caller's
+    # learned level, is dropped as room chatter unless Jev rates it addressed or it
+    # answers the agent's question. Frames under that bar reach the STT as silence.
+    # Gated browser sessions only. See gated_agent.
+    turn_voice_isolation_enabled: bool = True
+    turn_speech_margin_db: float = Field(10.0, ge=4.0, le=30.0)
+    turn_speech_floor_dbfs: float = Field(-42.0, ge=-80.0, le=-20.0)
     # Turn router (app.agent.turn_router): Jev also says which lookup a finished
     # turn needs, so a search can run before the LLM instead of costing it a
     # second round trip. Gated browser sessions with an OpenRouter LLM only.

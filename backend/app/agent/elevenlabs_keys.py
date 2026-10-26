@@ -11,16 +11,20 @@ the next key the moment one fails mid-call. Two pieces live here:
   auth_error message (its receive loop swallows the exception), so the stream stays
   open on a dead key and the FallbackAdapter never switches. This subclass turns
   those messages into a stream failure.
+- BatchElevenLabsSTT: Scribe v2 on a whole turn (ELEVENLABS_STT_MODEL=scribe_v2),
+  with a cap on each request the plugin doesn't have.
 """
 
 import asyncio
+import dataclasses
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 import aiohttp
 from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, APIConnectOptions, APIError
-from livekit.agents import APIStatusError, NotGivenOr
+from livekit.agents import APIStatusError, APITimeoutError, NotGivenOr, stt
+from livekit.agents.utils import AudioBuffer
 from livekit.agents.utils import is_given
 from livekit.plugins import elevenlabs
 from livekit.plugins.elevenlabs.stt import SpeechStream
@@ -170,3 +174,42 @@ class FailFastElevenLabsSTT(elevenlabs.STT):
         )
         self._streams.add(stream)
         return stream
+
+
+# Per-attempt cap on one turn's transcription; a turn is a few seconds of audio.
+_BATCH_STT_TIMEOUT_S = 8.0
+_BATCH_STT_MAX_RETRY = 1
+
+
+class BatchElevenLabsSTT(elevenlabs.STT):
+    """The plugin's Scribe v2 (non-realtime) STT, transcribing each turn whole
+    once the session's VAD has cut it, so Scribe detects the language from all
+    of it: the realtime model can write Bangla as Turkish. Its request has no
+    timeout and may be retried 3 times, and transcription is serial, so one
+    stuck upload would stall the call; capped as openrouter_audio.OpenRouterSTT is."""
+
+    async def recognize(
+        self,
+        buffer: AudioBuffer,
+        *,
+        language: NotGivenOr[str] = NOT_GIVEN,
+        conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
+    ) -> stt.SpeechEvent:
+        if conn_options.max_retry > _BATCH_STT_MAX_RETRY:
+            conn_options = dataclasses.replace(conn_options, max_retry=_BATCH_STT_MAX_RETRY)
+        return await super().recognize(buffer, language=language, conn_options=conn_options)
+
+    async def _recognize_impl(
+        self,
+        buffer: AudioBuffer,
+        *,
+        language: NotGivenOr[str] = NOT_GIVEN,
+        conn_options: APIConnectOptions,
+    ) -> stt.SpeechEvent:
+        try:
+            return await asyncio.wait_for(
+                super()._recognize_impl(buffer, language=language, conn_options=conn_options),
+                _BATCH_STT_TIMEOUT_S,
+            )
+        except asyncio.TimeoutError:
+            raise APITimeoutError() from None

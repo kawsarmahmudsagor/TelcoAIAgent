@@ -27,7 +27,6 @@ class _Handle:
 class _Session:
     def __init__(self, caller="browser-user"):
         self.rpcs = []
-        self.on_close = []
 
         async def perform_rpc(**kwargs):
             self.rpcs.append(kwargs)
@@ -38,14 +37,6 @@ class _Session:
             linked_participant=participant,
             room=SimpleNamespace(local_participant=SimpleNamespace(perform_rpc=perform_rpc)),
         )
-
-    def once(self, event, cb):
-        assert event == "close"
-        self.on_close.append(cb)
-
-    def close(self):
-        for cb in self.on_close:
-            cb(None)
 
 
 def _ctx(session, text, *, generation="gen_1", interrupted=False):
@@ -82,7 +73,6 @@ def test_goodbye_before_it_asks_the_browser_and_wants_no_reply():
                 "response_timeout": 5.0,
             }
         ]
-        session.close()  # the browser ended the call: no fallback
 
     asyncio.run(go())
 
@@ -99,7 +89,6 @@ def test_no_goodbye_asks_for_one_and_ends_after_it_played():
         ctx.speech_handle.finish()
         await asyncio.sleep(0)
         assert len(session.rpcs) == 1
-        session.close()
 
     asyncio.run(go())
 
@@ -124,28 +113,32 @@ def test_an_interrupted_goodbye_reply_keeps_the_call_going():
         ctx.speech_handle.finish(interrupted=True)
         await asyncio.sleep(0)
         assert session.rpcs == []
-        # The customer went on; a later goodbye ends the call.
+        # The customer went on; a later goodbye still turns the mic off.
         assert await tool._end_call(_ctx(session, "Bye!", generation="gen_3")) is None
         assert len(session.rpcs) == 1
-        session.close()
 
     asyncio.run(go())
 
 
-def test_room_is_deleted_when_the_browser_never_ends_the_call(monkeypatch):
-    calls = []
+def test_a_later_voice_chat_can_be_ended_again():
+    async def go():
+        tool, session = BrowserEndCall(goodbye_instructions=GOODBYE), _Session()
+        assert await tool._end_call(_ctx(session, "Bye!")) is None
+        # The customer turns the mic on again later and says goodbye again.
+        assert await tool._end_call(_ctx(session, "Bye again!", generation="gen_5")) is None
+        assert len(session.rpcs) == 2
 
-    async def delete_room():
-        calls.append("delete_room")
+    asyncio.run(go())
 
-    job = SimpleNamespace(delete_room=delete_room, shutdown=lambda reason: calls.append(reason))
-    monkeypatch.setattr(browser_end_call, "get_job_context", lambda: job)
+
+def test_no_browser_to_ask_never_closes_the_room():
+    # Nothing is there to delete the room with: the chat stays open.
+    assert not hasattr(browser_end_call, "get_job_context")
 
     async def go():
-        tool = BrowserEndCall(goodbye_instructions=GOODBYE, fallback_s=0.01)
-        session = _Session(caller=None)  # no browser to ask
+        tool = BrowserEndCall(goodbye_instructions=GOODBYE)
+        session = _Session(caller=None)
         assert await tool._end_call(_ctx(session, "Bye!")) is None
-        await asyncio.sleep(0.05)
+        assert session.rpcs == []
 
     asyncio.run(go())
-    assert calls == ["delete_room", "browser did not end the call"]

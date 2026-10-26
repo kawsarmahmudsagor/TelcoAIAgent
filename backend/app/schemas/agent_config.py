@@ -42,6 +42,9 @@ class AgentConfigOut(BaseModel):
     elevenlabs_voice_id: str
     # In stt_tts_provider's id format; unused with deepgram.
     elevenlabs_tts_model: str
+    # Voice provider "elevenlabs" only: the Scribe model, and "auto", "bn" or "en".
+    elevenlabs_stt_model: str
+    elevenlabs_stt_language: str
 
     # Logged-in browser customers get voice replies; off, text. Guests always text.
     voice_replies_enabled: bool
@@ -96,6 +99,9 @@ class AgentConfigUpdate(BaseModel):
     elevenlabs_voice_id: str | None = Field(default=None, max_length=100)
     # Reset to the default when stt_tts_provider changes, unless sent with it.
     elevenlabs_tts_model: str | None = Field(default=None, max_length=100)
+    # Blank or null = the env default model / auto-detected language.
+    elevenlabs_stt_model: str | None = Field(default=None, max_length=100)
+    elevenlabs_stt_language: str | None = Field(default=None, max_length=20)
 
     voice_replies_enabled: bool | None = None
     quick_reply_enabled: bool | None = None
@@ -130,6 +136,9 @@ class AgentConfigOptions(BaseModel):
     elevenlabs_voices: list[ModelOption]
     # Keyed by provider ("elevenlabs", "openrouter"): the ids differ between them.
     elevenlabs_tts_models: dict[str, list[ModelOption]]
+    # The only STT models and languages voice provider "elevenlabs" accepts.
+    elevenlabs_stt_models: list[ModelOption]
+    elevenlabs_stt_languages: list[ModelOption]
     # The only models quick replies accept.
     quick_reply_models: list[ModelOption]
     # Allowed {placeholders} per template field.

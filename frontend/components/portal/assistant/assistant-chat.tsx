@@ -243,19 +243,19 @@ function EmptyState({ compact }: { compact: boolean }) {
         <BotAvatar size="sm" />
         <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
           {me ? (
-            <p>
-              Hi {me.first_name}! I’m your telco. assistant. I can check your balance, explain your
-              usage, find a package or sort out a recharge.
+            <p lang="bn">
+              আসসালামু আলাইকুম, {me.first_name}! আমি telco.-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
+              ইউসেজের হিসাব, প্যাক খোঁজা বা রিচার্জ, সবকিছুতেই হেল্প করতে পারি।
             </p>
           ) : (
-            <p>
-              Hi! I’m the telco. assistant. I can help you find a package, check the network in your
-              area, or answer questions about SIMs, stores and our policies. Log in to check your
-              own balance or buy a pack.
+            <p lang="bn">
+              আসসালামু আলাইকুম! আমি telco.-এর অ্যাসিস্ট্যান্ট। প্যাক খোঁজা, আপনার এলাকার নেটওয়ার্ক
+              চেক, বা সিম, স্টোর আর আমাদের পলিসি নিয়ে যেকোনো প্রশ্নে হেল্প করতে পারি। নিজের
+              ব্যালেন্স দেখতে বা প্যাক কিনতে লগইন করুন।
             </p>
           )}
           <p lang="bn" className="mt-2">
-            কীভাবে সাহায্য করতে পারি?
+            কীভাবে হেল্প করতে পারি?
           </p>
           <QuestionChips
             onAsk={sendText}

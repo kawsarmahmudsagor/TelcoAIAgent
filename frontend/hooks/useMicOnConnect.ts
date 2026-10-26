@@ -9,14 +9,23 @@ import { useSessionContext } from '@livekit/components-react';
 export async function turnOnMicrophone(room: Room): Promise<boolean> {
   // No automatic gain control: it turns a quiet room up while the customer listens, and
   // the agent tells the customer from people around them by how loud they are
-  // (backend app/agent/voice_level.py). Kept in the room defaults so a re-created mic
-  // track (device switch) stays the same.
+  // (backend app/agent/voice_level.py). Echo cancellation keeps the agent from hearing
+  // itself, noise suppression takes out steady noise (fans, traffic), and voice isolation
+  // asks the browser or OS for its own speech isolation where it has one. Kept in the
+  // room defaults so a re-created mic track (device switch) stays the same.
+  const capture = {
+    autoGainControl: false,
+    echoCancellation: true,
+    noiseSuppression: true,
+    voiceIsolation: true,
+    channelCount: 1,
+  };
   room.options.audioCaptureDefaults = {
     ...room.options.audioCaptureDefaults,
-    autoGainControl: false,
+    ...capture,
   };
   try {
-    await room.localParticipant.setMicrophoneEnabled(true, { autoGainControl: false });
+    await room.localParticipant.setMicrophoneEnabled(true, capture);
     return true;
   } catch (error: unknown) {
     console.warn('Could not turn on the microphone:', error);

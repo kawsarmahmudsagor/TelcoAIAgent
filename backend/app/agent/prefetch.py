@@ -72,6 +72,8 @@ class Prefetcher:
     # its turn is kept (the stored transcript).
     on_prefetch: Callable[[str, str, dict | None, str | None], None] | None = None
     _extracting: dict[str, asyncio.Task[RouterArgs | None]] = field(default_factory=dict)
+    # The fast rules' arguments for the same text (turn_router.fast_extract), or None.
+    _fast: dict[str, RouterArgs | None] = field(default_factory=dict)
     _warming: asyncio.Task | None = None
 
     # ---- warm-up, while the greeting plays ----
@@ -120,6 +122,7 @@ class Prefetcher:
             text,
             self.settings.router_reasoning_effort,
         )
+        self._fast[key] = turn_router.fast_extract(text, history)
         self._extracting[key] = asyncio.ensure_future(
             turn_router.extract(
                 self.client,
@@ -134,6 +137,7 @@ class Prefetcher:
         for task in self._extracting.values():
             task.cancel()
         self._extracting.clear()
+        self._fast.clear()
 
     # ---- an accepted turn ----
 
@@ -178,7 +182,14 @@ class Prefetcher:
         if key not in self._extracting:
             # The library's turn text differs from the finals the gate saw.
             self.start(text, history)
-        args = await self._extracting[key]
+        fast = self._fast.get(key) if judgement.lookup == "packages" else None
+        if fast is not None:
+            # A plain package request: the rules give the extractor's arguments
+            # without waiting for it. Every other lookup waits, as before.
+            logger.info("router: fast rules gave %s", fast.packages)
+            args = fast
+        else:
+            args = await self._extracting[key]
         if args is None:
             return []
 

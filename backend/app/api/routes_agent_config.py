@@ -117,6 +117,22 @@ _OPENROUTER_TTS_MODELS = [
 ]
 
 
+# Voice provider "elevenlabs" only (OpenRouter always transcribes whole turns).
+_ELEVENLABS_STT_MODELS = [
+    ("scribe_v2", "Whole turn (Scribe v2, reliable Bangla)"),
+    ("scribe_v2_realtime", "Streaming (Scribe v2 Realtime, faster)"),
+]
+_ELEVENLABS_STT_LANGUAGES = [
+    ("auto", "Auto-detect (Bangla or English)"),
+    ("bn", "Bangla (বাংলা)"),
+    ("en", "English"),
+]
+_CHOICES = {
+    "elevenlabs_stt_model": {model_id for model_id, _ in _ELEVENLABS_STT_MODELS},
+    "elevenlabs_stt_language": {code for code, _ in _ELEVENLABS_STT_LANGUAGES},
+}
+
+
 def _options(pairs: list[tuple[str, str]], extra: str | None = None, label: str = "") -> list[ModelOption]:
     """Adds `extra` (an env default) to the front if the curated list lacks it."""
     options = [ModelOption(id=model_id, label=model_label) for model_id, model_label in pairs]
@@ -150,6 +166,8 @@ def _to_out(row: AgentConfig) -> AgentConfigOut:
         deepgram_tts_model=resolved.deepgram_tts_model,
         elevenlabs_voice_id=resolved.elevenlabs_voice_id,
         elevenlabs_tts_model=resolved.elevenlabs_tts_model,
+        elevenlabs_stt_model=resolved.elevenlabs_stt_model,
+        elevenlabs_stt_language=resolved.elevenlabs_stt_language,
         voice_replies_enabled=resolved.voice_replies_enabled,
         quick_reply_enabled=resolved.quick_reply_enabled,
         quick_fast_answer=resolved.quick_fast_answer,
@@ -204,6 +222,14 @@ def update_agent_config(payload: AgentConfigUpdate, db: Session = Depends(get_db
             value = value.strip()
         if key == "stt_tts_provider" and value is not None:
             value = SttTtsProvider(value)
+        if key in _CHOICES and value:
+            if value not in _CHOICES[key]:
+                allowed = ", ".join(sorted(_CHOICES[key]))
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_CONTENT, f"{key}: unknown value. Allowed: {allowed}"
+                )
+            if key == "elevenlabs_stt_language" and value == "auto":
+                value = None  # auto-detect is the default
         if key == "quick_reply_model" and value is not None and value not in QUICK_REPLY_MODELS:
             allowed = ", ".join(QUICK_REPLY_MODELS)
             raise HTTPException(
@@ -326,6 +352,8 @@ def get_options() -> AgentConfigOptions:
                 _OPENROUTER_TTS_MODELS, settings.elevenlabs_openrouter_tts_model
             ),
         },
+        elevenlabs_stt_models=_options(_ELEVENLABS_STT_MODELS),
+        elevenlabs_stt_languages=_options(_ELEVENLABS_STT_LANGUAGES),
         quick_reply_models=[
             ModelOption(id=model_id, label=QUICK_REPLY_LABELS.get(model_id, model_id))
             for model_id in QUICK_REPLY_MODELS

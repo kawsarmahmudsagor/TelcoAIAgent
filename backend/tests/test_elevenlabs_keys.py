@@ -7,13 +7,18 @@ from types import SimpleNamespace
 import aiohttp
 import pytest
 from livekit import rtc
-from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, APIStatusError
+from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, APIError, APIStatusError
 from livekit.agents import stt as stt_utils
 from livekit.agents import tts as tts_utils
 from livekit.plugins.elevenlabs.stt import SpeechStream
 
 from app.agent import elevenlabs_keys, openrouter_audio
-from app.agent.elevenlabs_keys import FailFastElevenLabsSTT, is_spent, usable_keys
+from app.agent.elevenlabs_keys import (
+    BatchElevenLabsSTT,
+    FailFastElevenLabsSTT,
+    is_spent,
+    usable_keys,
+)
 from app.agent.entrypoint import _build_stt_and_tts, _elevenlabs_keys_for_call
 from app.agent.openrouter_audio import OpenRouterSTT, OpenRouterTTS
 from app.agent.sentence_tokenizer import SentenceTokenizer as BanglaSentenceTokenizer
@@ -366,12 +371,17 @@ _CONFIG = SimpleNamespace(
     stt_tts_provider="elevenlabs",
     elevenlabs_voice_id="voice",
     elevenlabs_tts_model="eleven_v4_turbo",
+    elevenlabs_stt_model="",
+    elevenlabs_stt_language="auto",
     deepgram_tts_model="aura-2-thalia-en",
 )
 
 
+_REALTIME = {"elevenlabs_stt_model": "scribe_v2_realtime"}
+
+
 def test_builder_chains_every_key_then_deepgram(make_settings):
-    s = make_settings(deepgram_api_key="dg")
+    s = make_settings(deepgram_api_key="dg", **_REALTIME)
     stt, tts = _build_stt_and_tts(s, _CONFIG, ["key-aaaa", "key-bbbb", "key-cccc"])
     assert isinstance(stt, stt_utils.FallbackAdapter)
     assert isinstance(tts, tts_utils.FallbackAdapter)
@@ -384,17 +394,17 @@ def test_builder_chains_every_key_then_deepgram(make_settings):
 
 
 def test_builder_single_key_is_not_wrapped(make_settings):
-    stt, tts = _build_stt_and_tts(make_settings(), _CONFIG, ["key-aaaa"])
+    stt, tts = _build_stt_and_tts(make_settings(**_REALTIME), _CONFIG, ["key-aaaa"])
     assert isinstance(stt, FailFastElevenLabsSTT)
     assert isinstance(tts, tts_utils.StreamAdapter)
     assert isinstance(tts._sentence_tokenizer, BanglaSentenceTokenizer)
 
 
 def test_builder_sets_scribe_server_vad(make_settings):
-    single, _ = _build_stt_and_tts(make_settings(), _CONFIG, ["key-aaaa"])
+    single, _ = _build_stt_and_tts(make_settings(**_REALTIME), _CONFIG, ["key-aaaa"])
     assert single._opts.server_vad == {"vad_silence_threshold_secs": 0.8}
 
-    s = make_settings(deepgram_api_key="dg", elevenlabs_stt_silence_secs=1.2)
+    s = make_settings(deepgram_api_key="dg", elevenlabs_stt_silence_secs=1.2, **_REALTIME)
     chain, _ = _build_stt_and_tts(s, _CONFIG, ["key-aaaa", "key-bbbb"])
     scribes = [i for i in chain._stt_instances if isinstance(i, FailFastElevenLabsSTT)]
     assert len(scribes) == 2
@@ -419,15 +429,89 @@ def test_builder_no_provider_raises(make_settings):
 
 def test_builder_placeholder_deepgram_not_appended(make_settings):
     stt, _ = _build_stt_and_tts(
-        make_settings(deepgram_api_key="changeme"), _CONFIG, ["key-aaaa", "key-bbbb"]
+        make_settings(deepgram_api_key="changeme", **_REALTIME), _CONFIG, ["key-aaaa", "key-bbbb"]
     )
     assert [i.label for i in stt._stt_instances] == ["elevenlabs …aaaa", "elevenlabs …bbbb"]
 
 
-def test_builder_rejects_non_realtime_stt_model(make_settings):
-    s = make_settings(elevenlabs_stt_model="scribe_v1")
-    with pytest.raises(RuntimeError, match="not a realtime model"):
-        _build_stt_and_tts(s, _CONFIG, ["key-aaaa"])
+def test_builder_batch_stt_is_driven_by_the_vad(make_settings):
+    """The default scribe_v2 transcribes each turn whole, cut by the session's VAD."""
+    s = make_settings(deepgram_api_key="dg")
+    assert s.elevenlabs_stt_model == "scribe_v2"
+    vad = SimpleNamespace(capabilities=SimpleNamespace(update_interval=0.032))
+    chain, _ = _build_stt_and_tts(s, _CONFIG, ["key-aaaa", "key-bbbb"], vad)
+    assert [i.label for i in chain._stt_instances] == [
+        "elevenlabs …aaaa",
+        "elevenlabs …bbbb",
+        "deepgram",
+    ]
+    for adapter in chain._stt_instances[:2]:
+        assert isinstance(adapter, stt_utils.StreamAdapter)
+        assert isinstance(adapter.wrapped_stt, BatchElevenLabsSTT)
+        assert adapter.wrapped_stt.model == "scribe_v2"
+        assert adapter.wrapped_stt.capabilities.streaming is False
+
+    single, _ = _build_stt_and_tts(make_settings(), _CONFIG, ["key-aaaa"], vad)
+    assert isinstance(single, stt_utils.StreamAdapter)
+    assert single.label == "elevenlabs …aaaa"
+
+
+def test_builder_stt_detects_the_language_in_both_modes(make_settings):
+    # Customers speak Bangla or English: by default no language is forced on Scribe.
+    vad = SimpleNamespace(capabilities=SimpleNamespace(update_interval=0.032))
+    realtime, _ = _build_stt_and_tts(make_settings(**_REALTIME), _CONFIG, ["key-aaaa"], vad)
+    assert isinstance(realtime, FailFastElevenLabsSTT)
+    assert realtime._opts.language_code is None
+    batch, _ = _build_stt_and_tts(make_settings(), _CONFIG, ["key-aaaa"], vad)
+    assert batch.wrapped_stt._opts.language_code is None
+
+
+def _agent(**values):
+    return SimpleNamespace(**{**vars(_CONFIG), **values})
+
+
+def test_builder_the_agents_stt_model_overrides_the_env(make_settings):
+    vad = SimpleNamespace(capabilities=SimpleNamespace(update_interval=0.032))
+    realtime, _ = _build_stt_and_tts(
+        make_settings(), _agent(elevenlabs_stt_model="scribe_v2_realtime"), ["key-aaaa"], vad
+    )
+    assert isinstance(realtime, FailFastElevenLabsSTT)
+    batch, _ = _build_stt_and_tts(
+        make_settings(**_REALTIME), _agent(elevenlabs_stt_model="scribe_v2"), ["key-aaaa"], vad
+    )
+    assert isinstance(batch.wrapped_stt, BatchElevenLabsSTT)
+
+
+def test_builder_the_agents_language_is_forced_in_both_modes(make_settings):
+    vad = SimpleNamespace(capabilities=SimpleNamespace(update_interval=0.032))
+    realtime, _ = _build_stt_and_tts(
+        make_settings(**_REALTIME), _agent(elevenlabs_stt_language="bn"), ["key-aaaa"], vad
+    )
+    assert realtime._opts.language_code == "bn"
+    batch, _ = _build_stt_and_tts(make_settings(), _agent(elevenlabs_stt_language="en"), ["key-aaaa"], vad)
+    assert batch.wrapped_stt._opts.language_code == "en"
+
+
+def test_builder_batch_stt_needs_a_vad(make_settings):
+    with pytest.raises(RuntimeError, match="needs a VAD"):
+        _build_stt_and_tts(make_settings(), _CONFIG, ["key-aaaa"])
+
+
+def test_batch_stt_caps_each_request(monkeypatch):
+    """One stuck upload must not stall the call: each attempt is cut off, and retried once."""
+    attempts: list[int] = []
+
+    async def stuck(self, buffer, *, language=NOT_GIVEN, conn_options):
+        attempts.append(conn_options.max_retry)
+        await asyncio.sleep(10)
+
+    monkeypatch.setattr(elevenlabs_keys.elevenlabs.STT, "_recognize_impl", stuck)
+    monkeypatch.setattr(elevenlabs_keys, "_BATCH_STT_TIMEOUT_S", 0.05)
+    stt = BatchElevenLabsSTT(api_key="x", model="scribe_v2")
+    frame = rtc.AudioFrame(b"\x00\x00" * 160, sample_rate=16000, num_channels=1, samples_per_channel=160)
+    with pytest.raises(APIError):
+        asyncio.run(stt.recognize([frame]))
+    assert attempts == [1, 1]
 
 
 # ---- voice provider "openrouter" ----
@@ -455,9 +539,10 @@ def test_openrouter_builder_needs_no_elevenlabs_keys(make_settings):
     assert stt.model == "elevenlabs/scribe-x"
     assert str(stt._client.base_url).rstrip("/") == s.openrouter_base_url
     assert isinstance(tts, tts_utils.StreamAdapter)
-    assert isinstance(tts._wrapped_tts, OpenRouterTTS)
+    underlying = getattr(tts._wrapped_tts, "_wrapped", tts._wrapped_tts)
+    assert isinstance(underlying, OpenRouterTTS)
     assert isinstance(tts._sentence_tokenizer, BanglaSentenceTokenizer)
-    assert tts._wrapped_tts.model == "elevenlabs/eleven-v3"
+    assert underlying.model == "elevenlabs/eleven-v3"
 
 
 def test_openrouter_builder_falls_back_to_deepgram(make_settings):

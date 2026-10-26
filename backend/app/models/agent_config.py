@@ -77,6 +77,10 @@ class AgentConfig(TimestampedBase):
     # Model id in the chosen provider's format (eleven_v4_turbo directly,
     # elevenlabs/eleven-v4-turbo via OpenRouter), so it resets when that changes.
     elevenlabs_tts_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Voice provider "elevenlabs" only: scribe_v2 (whole turns) or scribe_v2_realtime
+    # (streaming); null = ELEVENLABS_STT_MODEL. Language: bn, en, or null = auto-detect.
+    elevenlabs_stt_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    elevenlabs_stt_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Browser sessions of logged-in customers answer in voice; off, in text
     # (app.agent.voice_mode). Guests always get text.

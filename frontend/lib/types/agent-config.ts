@@ -44,6 +44,10 @@ export interface AgentConfig {
   elevenlabs_voice_id: string;
   /** In stt_tts_provider's id format; unused with deepgram. */
   elevenlabs_tts_model: string;
+  /** Voice provider 'elevenlabs' only: scribe_v2 (whole turns) or scribe_v2_realtime. */
+  elevenlabs_stt_model: string;
+  /** 'auto' (Bangla or English, detected per turn), 'bn' or 'en'. */
+  elevenlabs_stt_language: string;
 
   /** Logged-in customers hear the agent's replies; off, they read them (and can still speak).
    * Guests always chat in text. */
@@ -103,6 +107,9 @@ export interface AgentConfigUpdate {
   elevenlabs_voice_id?: string | null;
   /** Reset to the default when stt_tts_provider changes, unless sent with it. */
   elevenlabs_tts_model?: string | null;
+  /** Null or blank: the server default model; 'auto' or null: detect the language. */
+  elevenlabs_stt_model?: string | null;
+  elevenlabs_stt_language?: string | null;
 
   /** Null is ignored. */
   voice_replies_enabled?: boolean | null;
@@ -142,6 +149,9 @@ export interface AgentConfigOptions {
   elevenlabs_voices: ModelOption[];
   /** Keyed by provider ('elevenlabs', 'openrouter'): the ids differ between them. */
   elevenlabs_tts_models: Record<string, ModelOption[]>;
+  /** The only STT models and languages voice provider 'elevenlabs' accepts. */
+  elevenlabs_stt_models: ModelOption[];
+  elevenlabs_stt_languages: ModelOption[];
   /** The only models quick replies accept. */
   quick_reply_models: ModelOption[];
   /** Allowed `{placeholders}` per template field. */

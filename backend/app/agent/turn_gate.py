@@ -110,6 +110,9 @@ def _is_latin(c: str) -> bool:
 # English words outnumber them: "आ वो लोग milestone repeat की" (run_53).
 _OTHER_SCRIPT_MIN_LETTERS = 3
 
+# A phone number (seven or more digits, spaces and dashes allowed) or an email.
+_PHONE_OR_CONTACT_RE = re.compile(r"\+?\d(?:[\s-]?\d){6,}|\S+@\S+\.\w+")
+
 
 def classify_script(text: str) -> Script:
     """The script most of the letters are in. Voice STT writes Bangla in Bengali
@@ -130,10 +133,22 @@ def classify_script(text: str) -> Script:
         return "none"
     if other > bn + en or (other >= _OTHER_SCRIPT_MIN_LETTERS and other > bn):
         return "other"
-    return "bn" if bn >= en else "en"
+    # Any Bengali letters: Bangla with English loanwords, which can have more
+    # Latin letters than Bengali ones ("জি, data pack টা confirm করুন।"). English
+    # speakers never write Bengali script.
+    if bn > 0:
+        return "bn"
+    return "en"
+
+
+def has_contact(text: str) -> bool:
+    """A phone number or an email: never filler, whatever its script."""
+    return bool(_PHONE_OR_CONTACT_RE.search(text))
 
 
 def is_filler_or_empty(text: str) -> bool:
+    if has_contact(text):
+        return False
     ws = words(text)
     return not ws or all(w in _FILLERS for w in ws)
 
@@ -161,6 +176,11 @@ def is_closing(text: str) -> bool:
 def is_stop_phrase(text: str) -> bool:
     norm = normalize(text)
     return any(norm == p or norm.startswith(p + " ") for p in _STOP_PHRASES)
+
+
+def is_bare_stop_phrase(text: str) -> bool:
+    """Nothing but a stop phrase ("Wait.", "না না।")."""
+    return normalize(text) in _STOP_PHRASES
 
 
 def _words_without_digits(text: str) -> list[str]:
@@ -240,6 +260,16 @@ class GateState:
             self.other_language_since_reply = False
 
 
+_PRESENCE_CHECK_RE = re.compile(
+    r"শুনতে\s*পাচ্ছ|শুনতে\s*পাচ্ছেন|শোনা\s*যাচ্ছে|কথা\s*শোনা|কথা\s*কি\s*শুনতে|hello\??$|can\s*you\s*hear|are\s*you\s*there",
+    re.I,
+)
+
+
+def is_presence_check(text: str) -> bool:
+    return bool(_PRESENCE_CHECK_RE.search(text))
+
+
 @dataclass(frozen=True)
 class Precheck:
     script: Script
@@ -248,16 +278,22 @@ class Precheck:
     word_count: int
     confidence: float | None
     closing: bool = False
+    presence: bool = False
 
 
 def precheck(text: str, confidence: float | None) -> Precheck:
+    contact = has_contact(text)
+    script = classify_script(strip_sound_tags(text))
+    if script == "none" and contact:
+        script = "bn"
     return Precheck(
-        script=classify_script(strip_sound_tags(text)),
+        script=script,
         filler=is_filler_or_empty(text),
         assent=is_assent_filler(text),
-        word_count=len(words(text)),
+        word_count=max(len(words(text)), 1 if contact else 0),
         confidence=confidence if confidence_known(confidence) else None,
         closing=is_closing(text),
+        presence=is_presence_check(text),
     )
 
 
@@ -290,6 +326,8 @@ def decide(
     if pre.filler or pre.script == "none":
         return Verdict.DROP
     if pre.closing:
+        return Verdict.ACCEPT
+    if pre.presence:
         return Verdict.ACCEPT
 
     # Another script is only trusted as another language when the STT can write

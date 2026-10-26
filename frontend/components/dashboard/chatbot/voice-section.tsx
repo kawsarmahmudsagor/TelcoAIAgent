@@ -185,6 +185,69 @@ export function VoiceSection({
           </>
         )}
 
+        {provider === 'elevenlabs' && (
+          <>
+            <FormField
+              id="elevenlabs_stt_model"
+              label="Transcription mode"
+              error={errors.elevenlabs_stt_model}
+              hint={
+                draft.elevenlabs_stt_model === 'scribe_v2_realtime'
+                  ? 'Replies start sooner, but the language is guessed from the first moments of speech, so Bangla can come out as another language.'
+                  : 'Each turn is transcribed whole after the caller stops: reliable Bangla, replies start about 1–2 s later.'
+              }
+            >
+              {(control) => (
+                <Select
+                  value={draft.elevenlabs_stt_model}
+                  onValueChange={(value) => set('elevenlabs_stt_model', value)}
+                >
+                  <SelectTrigger {...control} className="w-full">
+                    <SelectValue placeholder="Server default" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {withCurrent(options.elevenlabs_stt_models, draft.elevenlabs_stt_model).map(
+                      (m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.label}
+                        </SelectItem>
+                      )
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+
+            <FormField
+              id="elevenlabs_stt_language"
+              label="Caller language"
+              error={errors.elevenlabs_stt_language}
+              hint="Auto-detect hears Bangla and English. Pick one language only if every caller speaks it."
+            >
+              {(control) => (
+                <Select
+                  value={draft.elevenlabs_stt_language}
+                  onValueChange={(value) => set('elevenlabs_stt_language', value)}
+                >
+                  <SelectTrigger {...control} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {withCurrent(
+                      options.elevenlabs_stt_languages,
+                      draft.elevenlabs_stt_language
+                    ).map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </FormField>
+          </>
+        )}
+
         <VoicePreview
           className="sm:col-span-2"
           provider={provider}

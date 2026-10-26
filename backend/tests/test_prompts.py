@@ -36,7 +36,7 @@ def _prompts(*, rag: bool = False) -> dict[str, str]:
 def test_no_missing_tools_mentioned():
     for name, prompt in _prompts().items():
         assert "search_knowledge_base" not in prompt, name
-        # Every session has end_call: a browser call ends on a goodbye.
+        # Every session has end_call: a goodbye turns a browser session's mic off.
         assert "end_call" in prompt, name
 
 
@@ -205,7 +205,7 @@ def test_prompt_rules_present():
     assert "ACCOUNT SNAPSHOT pytest-marker" in prompt
     # After the identity block, before the task and closing notes.
     assert prompt.index("pytest-marker") > prompt.index("CONFIDENTIALITY")
-    assert prompt.index("pytest-marker") < prompt.index("ENDING THE CALL")
+    assert prompt.index("pytest-marker") < prompt.index("ENDING THE VOICE CHAT")
     # A session without a snapshot is a guest.
     guest = build_system_prompt(SessionUserdata(channel=Channel.inbound_chat, room=None), config)
     assert GUEST_SNAPSHOT in guest

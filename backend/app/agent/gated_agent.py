@@ -31,6 +31,7 @@ transcripts entirely: no barge-in, no queued answer, no turn accepted.
 import asyncio
 import json
 import logging
+import re
 import time
 from collections import deque
 from collections.abc import AsyncIterable, Callable, Coroutine
@@ -45,7 +46,7 @@ from livekit.agents.types import FlushSentinel
 from livekit.agents import room_io
 from livekit.agents.voice.events import UserInputTranscribedEvent
 
-from app.agent import cards, quick_reply, turn_gate, turn_judge, voice_level
+from app.agent import cards, quick_reply, reply_punctuation, turn_gate, turn_judge, voice_level
 from app.agent.prefetch import Prefetcher
 from app.agent.quick_reply import QuickReplyRuntime
 from app.agent.turn_gate import GateState, Thresholds, Verdict
@@ -65,6 +66,34 @@ GATE_ATTRIBUTE = "turn_gate"
 IGNORED_TEXT_TOPIC = "ignored-text"
 
 OTHER_LANGUAGE_LINE = "I could not understand that. Could you kindly repeat that?"
+# Said when a turn the gate dropped still reads like a question to the agent.
+UNCLEAR_TURN_LINE = "সরি, ঠিক বুঝতে পারিনি। আরেকবার বলবেন?"
+# Said when the turn's processing or the main model's reply fails.
+STREAM_FAILED_LINE = "সরি, একটু সমস্যা হচ্ছে। আরেকবার বলবেন, প্লিজ?"
+
+# A dropped turn that still reads like a question to the agent gets "please say
+# that again" instead of silence. Bengali vowel signs aren't word characters, so
+# the Bangla words have no \b around them.
+_QUESTION_OR_ADDRESS_RE = re.compile(
+    r"\?|？|কি|কী|কেমন|কত|কোথায়|কোন|কখন|কবে|কেন|আছে|বলবেন|শুনতে|ভাই|আপু|ম্যাডাম|স্যার|"
+    r"ব্যালেন্স|প্যাক|ডাটা|মিনিট|রিচার্জ|নেটওয়ার্ক|অফার|টাকা|"
+    r"\b(?:balance|pack|data|minutes?|recharge|network|offer|price)\b",
+    re.I,
+)
+
+
+def _has_question_or_address(text: str) -> bool:
+    return bool(_QUESTION_OR_ADDRESS_RE.search(text))
+
+# STT language codes (ISO 639-1 and -3, region dropped) a customer's turn may carry.
+_CUSTOMER_LANGUAGES = frozenset({"bn", "ben", "en", "eng"})
+
+# How long frames under the voice isolation bar still pass after a louder one:
+# protects soft word endings and the gaps between words.
+_ISOLATION_HANGOVER_S = 0.35
+
+# Assent words ("হ্যাঁ", "জি") are said softer still: this much more margin.
+_ASSENT_EXTRA_MARGIN_DB = 8.0
 
 _BUSY_STATES = {"initializing", "thinking", "speaking"}
 _HISTORY_MESSAGES = 4
@@ -98,6 +127,10 @@ class GateConfig:
     stt_writes_bengali: bool
     # None: speech over the agent never pauses it, only the judge stops it.
     pause: PauseConfig | None = None
+    # Voice isolation (settings.turn_voice_isolation_enabled and its bars).
+    voice_isolation_enabled: bool = False
+    speech_margin_db: float = 10.0
+    speech_floor_dbfs: float = -42.0
 
 
 def pause_config(settings: Settings) -> PauseConfig | None:
@@ -124,6 +157,9 @@ def gate_config(settings: Settings, stt_tts_provider: str) -> GateConfig:
         interrupt_min_words=settings.turn_interrupt_min_words,
         stt_writes_bengali=stt_tts_provider in _BENGALI_STT_PROVIDERS,
         pause=pause_config(settings),
+        voice_isolation_enabled=settings.turn_voice_isolation_enabled,
+        speech_margin_db=settings.turn_speech_margin_db,
+        speech_floor_dbfs=settings.turn_speech_floor_dbfs,
     )
 
 
@@ -156,12 +192,45 @@ def jev_judge(
             knowledge_base=knowledge_base,
         )
         started = time.perf_counter()
-        judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s)
+        judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s, utterance=text)
         if on_judged is not None:
             on_judged(text, bot_state, time.perf_counter() - started, judgement.p)
         return judgement
 
     return _judge
+
+
+# Nobody waits on the warm-up, so it may take as long as a cold start needs.
+_JUDGE_WARM_TIMEOUT_S = 10.0
+
+
+def jev_warm_up(
+    settings: Settings,
+    api_key: str,
+    client: httpx.AsyncClient,
+    *,
+    router: bool = False,
+    knowledge_base: bool = False,
+) -> Callable[[], Coroutine[Any, Any, None]]:
+    """One throwaway Jev request, shaped like a real first turn's, to send
+    while the greeting plays. Otherwise the first real one pays for Jev's cold
+    start and can hit the judge timeout, and the customer's first turn goes
+    through unjudged, someone nearby included."""
+    url = turn_judge.decisions_url(settings.openrouter_base_url)
+
+    async def _warm() -> None:
+        payload = turn_judge.build_request(
+            settings.turn_judge_model,
+            [],
+            "hello",
+            "listening",
+            turn_gate.address_form("hello"),
+            lookup=router,
+            knowledge_base=knowledge_base,
+        )
+        await turn_judge.judge(client, url, api_key, payload, _JUDGE_WARM_TIMEOUT_S)
+
+    return _warm
 
 
 def _recent_exchanges(session: AgentSession) -> list[Exchange]:
@@ -174,14 +243,52 @@ def _recent_exchanges(session: AgentSession) -> list[Exchange]:
     return out[-_HISTORY_MESSAGES:]
 
 
+_PROMPT_ENDINGS_BN = (
+    "বলবেন", "জানাবেন", "করবেন", "করব", "করবো", "চান", "লাগবে", "হবে", "কি", "কী",
+)
+
+_CONFIRM_OR_ASSENT_WORDS = {
+    "জি", "হ্যাঁ", "হুম", "হ্যা", "হাঁ", "জিহ", "yes", "yeah", "yep", "sure", "ok", "okay",
+    "করেন", "করুন", "নিশ্চিত", "কনফার্ম", "confirm", "হবে", "চাই", "রাখুন", "রাখেন",
+    "না", "no", "nope", "not", "লাগবে না", "দরকার নেই", "না না", "নেই", "না ভাই", "না আপু",
+}
+
+
+# A yes to a waiting action (recharge, purchase, redeem) or a cancel: often said
+# softly, after the agent read numbers back.
+_CONFIRM_RE = re.compile(
+    r"confirm|কনফার্ম|নিশ্চিত|বাতিল|cancel|"
+    r"(?:জি|হ্যাঁ|হুম)\s*(?:করুন|করেন|করে\s*(?:দিন|দেন)|দিন|দেন|ঠিক\s*আছে|কিনুন|নিন)|"
+    r"(?:কিনে|রিচার্জ\s*করে|চালু\s*করে)\s*(?:দিন|দেন)|"
+    r"\b(?:go\s+ahead|do\s+it|buy\s+it)\b",
+    re.I,
+)
+
+
+def _is_confirmation_or_assent(text: str) -> bool:
+    if _CONFIRM_RE.search(text):
+        return True
+    ws = turn_gate.words(text)
+    if not ws:
+        return False
+    return len(ws) <= 4 and any(w in _CONFIRM_OR_ASSENT_WORDS for w in ws)
+
+
 def _bot_just_asked(session: AgentSession) -> bool:
     """Whether the latest message of the conversation is the agent's, ending
-    in a question. Tool calls and config updates in between don't count."""
+    in a question or polite prompt. Tool calls and config updates in between don't count."""
     for item in reversed(session.history.items):
         if getattr(item, "type", None) != "message" or item.role not in ("user", "assistant"):
             continue
+        if item.role != "assistant":
+            return False
         text = (item.text_content or "").rstrip()
-        return item.role == "assistant" and text.endswith(("?", "？"))
+        if text.endswith(("?", "？")):
+            return True
+        tail = text[-35:] if len(text) > 35 else text
+        if any(w in tail for w in _PROMPT_ENDINGS_BN):
+            return True
+        return False
     return False
 
 
@@ -243,6 +350,8 @@ class TurnGateController:
     # What became of speech over the agent: paused, resumed, interrupted,
     # queued (run_log).
     on_barge_in: Callable[[str], None] | None = None
+    # A throwaway judge call for warm() (see jev_warm_up).
+    warm_judge: Callable[[], Coroutine[Any, Any, None]] | None = None
 
     state: GateState = field(default_factory=GateState)
     _buffer: list[str] = field(default_factory=list)
@@ -280,6 +389,7 @@ class TurnGateController:
     _filler_segment: bool = False
     # The user message whose reply the small model writes (GatedAgent.llm_node).
     fast_for: str | None = None
+    _judge_warmed: bool = False
 
     def __post_init__(self) -> None:
         if self.config.pause is not None:
@@ -288,6 +398,18 @@ class TurnGateController:
     def attach(self) -> None:
         self.session.on("user_input_transcribed", self.on_user_input_transcribed)
         self.session.on("agent_state_changed", self._on_agent_state_changed)
+
+    @property
+    def caller_reference(self) -> float | None:
+        """The customer's learned speaking level (dBFS), or None before their
+        first accepted turn."""
+        return self._level.reference
+
+    def warm(self) -> None:
+        """Starts the judge's warm-up, once; nothing waits for it."""
+        if self.warm_judge is not None and not self._judge_warmed:
+            self._judge_warmed = True
+            self._spawn(self.warm_judge())
 
     # ---- agent speech, for the echo check ----
 
@@ -320,23 +442,26 @@ class TurnGateController:
         """One mic frame's level. While the agent speaks, speech within margin_db
         of the customer's own level for min_speech_s pauses it at once; the
         judge then interrupts it (barge-in) or it resumes. Frames heard while it
-        listens calibrate that level once the gate accepts the turn."""
+        listens calibrate that level once the gate accepts the turn (the pause and
+        voice isolation both use it, so it is learned when either is on)."""
         pause = self.config.pause
-        if pause is None or self._loud is None:
+        if pause is None and not self.config.voice_isolation_enabled:
             return
-        now = self.clock()
         user_speaking = self.session.user_state == "speaking"
-        if user_speaking:
-            self._last_voice_at = now
-        else:
-            self._pause_vetoed = False
-            self._loud.reset()
-
         agent_state = self.session.agent_state
         if self._filler_playing():
             agent_state = "speaking"
         if agent_state == "listening" and user_speaking:
             self._level.heard(db)
+        if pause is None or self._loud is None:
+            return
+
+        now = self.clock()
+        if user_speaking:
+            self._last_voice_at = now
+        else:
+            self._pause_vetoed = False
+            self._loud.reset()
         if self._paused_at is not None:
             if now - self._last_voice_at >= pause.resume_after_s:
                 self._resume("quiet")
@@ -410,6 +535,19 @@ class TurnGateController:
             # barge in (interrupt(force=True) ignores allow_interruptions) or be
             # queued as an answer.
             return
+
+        raw = (ev.transcript or "").strip()
+        # Drop non-speech sound tags: [background noise], [crosstalk], [笑], (laughter), etc.
+        if not raw or turn_gate.is_sound_only(raw):
+            return
+
+        # Quiet noise comes back as text in some other language (Polish, Turkish,
+        # Malayalam); customers speak only Bangla or English.
+        lang = (getattr(ev, "language", "") or "").lower().split("-")[0]
+        if lang and lang not in _CUSTOMER_LANGUAGES:
+            logger.info("ignoring transcript in language %r: %r", lang, raw)
+            return
+
         if ev.is_final:
             self._buffer.append(ev.transcript)
             text = " ".join(self._buffer)
@@ -444,6 +582,9 @@ class TurnGateController:
         del self._buffer[:judged]
 
     async def _consider_barge_in(self, text: str, is_final: bool, bot_state: BotState) -> None:
+        text = turn_gate.clean_transcript(text)
+        if not text or turn_gate.is_sound_only(text):
+            return
         now = self.clock()
         judged = len(self._buffer)
         if turn_gate.matches_handled(text, self._answered.text, now - self._answered.at):
@@ -462,7 +603,14 @@ class TurnGateController:
                 self._forget_judged(judged)
             return
 
-        stop = turn_gate.is_stop_phrase(text)
+        # A stop phrase interrupts without the judge while the caller is still
+        # saying it, and the whole sentence is judged once it arrives. A whole
+        # sentence that only opens with one is judged like any other: a bystander's
+        # "না, না, আর উপর থেকে নিচে নামার জন্য কী করতে হবে" was answered in place of
+        # the customer's question.
+        stop = turn_gate.is_stop_phrase(text) and (
+            not is_final or turn_gate.is_bare_stop_phrase(text)
+        )
         p: float | None = None
         judgement: Judgement | None = None
         if not stop:
@@ -549,7 +697,7 @@ class TurnGateController:
         if self.quick is None or judgement is None:
             return
         path = quick_reply.route(
-            judgement, self.session.userdata, self.quick.config, self.quick.settings
+            judgement, self.session.userdata, self.quick.config, self.quick.settings, text=text
         )
         key = _text_key(text)
         if path == "fast":
@@ -583,7 +731,10 @@ class TurnGateController:
         accepted turn's lookup is prefetched into turn_ctx (see app.agent.prefetch)."""
         self._buffer.clear()
         now = self.clock()
-        if not self._greeting_done() or not turn_gate.normalize(new_message.text_content or ""):
+        raw_text = new_message.text_content or ""
+        if not self._greeting_done() or (
+            not turn_gate.normalize(raw_text) and not turn_gate.has_contact(raw_text)
+        ):
             raise StopResponse()
         # Sound tags ("[clears throat]") stay out of the conversation the agent
         # and the transcript see; a turn that is only tags was dropped above. A
@@ -616,8 +767,12 @@ class TurnGateController:
             await self._run_accepted(text, judgement, turn_ctx, new_message)
             return
 
+        if self.config.voice_isolation_enabled:
+            await self._drop_quiet_voice(text, new_message.transcript_confidence, now)
+
         started = time.perf_counter()
         pre = turn_gate.precheck(text, new_message.transcript_confidence)
+        is_confirm = _is_confirmation_or_assent(text)
         judgement: Judgement | None = None
         if turn_gate.needs_judge(pre, stt_writes_bengali=self.config.stt_writes_bengali):
             judgement = await self._judge_cached(text, "listening")
@@ -629,7 +784,7 @@ class TurnGateController:
             state=self.state,
             now=now,
             th=self.config.thresholds,
-            bot_asked=pre.assent and _bot_just_asked(self.session),
+            bot_asked=(pre.assent or is_confirm) and _bot_just_asked(self.session),
         )
         self.state.record(verdict, now)
         _log(verdict.value, text, p=p, pre=pre, ms=(time.perf_counter() - started) * 1000)
@@ -642,13 +797,84 @@ class TurnGateController:
 
         if verdict is Verdict.ACCEPT:
             await self._publish_user_turn(text)
-            await self._run_accepted(text, judgement, turn_ctx, new_message, closing=pre.closing)
+            try:
+                await self._run_accepted(text, judgement, turn_ctx, new_message, closing=pre.closing)
+            except StopResponse:
+                raise
+            except Exception as exc:
+                logger.exception("Error during accepted turn processing; proceeding to LLM: %s", exc)
+                self._cancel_fillers()
+                if self.prefetcher is not None:
+                    self.prefetcher.cancel()
             return
         self._cancel_fillers()
         if self.prefetcher is not None:
             self.prefetcher.cancel()
         if verdict is Verdict.OTHER_LANGUAGE:
             self.session.say(OTHER_LANGUAGE_LINE, add_to_chat_ctx=False)
+            raise StopResponse()
+        if verdict is Verdict.DROP:
+            # If the user spoke substantive words (not pure filler, silence or sound tags)
+            # but it was dropped (e.g. low Jev score or unclear speech):
+            # Clarify so the agent never stays stuck or silent.
+            if (
+                self.session.current_speech is None
+                and (p is None or p >= 0.20)
+                and turn_gate.address_form(text) != "informal"
+                and pre.word_count >= 2
+                and not pre.filler
+                and not turn_gate.is_sound_only(text)
+            ):
+                if _has_question_or_address(text):
+                    logger.info("Turn was dropped by gate but contains question/address; asking clarification: %s", text)
+                    try:
+                        self.session.say(UNCLEAR_TURN_LINE, add_to_chat_ctx=True)
+                    except Exception:
+                        pass
+        raise StopResponse()
+
+    async def _drop_quiet_voice(self, text: str, confidence: float | None, now: float) -> None:
+        """Voice isolation: raises StopResponse for a turn too quiet to be the
+        customer (they sit nearest the mic). Below the floor it is someone across
+        the room; more than the margin below the caller's learned level, someone
+        nearby. Soft answers to the agent's question ("জি করেন", a code read back)
+        often come 15-20 dB under the caller's peak, so an answer or a
+        confirmation skips the margin and survives the floor when Jev rates it
+        addressed; any other quiet turn survives only that way too."""
+        turn_db = self._level.current_turn_level()
+        if turn_db is None:
+            return
+        answer = _bot_just_asked(self.session) or _is_confirmation_or_assent(text)
+        floor = self.config.speech_floor_dbfs
+        if turn_db < floor:
+            if answer and await self._judged_addressed(text):
+                logger.info("quiet answer kept: %.1f dBFS under floor %.1f: %s", turn_db, floor, text)
+                return
+            self._drop_isolated("drop_distant_voice", text, now, db=round(turn_db, 1), floor=floor)
+        ref = self._level.reference
+        if ref is None or answer:
+            return
+        margin = self.config.speech_margin_db
+        if turn_gate.precheck(text, confidence).assent:
+            margin += _ASSENT_EXTRA_MARGIN_DB
+        if turn_db >= ref - margin:
+            return
+        if await self._judged_addressed(text):
+            logger.info(
+                "quiet turn kept: %.1f dBFS, %.1f dB under the caller, Jev rates it addressed: %s",
+                turn_db, ref - turn_db, text,
+            )
+            return
+        self._drop_isolated("drop_surrounding_voice", text, now, db=round(turn_db, 1), ref=round(ref, 1))
+
+    async def _judged_addressed(self, text: str) -> bool:
+        judgement = await self._judge_cached(text, "listening")
+        return judgement.p is not None and judgement.p >= self.config.thresholds.drop_p
+
+    def _drop_isolated(self, event: str, text: str, now: float, **fields) -> None:
+        self._level.clear()
+        self.state.record(Verdict.DROP, now)
+        _log(event, text, **fields)
         raise StopResponse()
 
     async def _run_accepted(
@@ -675,6 +901,7 @@ class TurnGateController:
                     self.session.userdata,
                     self.quick.config,
                     self.quick.settings,
+                    text=text,
                     closing=closing,
                 )
             if path == "fast":
@@ -828,7 +1055,7 @@ class TurnGateController:
         if judgement.p is not None and judgement.p < self.config.thresholds.drop_p:
             return
         route = quick_reply.route(
-            judgement, self.session.userdata, self.quick.config, self.quick.settings
+            judgement, self.session.userdata, self.quick.config, self.quick.settings, text=text
         )
         if route == "filler":
             self._filler_task(text, judgement)
@@ -1019,7 +1246,8 @@ class GatedAgent(Agent):
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
     ) -> AsyncIterable[llm.ChatChunk | str]:
         message_id, text = _last_user(chat_ctx)
-        return self._gate.with_filler(self._reply(chat_ctx, tools, model_settings), message_id, text)
+        reply = reply_punctuation.clean_reply_stream(self._reply(chat_ctx, tools, model_settings))
+        return self._gate.with_filler(reply, message_id, text)
 
     async def _reply(
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
@@ -1077,13 +1305,18 @@ class GatedAgent(Agent):
         without a tool call is the last one: the cards go then."""
         userdata = _userdata(self)
         tool_call = False
-        async for chunk in stream:
-            if userdata is not None and userdata.pending_card is not None:
-                if _has_speech(chunk):
-                    await cards.flush_pending_card(userdata)
-            if isinstance(chunk, llm.ChatChunk) and chunk.delta is not None and chunk.delta.tool_calls:
-                tool_call = True
-            yield chunk
+        try:
+            async for chunk in stream:
+                if userdata is not None and userdata.pending_card is not None:
+                    if _has_speech(chunk):
+                        await cards.flush_pending_card(userdata)
+                if isinstance(chunk, llm.ChatChunk) and chunk.delta is not None and chunk.delta.tool_calls:
+                    tool_call = True
+                yield chunk
+        except Exception as exc:
+            logger.exception("main model stream failed: %s; saying a fallback line", exc)
+            yield STREAM_FAILED_LINE
+            return
         if userdata is not None and not tool_call and userdata.pending_card is not None:
             await cards.flush_pending_card(userdata)
 
@@ -1111,17 +1344,51 @@ class GatedAgent(Agent):
         return Agent.default.stt_node(self, self._metered(audio), model_settings)
 
     async def _metered(self, audio: AsyncIterable[rtc.AudioFrame]) -> AsyncIterable[rtc.AudioFrame]:
+        """Every frame's level goes to the gate. With voice isolation on, a frame
+        under the bar (the floor, or the caller's level less the margin) reaches
+        the VAD and STT as silence, so room chatter never becomes a transcript;
+        the hangover keeps soft word endings and short gaps between words."""
+        config = self._gate.config
+        hangover_until = 0.0
         async for frame in audio:
             samples = np.frombuffer(frame.data, dtype=np.int16)
-            self._gate.on_audio_level(
-                voice_level.dbfs(samples), frame.samples_per_channel / frame.sample_rate
-            )
-            yield frame
+            db = voice_level.dbfs(samples)
+            self._gate.on_audio_level(db, frame.samples_per_channel / frame.sample_rate)
+            if not config.voice_isolation_enabled:
+                yield frame
+                continue
+            ref = self._gate.caller_reference
+            cutoff = config.speech_floor_dbfs
+            if ref is not None:
+                cutoff = max(cutoff, ref - config.speech_margin_db)
+            now = self._gate.clock()
+            if db >= cutoff:
+                hangover_until = now + _ISOLATION_HANGOVER_S
+                yield frame
+            elif now < hangover_until:
+                yield frame
+            else:
+                yield rtc.AudioFrame(
+                    data=b"\x00" * (frame.num_channels * frame.samples_per_channel * 2),
+                    sample_rate=frame.sample_rate,
+                    num_channels=frame.num_channels,
+                    samples_per_channel=frame.samples_per_channel,
+                )
 
     async def on_user_turn_completed(
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
     ) -> None:
-        await self._gate.on_user_turn_completed(new_message, turn_ctx)
+        try:
+            await self._gate.on_user_turn_completed(new_message, turn_ctx)
+        except StopResponse:
+            raise
+        except Exception as exc:
+            logger.exception("Unexpected error in GatedAgent.on_user_turn_completed: %s", exc)
+            try:
+                self.session.say(STREAM_FAILED_LINE, add_to_chat_ctx=True)
+            except Exception:
+                pass
+            raise StopResponse()
 
     async def transcription_node(
         self, text: AsyncIterable[str | Any], model_settings
@@ -1154,6 +1421,13 @@ class TurnPublishingAgent(Agent):
     def __init__(self, *, room: rtc.Room | None, **kwargs) -> None:
         super().__init__(**kwargs)
         self._room = room
+
+    def llm_node(
+        self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
+    ) -> AsyncIterable[llm.ChatChunk | str]:
+        return reply_punctuation.clean_reply_stream(
+            Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        )
 
     async def on_user_turn_completed(
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage

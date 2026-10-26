@@ -10,6 +10,7 @@ Run from backend/ so the backend environment, .env and database are used:
     cd backend && uv run python ../scripts/reply_bench/run.py --customer Samiha
     cd backend && uv run python ../scripts/reply_bench/run.py --customer Samiha --baseline
     cd backend && uv run python ../scripts/reply_bench/run.py --guest
+    cd backend && uv run python ../scripts/reply_bench/run.py --sim
 
 There is no turn gate here, so the router never prefetches: a lookup always
 costs two LLM calls, where the live agent may need one.
@@ -67,6 +68,15 @@ GUEST_TURNS = [
 ]
 
 
+# A stolen SIM, in Bangla: knowledge-base wording and the nearest care centre.
+SIM_TURNS = [
+    "amar sim ta churi hoye geche, ki korbo?",
+    "হ্যাঁ, একটু বলেন কোথায় যেতে হবে। আমি গাজীপুরে থাকি।",
+    "ফি কত?",
+    "customer care kothay? ami mirpur e thaki",
+]
+
+
 class _NoRoom:
     """Cards are published to the room; here they go nowhere."""
 
@@ -102,6 +112,7 @@ async def main() -> None:
     parser.add_argument("--customer", default="Samiha", help="start of the subscriber's full name")
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--guest", action="store_true", help="not logged in")
+    parser.add_argument("--sim", action="store_true", help="the stolen-SIM conversation")
     args = parser.parse_args()
     if args.baseline:
         _apply_baseline()
@@ -125,7 +136,8 @@ async def main() -> None:
     )
     async with AgentSession(llm=_build_llm(get_settings(), config), userdata=userdata) as session:
         await session.start(agent)
-        for turn in GUEST_TURNS if args.guest else TURNS:
+        turns = SIM_TURNS if args.sim else GUEST_TURNS if args.guest else TURNS
+        for turn in turns:
             started = time.perf_counter()
             result = await session.run(user_input=turn)
             took = time.perf_counter() - started

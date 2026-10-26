@@ -120,7 +120,7 @@ def test_avoid_keeps_the_utterance_script():
         ("Balance is 50 taka, one moment.", "what is my balance", False),  # money
         ("Call 01711223344 for the details.", "details?", False),  # contact
         ("Do you want data or minutes?", "packs?", False),  # a question
-        ("One two three four five six seven eight nine ten eleven", "x", False),  # too long
+        ("One two three four five six seven eight nine ten eleven twelve thirteen", "x", False),  # too long
         ("", "x", False),
     ],
 )
@@ -320,7 +320,7 @@ def test_marker_cut_at_the_buffer_edge_is_never_spoken():
 
 
 def test_quick_reply_module_imports_without_a_worker():
-    assert quick_reply.FILLER_MAX_WORDS == 10
+    assert quick_reply.FILLER_MAX_WORDS == 12
 
 
 def test_fast_and_filler_prompts_are_telco_only():
@@ -336,3 +336,87 @@ def test_fast_rules_hand_off_telco_facts_and_codes():
 def test_filler_examples_are_telco():
     for line in ("ব্যালেন্সটা চেক করছি।", "প্যাকগুলো দেখছি।", "Checking your account."):
         assert line in quick_reply._FILLER_SYSTEM
+
+
+# --- template fillers -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("আমার ব্যালেন্স কত আছে?", "filler"),  # an account tool, though Jev says no lookup
+        ("আমার টাকা কেটে নিল কেন?", "filler"),
+        ("amar balance koto?", "filler"),
+        ("ধন্যবাদ, আসসালামু আলাইকুম", "fast"),
+        ("ঠিক আছে", "fast"),
+    ],
+)
+def test_route_gives_a_tool_turn_a_filler_whatever_the_lookup(text, expected):
+    judgement = Judgement(0.9, "none", 0.9, text=text)
+    assert route(judgement, _Userdata(), _config(), _settings()) == expected
+    # The turn's own text wins over the judgement's.
+    assert route(Judgement(0.9, "none", 0.9), _Userdata(), _config(), _settings(), text=text) == expected
+
+
+def test_route_never_fills_over_a_pending_action():
+    judgement = Judgement(0.9, "none", 0.9, text="রিচার্জ করে দিন")
+    assert route(judgement, _Userdata(pending_action=object()), _config(), _settings()) is None
+
+
+@pytest.mark.parametrize(
+    ("utterance", "lookup", "expected"),
+    [
+        ("আমার ব্যালেন্স কত আছে?", "none", "ব্যালেন্সটা চেক করছি।"),
+        ("৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী আছে?", "packages", "ডাটা প্যাকগুলো দেখছি।"),
+        ("সাত দিনের মিনিট প্যাক আছে?", "packages", "মিনিট প্যাকগুলো দেখছি।"),
+        ("আমার নেটওয়ার্ক কাজ করছে না", "none", "আপনার এলাকার নেটওয়ার্কটা চেক করছি।"),
+        ("রোমিং চালু করতে কী লাগে?", "knowledge_base", "ওকে, এক সেকেন্ড।"),
+        ("How much data do I have left?", "none", "Checking your usage."),
+        ("Show me weekly voice packs under 100 taka.", "packages", "Checking the minute packs."),
+        ("amar balance koto ache?", "none", "ব্যালেন্সটা চেক করছি।"),
+    ],
+)
+def test_fast_filler_names_what_was_asked(utterance, lookup, expected):
+    assert quick_reply.fast_filler(utterance, lookup) == expected
+
+
+def test_fast_filler_varies_its_lines_and_openers():
+    said: list[str] = []
+    for _ in range(4):
+        line = quick_reply.fast_filler("আমার ব্যালেন্স কত আছে?", "none", avoid=said)
+        assert line not in said
+        said.append(line)
+    # A topic line first, then the next topic line, then generic ones.
+    assert said[:2] == ["ব্যালেন্সটা চেক করছি।", "জি, আপনার ব্যালেন্সটা দেখছি।"]
+
+
+def test_fast_filler_prefers_a_line_already_cached(tmp_path):
+    from app.agent.audio_cache import AudioCache
+
+    cache = AudioCache(tmp_path)
+    cache.save("জি, আপনার ব্যালেন্সটা দেখছি।", b"\x00\x00" * 100, 24000, 1, "voice:model")
+    assert quick_reply.fast_filler("আমার ব্যালেন্স কত আছে?", "none", cache=cache) == (
+        "জি, আপনার ব্যালেন্সটা দেখছি।"
+    )
+
+
+def test_template_lines_are_safe_short_and_telco():
+    lines = [
+        *quick_reply._GENERIC_BN,
+        *quick_reply._GENERIC_EN,
+        *(line for lines in quick_reply._TOPIC_LINES_BN.values() for line in lines),
+        *(line for lines in quick_reply._TOPIC_LINES_EN.values() for line in lines),
+    ]
+    for line in lines:
+        assert safe_filler(line, "") == line, line
+        assert not real_estate_words(line), line
+        # The filler prompt's own rule: no literary Bangla.
+        assert not any(word in line for word in ("যাচাই", "মিলিয়ে", "ঘেঁটে", "খুলছি")), line
+        assert quick_reply.is_filler_line(line)
+
+
+def test_only_filler_lines_are_cacheable():
+    assert quick_reply.is_filler_line("ব্যালেন্সটা চেক করছি")  # punctuation aside
+    assert not quick_reply.is_filler_line("আপনার ব্যালেন্স ৫০ টাকা।")
+    quick_reply.remember_filler("ওকে, আপনার প্যাকটা দেখছি।")
+    assert quick_reply.is_filler_line("ওকে, আপনার প্যাকটা দেখছি।")

@@ -320,3 +320,19 @@ def test_goodbyes_are_accepted_without_the_judge(text):
 )
 def test_other_turns_are_not_goodbyes(text):
     assert not turn_gate.is_closing(text)
+
+
+def test_mixed_loanwords_classified_as_bengali():
+    assert turn_gate.classify_script("জি, এহ booking টি confirm করুন।") == "bn"
+    assert turn_gate.classify_script("এই flat টি visit করতে চাই") == "bn"
+
+
+def test_phone_numbers_not_dropped_as_filler():
+    pre = precheck("017909090", 0.9)
+    assert not pre.filler
+    assert pre.script == "bn"
+    assert pre.word_count >= 1
+    # If Jev scores 0.46 (above drop_p 0.35), it must be accepted!
+    v = decide(pre, 0.46, stt_writes_bengali=True, state=GateState(), now=0.0)
+    assert v is Verdict.ACCEPT
+

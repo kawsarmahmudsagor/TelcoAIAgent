@@ -5,13 +5,13 @@ import { useSessionContext, useVoiceAssistant } from '@livekit/components-react'
 const END_CALL_RPC = 'end_call';
 // After the agent stops speaking, so the goodbye's last audio has played here too.
 const AFTER_SPEECH_MS = 600;
-// Ends the call even if the agent still shows as speaking (a stuck state).
+// Calls onEnd even if the agent still shows as speaking (a stuck state).
 const MAX_WAIT_MS = 15_000;
 
 /**
- * Ends the call when the agent asks to, after its goodbye: the agent calls the `end_call` RPC
+ * Runs `onEnd` when the agent asks to, after its goodbye: the agent calls the `end_call` RPC
  * once the goodbye has played on its side, and this waits until the agent is no longer
- * speaking here before calling `onEnd` -- the same handler as the End call button.
+ * speaking here. In the portal `onEnd` turns the mic off; the session stays connected.
  */
 export function useAgentEndCall(onEnd: () => void) {
   const { room } = useSessionContext();

@@ -88,6 +88,10 @@ class ResolvedAgentConfig:
     elevenlabs_voice_id: str
     # In stt_tts_provider's format; unused with deepgram.
     elevenlabs_tts_model: str = ""
+    # Voice provider "elevenlabs" only: the Scribe model ("" = ELEVENLABS_STT_MODEL)
+    # and the spoken language, "auto" to detect it per turn.
+    elevenlabs_stt_model: str = ""
+    elevenlabs_stt_language: str = "auto"
     rag_enabled: bool = False
     rag_top_k: int = 5
     rag_similarity_threshold: float = 0.45
@@ -175,6 +179,8 @@ def resolve(row: AgentConfig | None, settings: Settings | None = None) -> Resolv
         elevenlabs_tts_model=(
             row.elevenlabs_tts_model or default_elevenlabs_tts_model(stt_tts, settings)
         ),
+        elevenlabs_stt_model=row.elevenlabs_stt_model or settings.elevenlabs_stt_model,
+        elevenlabs_stt_language=row.elevenlabs_stt_language or "auto",
         rag_enabled=bool(row.rag_enabled),
         rag_top_k=row.rag_top_k if row.rag_top_k is not None else 5,
         rag_similarity_threshold=(

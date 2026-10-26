@@ -1,14 +1,14 @@
-"""end_call for browser calls: the goodbye first, then the browser ends the call.
+"""end_call for browser sessions: the goodbye first, then the browser turns the mic off.
 
-The model says its goodbye and calls end_call in the same reply. The tool waits
-until that goodbye has played, then asks the browser over RPC to end the call
-the way its End call button does (frontend hooks/useAgentEndCall.ts), so the
-call screen closes normally instead of the room being deleted under it.
+A browser session is one conversation that can switch between text and voice, so
+ending the voice part never closes the room: the chat stays open and the customer
+can type, or turn the mic on again. The model says its goodbye and calls end_call
+in the same reply. The tool waits until that goodbye has played, then asks the
+browser over RPC to turn the mic off (frontend hooks/useAgentEndCall.ts).
 
 A model that calls end_call with no goodbye before it gets one asked for in the
 tool's result, and the browser is told once that reply has played. Should the
-browser never end the call (tab closed, RPC lost), the agent deletes the room
-after FALLBACK_S.
+RPC fail (tab closed), nothing more happens: the room ends when the browser leaves.
 
 Phone calls keep the library's EndCallTool: there is no browser to ask.
 """
@@ -16,7 +16,7 @@ Phone calls keep the library's EndCallTool: there is no browser to ask.
 import asyncio
 import logging
 
-from livekit.agents import AgentSession, RunContext, function_tool, get_job_context
+from livekit.agents import AgentSession, RunContext, function_tool
 from livekit.agents.llm import FunctionTool
 from livekit.agents.voice.speech_handle import SpeechHandle
 
@@ -24,12 +24,11 @@ logger = logging.getLogger("agent.browser_end_call")
 
 # Must match END_CALL_RPC in frontend/hooks/useAgentEndCall.ts.
 END_CALL_RPC = "end_call"
-FALLBACK_S = 120.0
 _RPC_TIMEOUT_S = 5.0
 
 _DESCRIPTION = """
-Ends the call. Say your goodbye first, then call this in the same reply: the call ends once
-the goodbye has played. Nothing more can be said after it.
+Ends the voice chat: the customer's mic turns off once your goodbye has played, and the text
+chat stays open. Say your goodbye first, then call this in the same reply.
 """
 
 
@@ -48,16 +47,13 @@ def _said_before(ctx: RunContext) -> bool:
 
 
 class BrowserEndCall:
-    """Per session: it remembers that the call is ending, so a second end_call
-    (the model calling it again from the goodbye it was asked for) does nothing."""
+    """Per session: it remembers that a goodbye is under way, so a second end_call
+    (the model calling it again from the goodbye it was asked for) does nothing.
+    Once the browser has been asked, a later voice chat can be ended again."""
 
-    def __init__(
-        self, *, goodbye_instructions: str, extra_description: str = "", fallback_s: float = FALLBACK_S
-    ):
+    def __init__(self, *, goodbye_instructions: str, extra_description: str = ""):
         self._goodbye_instructions = goodbye_instructions
-        self._fallback_s = fallback_s
         self._ending = False
-        self._fallback: asyncio.Task[None] | None = None
         self.tool: FunctionTool = function_tool(
             self._end_call,
             name="end_call",
@@ -67,7 +63,7 @@ class BrowserEndCall:
     async def _end_call(self, ctx: RunContext) -> str | None:
         if self._ending:
             return None
-        # A goodbye interrupted by the customer cancels this tool, and the call goes on.
+        # A goodbye interrupted by the customer cancels this tool, and the voice chat goes on.
         await ctx.wait_for_playout()
         self._ending = True
         session = ctx.session
@@ -86,9 +82,6 @@ class BrowserEndCall:
         return self._goodbye_instructions
 
     async def _ask_browser(self, session: AgentSession) -> None:
-        if self._fallback is None:
-            self._fallback = asyncio.create_task(self._end_anyway())
-            session.once("close", lambda _: self._fallback and self._fallback.cancel())
         try:
             room_io = session.room_io
             caller = room_io.linked_participant
@@ -100,17 +93,8 @@ class BrowserEndCall:
                 payload="",
                 response_timeout=_RPC_TIMEOUT_S,
             )
-            logger.info("asked the browser to end the call")
+            logger.info("asked the browser to turn the mic off")
         except Exception:
-            logger.warning(
-                "couldn't ask the browser to end the call; ending it in %.0f s",
-                self._fallback_s,
-                exc_info=True,
-            )
-
-    async def _end_anyway(self) -> None:
-        await asyncio.sleep(self._fallback_s)
-        logger.warning("the browser didn't end the call; deleting the room")
-        job = get_job_context()
-        await job.delete_room()
-        job.shutdown(reason="browser did not end the call")
+            logger.warning("couldn't ask the browser to turn the mic off", exc_info=True)
+        finally:
+            self._ending = False

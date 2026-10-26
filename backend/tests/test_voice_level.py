@@ -107,3 +107,14 @@ def test_reset_starts_over():
     _feed(loud, -20.0, 0.25)
     loud.reset()
     assert not _feed(loud, -20.0, 0.1)
+
+
+def test_current_turn_level():
+    level = CallerLevel()
+    assert level.current_turn_level() is None
+    level.heard(-20.0)
+    level.heard(-20.0)
+    assert level.current_turn_level() == pytest.approx(-20.0)
+    level.clear()
+    assert level.current_turn_level() is None
+

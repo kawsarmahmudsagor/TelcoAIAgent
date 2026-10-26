@@ -117,8 +117,8 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
   useAgentErrors();
   const voiceMode = useVoiceMode();
   useMicOnConnect(voiceRequested && voiceMode !== 'off');
-  // The agent ends the session after its goodbye.
-  useAgentEndCall(() => void session.end());
+  // The agent's goodbye ends the voice chat only: the mic turns off, the chat stays open.
+  useAgentEndCall(() => void room.localParticipant.setMicrophoneEnabled(false));
 
   const { state: agentState } = useVoiceAssistant();
   const { messages: sessionMessages } = useSessionMessages(session);

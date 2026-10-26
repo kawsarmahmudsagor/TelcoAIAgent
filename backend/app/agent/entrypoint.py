@@ -1,6 +1,14 @@
 import asyncio
 import logging
 import random
+import sys
+
+# Bangla log lines would crash a Windows console's default code page.
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,6 +25,7 @@ from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 from app.agent import (
     account_link,
     action_rpc,
+    audio_cache,
     browser_end_call,
     elevenlabs_keys,
     gated_agent,
@@ -195,6 +204,16 @@ def _sentence_tts(tts: tts_utils.TTS) -> tts_utils.StreamAdapter:
     )
 
 
+def _filler_cached(raw_tts: tts_utils.TTS, config: ResolvedAgentConfig) -> tts_utils.TTS:
+    """Filler lines play from app.agent.audio_cache once said in this voice;
+    every other sentence is synthesized as usual."""
+    return audio_cache.AudioCachingTTS(
+        raw_tts,
+        cacheable=quick_reply.is_filler_line,
+        voice_key=f"{config.elevenlabs_voice_id}:{raw_tts.model}",
+    )
+
+
 def _build_openrouter_stt_and_tts(
     settings: Settings, config: ResolvedAgentConfig, vad: vad_utils.VAD | None
 ) -> tuple[stt_utils.STT, tts_utils.TTS]:
@@ -212,14 +231,13 @@ def _build_openrouter_stt_and_tts(
         raise RuntimeError("the OpenRouter STT needs a VAD to fall back to Deepgram")
 
     stt = openrouter_audio.make_openrouter_stt(settings, key)
-    tts = _sentence_tts(
-        openrouter_audio.OpenRouterTTS(
-            api_key=key,
-            base_url=settings.openrouter_base_url,
-            model=config.elevenlabs_tts_model or settings.elevenlabs_openrouter_tts_model,
-            voice=config.elevenlabs_voice_id,
-        )
+    raw_tts = openrouter_audio.OpenRouterTTS(
+        api_key=key,
+        base_url=settings.openrouter_base_url,
+        model=config.elevenlabs_tts_model or settings.elevenlabs_openrouter_tts_model,
+        voice=config.elevenlabs_voice_id,
     )
+    tts = _sentence_tts(_filler_cached(raw_tts, config))
     if not settings.deepgram_key:
         # AgentSession drives the non-streaming STT with its own VAD.
         return stt, tts
@@ -265,23 +283,35 @@ def _build_stt_and_tts(
         el_keys = settings.elevenlabs_keys
     stts: list[stt_utils.STT] = []
     ttss: list[tts_utils.TTS] = []
+    stt_model = _elevenlabs_stt_model(settings, config)
+    is_realtime = stt_model == "scribe_v2_realtime"
+    # None: Scribe detects the language (customers speak Bangla or English).
+    language = None if config.elevenlabs_stt_language == "auto" else config.elevenlabs_stt_language
     for key in el_keys:
         label = f"elevenlabs {elevenlabs_keys.key_tail(key)}"
-        stt = elevenlabs_keys.FailFastElevenLabsSTT(
-            api_key=key,
-            model=settings.elevenlabs_stt_model,
-            # no language_code set -> ElevenLabs Scribe auto-detects the spoken
-            # language across turns; DEFAULT_LANGUAGE is used as the persona's
-            # fallback tone/wording, not as an STT constraint.
-            # Without server_vad the plugin uses manual commits, and nothing in the
-            # session sends one: turns then hang on partial transcripts until
-            # ElevenLabs commits on its own (minutes, or never).
-            server_vad={"vad_silence_threshold_secs": settings.elevenlabs_stt_silence_secs},
-        )
-        if not stt.capabilities.streaming:
-            # FallbackAdapter would need a VAD to drive a non-streaming STT.
-            raise RuntimeError(
-                f"ELEVENLABS_STT_MODEL={settings.elevenlabs_stt_model} is not a realtime model"
+        if is_realtime:
+            stt = elevenlabs_keys.FailFastElevenLabsSTT(
+                api_key=key,
+                model=stt_model,
+                language_code=language,
+                tag_audio_events=False,
+                # Without server_vad the plugin uses manual commits, and nothing in the
+                # session sends one: turns then hang on partial transcripts until
+                # ElevenLabs commits on its own (minutes, or never).
+                server_vad={"vad_silence_threshold_secs": settings.elevenlabs_stt_silence_secs},
+            )
+        else:
+            if vad is None:
+                raise RuntimeError("the ElevenLabs batch STT needs a VAD")
+            # Batch STT: auto-detection hears the whole turn, not its first moments.
+            stt = stt_utils.StreamAdapter(
+                stt=elevenlabs_keys.BatchElevenLabsSTT(
+                    api_key=key,
+                    model=stt_model,
+                    language_code=language,
+                    tag_audio_events=False,
+                ),
+                vad=vad,
             )
         stts.append(_labelled(stt, label))
         # StreamAdapter wraps the ElevenLabs TTS to synthesize sentence-by-sentence over its
@@ -295,7 +325,7 @@ def _build_stt_and_tts(
             voice_id=config.elevenlabs_voice_id,
             model=config.elevenlabs_tts_model or settings.elevenlabs_tts_model,
         )
-        ttss.append(_labelled(_sentence_tts(raw_tts), label))
+        ttss.append(_labelled(_sentence_tts(_filler_cached(raw_tts, config)), label))
 
     if settings.deepgram_key:
         # Last resort once every ElevenLabs key is spent.
@@ -322,6 +352,12 @@ def _build_stt_and_tts(
     return stt_chain, tts_chain
 
 
+def _openrouter_effort(effort: str) -> str:
+    """Endpoints like Gemini 3.5 Flash Lite require reasoning and reject "none"
+    with a 400; "minimal" is the closest every endpoint accepts."""
+    return "minimal" if effort == "none" else effort
+
+
 def _build_llm(settings: Settings, config: ResolvedAgentConfig) -> llm_utils.LLM:
     temperature = config.temperature if config.temperature is not None else NOT_GIVEN
     max_tokens = config.max_output_tokens if config.max_output_tokens else NOT_GIVEN
@@ -339,7 +375,7 @@ def _build_llm(settings: Settings, config: ResolvedAgentConfig) -> llm_utils.LLM
             max_completion_tokens=max_tokens,
             # OpenRouter's unified field, not OpenAI's top-level reasoning_effort,
             # so it reaches whichever provider OpenRouter routes the model to.
-            extra_body={"reasoning": {"effort": config.reasoning_effort}},
+            extra_body={"reasoning": {"effort": _openrouter_effort(config.reasoning_effort)}},
         )
 
     # Gemini 3 models (incl. gemini-3.1-flash-lite) only accept thinking_level,
@@ -377,10 +413,23 @@ _END_CALL_GOODBYE = (
     "say goodbye in one or two short sentences that fit what happened: thank them and invite "
     "them back anytime. If you already said goodbye just now, say nothing more."
 )
+# The same for a browser session, where only the mic turns off and the chat stays open.
+_BROWSER_END_GOODBYE = (
+    "The customer's mic turns off after your next words; the chat stays open. In the language "
+    "of the customer's latest message, say goodbye in one or two short sentences that fit what "
+    "happened: thank them and say you're here if they need anything else. If you already said "
+    "goodbye just now, say nothing more."
+)
 
 
 def _idle_checkin(
-    ctx: JobContext, settings: Settings, session: AgentSession
+    ctx: JobContext,
+    settings: Settings,
+    session: AgentSession,
+    *,
+    config: ResolvedAgentConfig | None = None,
+    api_key: str | None = None,
+    client: httpx.AsyncClient | None = None,
 ) -> idle_checkin.IdleCheckIn | None:
     """Browser sessions only; None when settings turn it off."""
     if settings.idle_checkin_s <= 0:
@@ -391,11 +440,17 @@ def _idle_checkin(
         await ctx.delete_room()
         ctx.shutdown(reason="customer idle")
 
+    model = (config.quick_reply_model if config else None) or settings.quick_reply_model
+
     watcher = idle_checkin.IdleCheckIn(
         session=session,
         on_end=_end_call,
         idle_s=settings.idle_checkin_s,
         grace_s=settings.idle_end_s,
+        client=client,
+        model=model,
+        api_key=api_key,
+        base_url=settings.openrouter_base_url,
     )
     watcher.attach()
     return watcher
@@ -414,8 +469,8 @@ def _rag_enabled(config: ResolvedAgentConfig | None) -> bool:
 
 def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None = None) -> list:
     """Tools for this session. end_call is always there: on a phone call the agent has to hang
-    up itself (EndCallTool deletes the room), and a browser call ends after the
-    goodbye, by the browser (BrowserEndCall). Both keep per-session state, so
+    up itself (EndCallTool deletes the room), and in a browser session the goodbye
+    turns the mic off, by the browser, and the chat stays open (BrowserEndCall). Both keep per-session state, so
     they're built fresh each time.
 
     search_knowledge_base is added only when `config` has the knowledge base
@@ -435,10 +490,10 @@ def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None
         )
     else:
         # Goodbye first, end_call after it in the same reply; the browser then
-        # ends the call itself (see browser_end_call).
+        # turns the mic off and the chat stays open (see browser_end_call).
         tools.append(
             browser_end_call.BrowserEndCall(
-                goodbye_instructions=_END_CALL_GOODBYE,
+                goodbye_instructions=_BROWSER_END_GOODBYE,
                 extra_description=_BROWSER_END_CALL_DESCRIPTION,
             ).tool
         )
@@ -483,14 +538,42 @@ def _turn_handling(gated: bool, endpoint_min_delay: float | None = None) -> dict
     return handling
 
 
+def _elevenlabs_stt_model(settings: Settings, config: ResolvedAgentConfig) -> str:
+    """The "elevenlabs" voice provider's Scribe model: the agent's choice, else
+    ELEVENLABS_STT_MODEL. scribe_v2_realtime streams; scribe_v2 transcribes
+    each turn whole."""
+    return config.elevenlabs_stt_model or settings.elevenlabs_stt_model
+
+
+def _batch_stt(settings: Settings, config: ResolvedAgentConfig) -> bool:
+    if config.stt_tts_provider == "openrouter":
+        return True
+    return (
+        config.stt_tts_provider == "elevenlabs"
+        and _elevenlabs_stt_model(settings, config) != "scribe_v2_realtime"
+    )
+
+
+def _stt_description(settings: Settings, config: ResolvedAgentConfig) -> str:
+    """The STT in use, for the run log's configuration lines."""
+    if config.stt_tts_provider == "deepgram":
+        return f"deepgram / {settings.deepgram_stt_model}"
+    if config.stt_tts_provider == "openrouter":
+        return f"openrouter / {settings.elevenlabs_openrouter_stt_model} (batch, per turn)"
+    model = _elevenlabs_stt_model(settings, config)
+    mode = "streaming" if model == "scribe_v2_realtime" else "batch, per turn"
+    return f"elevenlabs / {model} ({mode}, language: {config.elevenlabs_stt_language})"
+
+
 def _endpoint_min_delay(settings: Settings, config: ResolvedAgentConfig) -> float | None:
-    """With batch STT (voice provider "openrouter") a caller who pauses mid-sentence
-    loses half the sentence: when the second part stops, the library closes the
-    turn on the first part's text after min_delay (0.5 s), before the second
-    part's transcript is back (1.66 s later in run_2). A longer min_delay covers
+    """With batch STT (voice provider "openrouter", or "elevenlabs" on scribe_v2)
+    a caller who pauses mid-sentence loses half the sentence: when the second
+    part stops, the library closes the turn on the first part's text after
+    min_delay (0.5 s), before the second part's transcript is back (1.66 s later
+    in run_2). A longer min_delay covers
     that; a single-part turn waits for its transcript (2+ s) anyway, so it costs
     nothing there. Streaming STT finalizes fast and keeps the library default."""
-    if config.stt_tts_provider != "openrouter":
+    if not _batch_stt(settings, config):
         return None
     return settings.batch_stt_endpoint_min_delay_s
 
@@ -541,7 +624,10 @@ def _build_session(
     (room given) still publishes the voice turns it answers, like the gate.
     `timing` gets the session's per-turn timings (see run_log)."""
     gated = bool(gate_key)
-    vad = silero.VAD.load()
+    vad = silero.VAD.load(
+        activation_threshold=settings.vad_activation_threshold,
+        min_speech_duration=settings.vad_min_speech_duration,
+    )
     stt, tts = _build_stt_and_tts(settings, config, el_keys, vad)
     session = AgentSession(
         userdata=userdata,
@@ -563,6 +649,11 @@ def _build_session(
     usage_log.UsageLogger(room.name if room is not None else "").attach(session)
     if timing is not None:
         timing.attach(session)
+        timing.log_config(
+            stt=_stt_description(settings, config),
+            tts=f"{config.stt_tts_provider} / {config.elevenlabs_tts_model or settings.elevenlabs_tts_model}",
+            llm=f"{config.llm_provider} / {config.llm_model}",
+        )
     # The prompt mentions search_knowledge_base only when _session_tools
     # registers it -- both follow _rag_enabled.
     agent_kwargs = {
@@ -588,6 +679,7 @@ def _build_session(
     # apart than that: every turn's Jev and router calls paid for a new TLS
     # connection to OpenRouter. Kept open for the call instead.
     client = httpx.AsyncClient(limits=httpx.Limits(keepalive_expiry=_GATE_KEEPALIVE_S))
+    setattr(session, "_http_client", client)
     session.on("close", lambda _ev: asyncio.ensure_future(client.aclose()))
     prefetcher = None
     if _router_enabled(settings, config):
@@ -608,11 +700,14 @@ def _build_session(
             settings=settings,
             api_key=gate_key,
             client=client,
+            audio_cache=audio_cache.get_audio_cache(),
             on_event=timing.quick if timing is not None else None,
         )
     # The shortlist cards wait for the main model's first words, so they don't
     # appear while a filler line plays.
     userdata.defer_cards = quick is not None
+    # Quick replies route on Jev's lookup answer, so they ask for it too.
+    routed = _router_enabled(settings, config) or quick is not None
     gate = gated_agent.TurnGateController(
         session=session,
         room=room,
@@ -623,9 +718,11 @@ def _build_session(
             gate_key,
             client,
             timing.judged if timing is not None else None,
-            # Quick replies route on Jev's lookup answer, so they ask for it too.
-            router=_router_enabled(settings, config) or quick is not None,
+            router=routed,
             knowledge_base=_rag_enabled(config),
+        ),
+        warm_judge=gated_agent.jev_warm_up(
+            settings, gate_key, client, router=routed, knowledge_base=_rag_enabled(config)
         ),
         on_gate_reply=timing.gate_reply if timing is not None else None,
         prefetcher=prefetcher,
@@ -761,9 +858,12 @@ async def entrypoint(ctx: JobContext) -> None:
         linked_identity=userdata.linked_identity,
     ).register()
     await _announce_user_turns(ctx.room)
-    if isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:
-        agent.prefetcher.warm()
-    recorder = await TranscriptRecorder.start(session, userdata, ctx.room.name)
+    if isinstance(agent, gated_agent.GatedAgent):
+        # Both while the greeting plays, before the caller's first turn.
+        agent.gate.warm()
+        if agent.prefetcher:
+            agent.prefetcher.warm()
+    recorder =await TranscriptRecorder.start(session, userdata, ctx.room.name)
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:
         # Prefetched lookups never fire function_tools_executed, which is how the
         # recorder stores the LLM's own tool calls.
@@ -788,5 +888,13 @@ async def entrypoint(ctx: JobContext) -> None:
         await account_link.publish_account(ctx.room, userdata)
     except Exception:
         logger.exception("could not publish the account attribute")
-    idle = _idle_checkin(ctx, settings, session)
+    idle = _idle_checkin(
+        ctx,
+        settings,
+        session,
+        config=config,
+        api_key=gate_key,
+        # Gated sessions only: the call's OpenRouter connection, for the check-in line.
+        client=getattr(session, "_http_client", None),
+    )
     _greet(session, agent, userdata, config, room=ctx.room, on_done=idle.start if idle else None)

@@ -34,6 +34,8 @@ export interface ConfigDraft {
   deepgram_tts_model: string;
   elevenlabs_voice_id: string;
   elevenlabs_tts_model: string;
+  elevenlabs_stt_model: string;
+  elevenlabs_stt_language: string;
   voice_replies_enabled: boolean;
 
   quick_reply_enabled: boolean;
@@ -71,6 +73,8 @@ export const FIELD_TAB: Record<DraftKey, ChatbotTab> = {
   deepgram_tts_model: 'model',
   elevenlabs_voice_id: 'model',
   elevenlabs_tts_model: 'model',
+  elevenlabs_stt_model: 'model',
+  elevenlabs_stt_language: 'model',
   voice_replies_enabled: 'model',
   quick_reply_enabled: 'model',
   quick_fast_answer: 'model',
@@ -106,6 +110,8 @@ export function draftFrom(config: AgentConfig): ConfigDraft {
     deepgram_tts_model: config.deepgram_tts_model,
     elevenlabs_voice_id: config.elevenlabs_voice_id,
     elevenlabs_tts_model: config.elevenlabs_tts_model,
+    elevenlabs_stt_model: config.elevenlabs_stt_model,
+    elevenlabs_stt_language: config.elevenlabs_stt_language,
     voice_replies_enabled: config.voice_replies_enabled,
     quick_reply_enabled: config.quick_reply_enabled,
     quick_fast_answer: config.quick_fast_answer,
@@ -235,6 +241,8 @@ export function buildUpdate(
       case 'deepgram_tts_model':
       case 'elevenlabs_voice_id':
       case 'elevenlabs_tts_model':
+      case 'elevenlabs_stt_model':
+      case 'elevenlabs_stt_language':
         payload[key] = draft[key].trim() || null;
         break;
       default:

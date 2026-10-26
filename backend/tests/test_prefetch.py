@@ -344,3 +344,22 @@ def test_router_only_with_an_openrouter_llm():
     assert not entrypoint._router_enabled(on, config)
     config.llm_provider = "openrouter"
     assert not entrypoint._router_enabled(Settings(_env_file=None, router_enabled=False), config)
+
+
+def test_a_plain_package_request_runs_without_waiting_for_the_extractor(monkeypatch, tools):
+    p, _ = _prefetcher(monkeypatch, None)
+
+    async def never(client, base_url, api_key, payload, timeout_s):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(prefetch.turn_router, "extract", never)
+    text = "৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী কী আছে?"
+    lookups, _, _ = _run(p, text, Judgement(0.9, "packages", 0.97))
+    assert tools == [("packages", {"kind": "data", "max_price": 300.0, "min_data_gb": 10.0})]
+    assert [lookup.name for lookup in lookups] == ["search_packages"]
+
+
+def test_the_fast_rules_only_answer_a_package_lookup(monkeypatch, tools):
+    p, _ = _prefetcher(monkeypatch, _KB)
+    _run(p, "১০ জিবি ডাটা প্যাক", Judgement(0.9, "knowledge_base", 0.97))
+    assert tools == [("knowledge_base", _KB_ARGS)]

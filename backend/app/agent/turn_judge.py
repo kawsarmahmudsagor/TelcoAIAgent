@@ -33,7 +33,8 @@ _INSTRUCTIONS = (
     "The microphone also picks up other people in the room and background audio (TV, "
     "chatter). Decide whether the latest utterance is the customer speaking to the "
     "assistant about their mobile service, given the recent conversation. "
-    "Customers speak English or Bangla; Short answers to the "
+    "Customers speak English or Bangla, and may ask whether the assistant can hear them "
+    "(শুনতে পাচ্ছ, শুনতে পাচ্ছেন, hello, can you hear me). Short answers to the "
     "assistant's last question (a number, a code, yes/no, a package name) count, and so "
     "does someone reading out a 4 to 8 digit code. "
     "Requests on other topics (sports, news, weather, politics, general knowledge) do not "
@@ -44,8 +45,9 @@ _CRITERIA = {
     "true": (
         "The customer is talking to the assistant about their mobile service: answering its "
         "question or reading out a code, asking about balance, packages, usage, offers, "
-        "recharge, a complaint or the operator, correcting it, asking it to wait, stop or "
-        "repeat, or a brief greeting, thanks or goodbye."
+        "recharge, a complaint or the operator, asking whether the assistant can hear them "
+        "(hello, are you there, শুনতে পাচ্ছেন, কথা শুনতে পাচ্ছেন), correcting it, asking it to "
+        "wait, stop or repeat, or a brief greeting, thanks or goodbye."
     ),
     "false": (
         "Someone talking to another person in the room, TV or radio audio, a request about "
@@ -89,6 +91,7 @@ class Judgement:
     p: float | None
     lookup: str | None = None
     lookup_p: float | None = None
+    text: str | None = None
 
 
 @dataclass(frozen=True)
@@ -169,6 +172,7 @@ async def judge(
     api_key: str,
     payload: dict,
     timeout_s: float,
+    utterance: str | None = None,
 ) -> Judgement:
     """P(addressed) in [0, 1] (None on any error or timeout), plus the lookup
     choice when the request asked for it."""
@@ -194,12 +198,12 @@ async def judge(
             p,
             f", lookup={lookup}" if lookup is not None else "",
         )
-        return Judgement(p, lookup, lookup_p)
+        return Judgement(p, lookup, lookup_p, text=utterance)
     except (TimeoutError, asyncio.TimeoutError):
         logger.warning("turn judge timed out after %.2fs", timeout_s)
     except Exception as exc:
         logger.warning("turn judge failed: %s", exc)
-    return Judgement(None)
+    return Judgement(None, text=utterance)
 
 
 def _lookup_answer(answer: object) -> tuple[str | None, float | None]:

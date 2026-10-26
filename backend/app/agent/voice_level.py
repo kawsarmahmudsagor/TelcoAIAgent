@@ -48,6 +48,12 @@ class CallerLevel:
         if db >= _SPEECH_FLOOR_DBFS:
             self._frames.append(db)
 
+    def current_turn_level(self) -> float | None:
+        """The loud end (75th percentile) of the speech heard in the current turn so far."""
+        if not self._frames:
+            return None
+        return float(np.percentile(self._frames, _TURN_PERCENTILE))
+
     def clear(self) -> None:
         """Forgets frames heard so far: a new turn starts."""
         self._frames.clear()

@@ -5,11 +5,12 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import httpx
 import numpy as np
 import pytest
 from livekit.agents import StopResponse, llm
 
-from app.agent import entrypoint, gated_agent
+from app.agent import entrypoint, gated_agent, turn_gate
 from app.agent.gated_agent import (
     OTHER_LANGUAGE_LINE,
     USER_TURN_TOPIC,
@@ -145,14 +146,17 @@ def test_batch_stt_waits_longer_before_closing_the_turn():
     config.stt_tts_provider = "openrouter"
     delay = entrypoint._endpoint_min_delay(settings, config)
     assert delay == 2.0
+    # ElevenLabs' scribe_v2 (the default) transcribes whole turns too.
+    config.stt_tts_provider = "elevenlabs"
+    assert entrypoint._endpoint_min_delay(settings, config) == 2.0
     for gated in (False, True):
         handling = entrypoint._turn_handling(gated, delay)
         assert handling["endpointing"] == {"min_delay": 2.0, "max_delay": 3.0}
 
 
 def test_streaming_stt_keeps_the_library_endpointing():
-    settings = Settings(_env_file=None)
-    config = agent_config_service.resolve(None)
+    settings = Settings(_env_file=None, elevenlabs_stt_model="scribe_v2_realtime")
+    config = agent_config_service.resolve(None, settings)
     for provider in ("elevenlabs", "deepgram"):
         config.stt_tts_provider = provider
         assert entrypoint._endpoint_min_delay(settings, config) is None
@@ -285,6 +289,34 @@ def test_judge_failure_lets_the_turn_through():
     asyncio.run(go())
 
 
+def test_the_judge_is_warmed_once_and_the_warm_up_is_not_a_turn():
+    """run_6 and run_7: the first real Jev call hit its cold start and timed out,
+    so the first turn went through unjudged."""
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append({"path": request.url.path, **json.loads(request.content)})
+        return httpx.Response(200, json={"answers": {"addressed": {"noul": 0.9}}})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            gate, _, room, judged = _controller()
+            gate.warm_judge = gated_agent.jev_warm_up(
+                Settings(_env_file=None), "or-key", client, router=True
+            )
+            gate.warm()
+            gate.warm()  # a second call starts nothing new
+            await _settle(gate)
+            return room, judged
+
+    room, judged = asyncio.run(go())
+    assert len(requests) == 1
+    assert requests[0]["path"].endswith("/decisions")
+    assert requests[0]["model"] == Settings(_env_file=None).turn_judge_model
+    # Nothing was judged as the caller's speech, and nothing was shown.
+    assert judged == [] and room.sent == []
+
+
 def test_judge_starts_on_the_final_transcript_and_is_reused():
     async def go():
         gate, _, _, judged = _controller(0.8)
@@ -368,6 +400,43 @@ def test_stop_phrase_while_still_talking_only_interrupts():
         assert await _complete(gate, "না না, বনানী")
         assert room.sent == [(USER_TURN_TOPIC, "না না, বনানী")]
         assert judged == [("না না, বনানী", "listening")]
+
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("state", ["thinking", "speaking"])
+def test_a_whole_sentence_opening_with_a_stop_phrase_is_judged(state):
+    # run_7: a bystander's "না, না, ..." interrupted the agent's search answer
+    # and was answered instead of the customer.
+    async def go():
+        bystander = "না, না, আর উপর থেকে নিচে নামার জন্য কী করতে হবে"
+        gate, session, room, judged = _controller({bystander: 0.1, "না না, ডাটা প্যাক": 0.8})
+        if state == "speaking":
+            _speaking(gate, session)
+        else:
+            session.agent_state = "thinking"
+        _heard(gate, bystander)
+        await _settle(gate)
+        assert judged == [(bystander, state)]
+        assert session.calls == [] and room.sent == []
+
+        # The customer's own correction still interrupts, once the judge agrees.
+        _heard(gate, "না না, ডাটা প্যাক")
+        await _settle(gate)
+        assert ("interrupt", True) in session.calls
+        assert room.sent == [(USER_TURN_TOPIC, "না না, ডাটা প্যাক")]
+
+    asyncio.run(go())
+
+
+def test_a_bare_stop_phrase_still_interrupts_without_the_judge():
+    async def go():
+        gate, session, _, judged = _controller(0.1)
+        _speaking(gate, session)
+        _heard(gate, "না না।")
+        await _settle(gate)
+        assert session.calls[0] == ("interrupt", True)
+        assert judged == []
 
     asyncio.run(go())
 
@@ -731,6 +800,47 @@ def test_the_agent_meters_the_mic_audio_it_passes_to_the_stt():
     asyncio.run(go())
 
 
+def test_pre_stt_noise_gate_silences_background_and_preserves_hangover():
+    from dataclasses import replace
+    from livekit import rtc
+
+    async def go():
+        clock = FakeClock()
+        gate, _, _, _ = _controller(clock=clock)
+        gate.config = replace(gate.config, voice_isolation_enabled=True, speech_floor_dbfs=-38.0)
+        agent = gated_agent.GatedAgent(gate=gate, instructions="")
+
+        loud_samples = (np.full(480, 3277, dtype=np.int16)).tobytes()
+        loud_frame = rtc.AudioFrame(loud_samples, sample_rate=48000, num_channels=1, samples_per_channel=480)
+
+        quiet_samples = (np.full(480, 32, dtype=np.int16)).tobytes()
+        quiet_frame = rtc.AudioFrame(quiet_samples, sample_rate=48000, num_channels=1, samples_per_channel=480)
+
+        # 1. Background noise alone is silenced
+        async def background_mic():
+            yield quiet_frame
+
+        out1 = [f async for f in agent._metered(background_mic())]
+        assert len(out1) == 1
+        assert out1[0].data == b"\x00" * len(quiet_frame.data)
+
+        # 2. Loud frame opens gate; hangover protects word endings, then closes
+        async def speech_mic():
+            yield loud_frame
+            clock.now += 0.1
+            yield quiet_frame
+            clock.now += 0.5
+            yield quiet_frame
+
+        out2 = [f async for f in agent._metered(speech_mic())]
+        assert len(out2) == 3
+        assert bytes(out2[0].data) == loud_samples
+        assert bytes(out2[1].data) == quiet_samples
+        assert bytes(out2[2].data) == b"\x00" * len(quiet_samples)
+
+    asyncio.run(go())
+
+
 # ---- speech over the agent: the pause as evidence, nothing lost ----
 
 # run_47, +148 s: a real question over the agent that Jev scored 0.43.
@@ -871,7 +981,8 @@ def test_a_rejected_line_does_not_join_later_noise():
     async def go():
         bystander = "player আছে player আছে কথা বললে যে"
         noise = "We are before a full [static]"
-        gate, session, room, judged = _controller({bystander: 0.10, noise: 0.27})
+        clean_noise = turn_gate.clean_transcript(noise)
+        gate, session, room, judged = _controller({bystander: 0.10, clean_noise: 0.27, noise: 0.27})
         _speaking(gate, session)
         _heard(gate, bystander)
         await _settle(gate)
@@ -881,7 +992,7 @@ def test_a_rejected_line_does_not_join_later_noise():
         await _settle(gate)
         assert session.calls == []
         assert room.sent == []
-        assert [text for text, _ in judged] == [bystander, noise]
+        assert [text for text, _ in judged] == [bystander, clean_noise]
 
     asyncio.run(go())
 
@@ -958,3 +1069,91 @@ def test_a_spoken_phone_number_reaches_the_agent_as_digits():
         assert room.sent == [(USER_TURN_TOPIC, "আমার নাম্বার 01701001398")]
 
     asyncio.run(go())
+
+
+def _isolating(gate: TurnGateController, *, caller_db: float, turn_db: float) -> None:
+    """Voice isolation on, the caller's level learned, and this turn heard at turn_db."""
+    from dataclasses import replace
+
+    gate.config = replace(gate.config, voice_isolation_enabled=True)
+    gate._level._turns.append(caller_db)
+    gate._level._frames = [turn_db] * 5
+
+
+def test_a_soft_answer_to_the_agents_question_is_kept():
+    # Soft confirmations come 15-20 dB under the caller's level after the agent
+    # read numbers back; the margin (10 dB) must not drop them.
+    async def go():
+        gate, session, room, _ = _controller(0.85)
+        session.history.items.append(
+            SimpleNamespace(
+                type="message", role="assistant", text_content="১৫ জিবির প্যাকটা কি কিনে দেব?"
+            )
+        )
+        _isolating(gate, caller_db=-18.0, turn_db=-35.0)
+        assert await _complete(gate, "জি কিনে দিন")
+        assert room.sent == [(USER_TURN_TOPIC, "জি কিনে দিন")]
+
+    asyncio.run(go())
+
+
+def test_a_quiet_voice_nearby_is_dropped_unless_jev_rates_it_addressed():
+    async def go():
+        bystander, customer = "ভাত খেয়েছ তুমি", "আমার ব্যালেন্স কত আছে"
+        gate, _, room, judged = _controller({bystander: 0.1, customer: 0.9})
+        _isolating(gate, caller_db=-18.0, turn_db=-33.0)
+        assert not await _complete(gate, bystander)
+        assert room.sent == []
+
+        # As quiet, but Jev says it is the customer asking the agent.
+        _isolating(gate, caller_db=-18.0, turn_db=-33.0)
+        assert await _complete(gate, customer)
+        assert room.sent == [(USER_TURN_TOPIC, customer)]
+        # One Jev call per turn: the isolation check's answer is reused.
+        assert [text for text, _ in judged] == [bystander, customer]
+
+    asyncio.run(go())
+
+
+def test_a_turn_below_the_floor_is_dropped_even_when_addressed():
+    async def go():
+        gate, _, room, _ = _controller(0.9)
+        _isolating(gate, caller_db=-18.0, turn_db=-50.0)
+        assert not await _complete(gate, "আমার ব্যালেন্স কত আছে")
+        assert room.sent == []
+
+    asyncio.run(go())
+
+
+def test_the_caller_level_is_learned_without_the_pause():
+    from dataclasses import replace
+
+    gate, session, _, _ = _controller()
+    gate.config = replace(gate.config, voice_isolation_enabled=True)
+    session.user_state = "speaking"
+    gate.on_audio_level(-20.0, 0.02)
+    assert gate._level.current_turn_level() == -20.0
+
+
+
+@pytest.mark.parametrize(("language", "judged_too"), [("pl", False), ("tr", False), ("en-US", True), ("ben", True)])
+def test_speech_over_the_agent_in_another_language_is_ignored(language, judged_too):
+    # Quiet noise comes back from the STT as Polish or Turkish text.
+    async def go():
+        gate, session, _, judged = _controller(0.1)
+        _speaking(gate, session)
+        gate.on_user_input_transcribed(
+            SimpleNamespace(transcript="আমার ব্যালেন্স কত", is_final=True, language=language)
+        )
+        await _settle(gate)
+        return judged
+
+    assert bool(asyncio.run(go())) is judged_too
+
+
+def test_the_agents_stt_model_decides_the_endpointing():
+    settings = Settings(_env_file=None, elevenlabs_stt_model="scribe_v2")
+    config = agent_config_service.resolve(None, settings)
+    config.stt_tts_provider = "elevenlabs"
+    config.elevenlabs_stt_model = "scribe_v2_realtime"
+    assert entrypoint._endpoint_min_delay(settings, config) is None

@@ -20,7 +20,7 @@ _COLUMNS = [
     "assistant_name", "operator_name", "operator_phone", "operator_address", "prompt_identity_rules",
     "greeting_inbound", "greeting_nudge", "llm_provider", "llm_model", "temperature", "max_output_tokens",
     "reasoning_effort", "api_key_encrypted", "stt_tts_provider", "deepgram_tts_model", "elevenlabs_voice_id",
-    "elevenlabs_tts_model", "rag_enabled", "rag_top_k", "rag_similarity_threshold", "embedding_model", "chunk_size",
+    "elevenlabs_tts_model", "elevenlabs_stt_model", "elevenlabs_stt_language", "rag_enabled", "rag_top_k", "rag_similarity_threshold", "embedding_model", "chunk_size",
     "chunk_overlap", "embedding_migration_status", "embedding_migration_target",
     "embedding_migration_error", "quick_reply_enabled", "quick_fast_answer", "quick_filler",
     "quick_reply_model", "voice_replies_enabled",
@@ -67,7 +67,8 @@ def _reset_all(api):
             "prompt_identity_rules", "greeting_inbound", "greeting_nudge", "llm_provider",
             "llm_model", "temperature",
             "max_output_tokens", "reasoning_effort", "stt_tts_provider", "deepgram_tts_model",
-            "elevenlabs_voice_id", "elevenlabs_tts_model", "quick_reply_model",
+            "elevenlabs_voice_id", "elevenlabs_tts_model", "elevenlabs_stt_model",
+            "elevenlabs_stt_language", "quick_reply_model",
         )
     }  # fmt: skip
     body["api_key"] = ""
@@ -490,6 +491,38 @@ def test_options_list_defaults(api):
     assert {"customer_name", "nudge_text"} <= set(body["placeholders"]["greeting_nudge"])
     assert "knowledge_scope" in body["placeholders"]["prompt_identity_rules"]
     assert [m["id"] for m in body["quick_reply_models"]] == list(QUICK_REPLY_MODELS)
+    assert [m["id"] for m in body["elevenlabs_stt_models"]] == ["scribe_v2", "scribe_v2_realtime"]
+    assert [m["id"] for m in body["elevenlabs_stt_languages"]] == ["auto", "bn", "en"]
+
+
+def test_stt_model_and_language_default_to_the_env_and_auto(api):
+    body = api.get("/api/agent-config").json()
+    assert body["elevenlabs_stt_model"] == get_settings().elevenlabs_stt_model
+    assert body["elevenlabs_stt_language"] == "auto"
+
+
+def test_stt_model_and_language_are_saved_and_reset(api):
+    body = api.patch(
+        "/api/agent-config",
+        json={"elevenlabs_stt_model": "scribe_v2_realtime", "elevenlabs_stt_language": "bn"},
+    ).json()
+    assert body["elevenlabs_stt_model"] == "scribe_v2_realtime"
+    assert body["elevenlabs_stt_language"] == "bn"
+    # "auto" and blank both go back to the defaults.
+    body = api.patch(
+        "/api/agent-config", json={"elevenlabs_stt_model": "", "elevenlabs_stt_language": "auto"}
+    ).json()
+    assert body["elevenlabs_stt_model"] == get_settings().elevenlabs_stt_model
+    assert body["elevenlabs_stt_language"] == "auto"
+
+
+@pytest.mark.parametrize(
+    "field, value", [("elevenlabs_stt_model", "scribe_v9"), ("elevenlabs_stt_language", "fr")]
+)
+def test_unknown_stt_choices_are_refused(api, field, value):
+    response = api.patch("/api/agent-config", json={field: value})
+    assert response.status_code == 422
+    assert field in response.text
 
 
 # --- auth -------------------------------------------------------------------------------

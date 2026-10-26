@@ -10,6 +10,7 @@ import pytest
 from app.agent.turn_judge import Exchange
 from word_checks import real_estate_words
 
+from app.agent import turn_router
 from app.agent.turn_router import RouterArgs, build_request, extract, parse
 
 _BASE = "https://openrouter.ai/api/v1"
@@ -109,3 +110,67 @@ def test_timeout_returns_none():
         return _completion(json.dumps(_FULL))
 
     assert _extract(slow, timeout_s=0.05) is None
+
+
+# ---- fast rules ----
+
+
+def _bench_cases():
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[2] / "scripts" / "router_bench" / "cases.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for case in data["cases"]:
+        history = [Exchange(h["role"], h["text"]) for h in data["histories"][case["h"]]]
+        yield pytest.param(case, history, id=case["id"])
+
+
+@pytest.mark.parametrize("case, history", list(_bench_cases()))
+def test_fast_rules_never_disagree_with_the_bench(case, history):
+    """Either the extractor's exact arguments, or no answer at all."""
+    args = turn_router.fast_extract(case["utterance"], history)
+    if args is not None:
+        assert case.get("packages") is not None and "allow_extra" not in case
+        assert args.packages == case["packages"]
+
+
+@pytest.mark.parametrize(
+    "utterance, packages",
+    [
+        ("৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী কী আছে?", {"kind": "data", "max_price": 300, "min_data_gb": 10}),
+        ("Show me weekly voice packs under 100 taka.", {"kind": "voice", "validity_days": 7, "max_price": 100}),
+        ("500 takar moddhe 20 GB er data pack dekhao", {"kind": "data", "max_price": 500, "min_data_gb": 20}),
+        ("sat diner jonno minute pack ache?", {"kind": "voice", "validity_days": 7}),
+        ("10GB monthly data pack", {"kind": "data", "min_data_gb": 10, "validity_days": 30}),
+        ("500 MB data pack under 50 taka", {"kind": "data", "min_data_gb": 0.5, "max_price": 50}),
+        ("একটা কম্বো প্যাক দেখান", {"kind": "bundle"}),
+        ("৩০ দিনের এসএমএস প্যাক", {"kind": "sms", "validity_days": 30}),
+    ],
+)
+def test_fast_rules_read_a_plain_package_request(utterance, packages):
+    args = turn_router.fast_extract(utterance, [])
+    assert args is not None and args.packages == packages
+
+
+@pytest.mark.parametrize(
+    "utterance",
+    [
+        "৫০০ টাকা রিচার্জ করুন",  # a recharge, not a pack search
+        "৩০০ টাকার প্যাক",  # a ceiling or a rough price?
+        "ফেসবুক ছাড়া ডাটা প্যাক",  # a negation
+        "১০ ডাটা প্যাক",  # a number with no unit
+        "আমার ব্যালেন্স কত",
+        "জিবি প্যাক",  # a unit with no number
+    ],
+)
+def test_fast_rules_leave_anything_unclear_to_the_extractor(utterance):
+    assert turn_router.fast_extract(utterance, []) is None
+
+
+def test_fast_rules_step_aside_after_an_earlier_package_request():
+    # The extractor carries the earlier criteria over; the rules can't.
+    history = [Exchange("user", "১০ জিবি ডাটা প্যাক চাই"), Exchange("assistant", "...")]
+    assert turn_router.fast_extract("সাপ্তাহিক মিনিট প্যাক", history) is None
+    # An earlier message about something else changes nothing.
+    history = [Exchange("user", "আমার ব্যালেন্স কত?"), Exchange("assistant", "...")]
+    assert turn_router.fast_extract("সাপ্তাহিক মিনিট প্যাক", history) is not None

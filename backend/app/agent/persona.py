@@ -19,18 +19,19 @@ _INBOUND_TASK = (
     "Help the customer with their mobile service using your tools and the ACCOUNT SNAPSHOT.\n"
 )
 
-# Browser calls: a wrap-up gets "anything else?" first; a goodbye, or a no to
+# Browser sessions: a wrap-up gets "anything else?" first; a goodbye, or a no to
 # that, gets the goodbye and end_call in the same reply. end_call waits for the
-# goodbye to play, then the browser ends the call (browser_end_call). Should the
-# model call end_call alone, its result asks for the goodbye (run_48 did only one).
-_BROWSER_END_NOTE = """ENDING THE CALL: when the customer seems to be wrapping up (thanks for the help, that's all for
-now, no more help needed, ঠিক আছে ধন্যবাদ, আর কিছু লাগবে না), don't end the call yet: ask
+# goodbye to play, then the browser turns the mic off and the chat stays open
+# (browser_end_call). Should the model call end_call alone, its result asks for
+# the goodbye (run_48 did only one).
+_BROWSER_END_NOTE = """ENDING THE VOICE CHAT: when the customer seems to be wrapping up (thanks for the help, that's all for
+now, no more help needed, ঠিক আছে ধন্যবাদ, আর কিছু লাগবে না), don't end yet: ask
 whether they need anything else. When they then say no, or when they say goodbye outright (bye,
 আল্লাহ হাফেজ, আসি তাহলে, রাখি তাহলে), say goodbye in one or two short sentences that fit what
-happened (thank them and invite them back anytime), in the language of their latest message,
-and call end_call in that same reply, after the goodbye. The call ends once the goodbye has
-played. If a thanks comes with a question, or they clearly want to go on, just carry on and
-don't end the call.
+happened (thank them and say you're here if they need anything else), in the language of their
+latest message, and call end_call in that same reply, after the goodbye. Their mic turns off once
+the goodbye has played; the chat stays open, so never say the call or chat is over. If a thanks
+comes with a question, or they clearly want to go on, just carry on and don't call end_call.
 """
 
 

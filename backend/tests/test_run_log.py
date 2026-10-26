@@ -120,6 +120,37 @@ def test_a_turn_the_gate_answers_is_not_called_typed(tmp_path):
     assert "Speech-to-text" not in summary
 
 
+def test_stt_time_is_logged_without_the_librarys_end_of_turn_metrics(tmp_path):
+    """run_7: speech the gate dropped or answered itself had no STT time at all."""
+    file = open(tmp_path / "run_1.log", "x", encoding="utf-8")
+    log = RunLog("room-1", 1, file, clock=_Clock())
+    log._on_item(_message("assistant", "Hello!"))
+
+    # Dropped by the gate: still timed on its own line.
+    log._on_user_state(_ev(1001.0, old_state="listening", new_state="speaking"))
+    log._on_user_state(_ev(1002.0, old_state="speaking", new_state="listening"))
+    log._on_transcribed(_ev(1003.1, is_final=True, transcript="Hello?"))
+    # Answered by the gate itself (a barge-in): timed in the summary too.
+    log._on_user_state(_ev(1004.0, old_state="listening", new_state="speaking"))
+    log._on_user_state(_ev(1005.0, old_state="speaking", new_state="listening"))
+    log._on_transcribed(_ev(1006.4, is_final=True, transcript="What about Uttara?"))
+    # A second final with no new pause times nothing.
+    log._on_transcribed(_ev(1007.0, is_final=True, transcript="ok"))
+    log.gate_reply("What about Uttara?")
+    log._on_item(_message("user", "What about Uttara?"))
+    log._on_agent_state(_ev(1007.5, old_state="listening", new_state="speaking"))
+    log._on_item(_message("assistant", "Four flats."))
+    log._on_close(None)
+
+    text = (tmp_path / "run_1.log").read_text(encoding="utf-8")
+    assert 'heard "Hello?" 1.10 s after the caller stopped' in text
+    assert 'heard "What about Uttara?" 1.40 s after the caller stopped' in text
+    assert 'heard "ok"\n' in text
+    summary = re.sub(r" \.+ ", " : ", " ".join(text.split("Turn 1 timing")[1].split()))
+    assert "Speech-to-text : 1.40 s after the caller stopped" in summary
+    assert "Turn end wait" not in summary
+
+
 def test_a_typed_turn_is_still_typed(tmp_path):
     file = open(tmp_path / "run_1.log", "x", encoding="utf-8")
     log = RunLog("room-1", 1, file, clock=_Clock())
