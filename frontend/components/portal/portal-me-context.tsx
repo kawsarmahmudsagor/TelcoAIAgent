@@ -26,7 +26,7 @@ export function usePortalMe(): PortalMe {
   return me;
 }
 
-/** The signed-in customer, or null outside the portal (e.g. a card on the standalone /chat page). */
+/** The signed-in customer, or null for a guest (the bubble on the public home page). */
 export function useOptionalPortalMe(): PortalMe | null {
   return useContext(PortalMeContext);
 }

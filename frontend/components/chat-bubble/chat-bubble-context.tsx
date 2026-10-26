@@ -9,15 +9,30 @@ import {
   useRef,
   useState,
 } from 'react';
-import { ConnectionState, type Room } from 'livekit-client';
+import { ConnectionState, type Room, TokenSource } from 'livekit-client';
 import { toast } from 'sonner';
-import { type UseSessionReturn, useSession } from '@livekit/components-react';
+import { type ReceivedMessage, type UseSessionReturn, useSession } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
-import { useAppTokenSource } from '@/components/app/app';
+import { getSandboxTokenSource } from '@/lib/utils';
 import { useVisitorId, useVisitorSessionOptions } from '@/lib/visitor-id';
+
+/** The LiveKit token source: the sandbox endpoint when configured, else our /api/token route. */
+function useAppTokenSource(appConfig: AppConfig) {
+  return useMemo(() => {
+    return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
+      ? getSandboxTokenSource(appConfig)
+      : TokenSource.endpoint('/api/token');
+  }, [appConfig]);
+}
 
 /** The panel's element id, for `aria-controls`. */
 export const CHAT_PANEL_ID = 'chat-bubble-panel';
+
+/** An earlier chat picked from the history: shown above the live transcript and carried on. */
+export interface ResumedConversation {
+  id: string;
+  messages: ReceivedMessage[];
+}
 
 export interface StartSessionOptions {
   /** Turn the mic on once connected (a voice chat); otherwise the session is text-only. */
@@ -61,6 +76,12 @@ interface ChatBubbleContextValue {
   exitFullscreen: () => void;
   /** This browser's anonymous visitor id (null until mounted), for the chat history. */
   visitorId: string | null;
+  /**
+   * The earlier chat being carried on, if any: the next session's agent reopens it (no
+   * greeting) and its messages show above the live ones. Set while disconnected.
+   */
+  resumed: ResumedConversation | null;
+  setResumed: React.Dispatch<React.SetStateAction<ResumedConversation | null>>;
   /** The session's room, e.g. for setting participant attributes from a page. */
   room: Room;
   isConnected: boolean;
@@ -95,11 +116,13 @@ export function ChatBubbleProvider({
     options: StartSessionOptions;
     resolve: (ok: boolean) => void;
   } | null>(null);
+  const [resumed, setResumed] = useState<ResumedConversation | null>(null);
   const sessionOptions = useVisitorSessionOptions(
     appConfig.agentName,
     visitorId,
     nudgeId,
-    textStart
+    textStart,
+    resumed?.id ?? null
   );
   const session = useSession(tokenSource, sessionOptions);
   const [isOpen, setIsOpen] = useState(false);
@@ -169,6 +192,8 @@ export function ChatBubbleProvider({
       return new Promise<boolean>((resolve) => {
         pendingNudgeRef.current?.(false);
         pendingNudgeRef.current = resolve;
+        // A notification opens a new conversation, not the one picked from the history.
+        setResumed(null);
         setNudgeId(id);
       });
     },
@@ -220,6 +245,8 @@ export function ChatBubbleProvider({
       toggleFullscreen,
       exitFullscreen,
       visitorId,
+      resumed,
+      setResumed,
       room: session.room,
       isConnected,
       session,
@@ -237,6 +264,7 @@ export function ChatBubbleProvider({
       toggleFullscreen,
       exitFullscreen,
       visitorId,
+      resumed,
       isConnected,
       session,
     ]

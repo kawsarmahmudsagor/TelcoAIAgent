@@ -2,8 +2,7 @@
 
 The source of truth for the customer portal (`/portal/**`, public home page at `/`, log in at `/signin`), the admin portal
 (`/dashboard/**`) and `/login`. Tokens live in `styles/globals.css`; this file explains them and
-the patterns built on them. The voice/chat widget (the standalone `/chat` page and the chat
-bubble panel) deliberately keeps the original LiveKit starter look (see "Widget isolation").
+the patterns built on them.
 
 ## Direction
 
@@ -28,20 +27,20 @@ Never hard-code a brand colour in a component; use a token class. shadcn names a
 Every token has a light value in `:root` and, where it differs, a dark value in `.dark`; each
 is exposed to Tailwind as `--color-<name>` in the `@theme inline` block.
 
-| Group | Tokens | Use |
-| --- | --- | --- |
-| Palette | `brand`, `brand2`, `mint`, `orange`, `red` | Brand and accents (`bg-brand`, `text-mint`) |
-| Surfaces | `background`, `surface`, `surface2`, `line`, `card`, `muted`, `accent` | Page, panels, hairlines, hover and selected rows |
-| Brand text | `brand-text` | Indigo text that stays readable in dark (`#a9a3ff`); use instead of `text-brand` for links and icons |
-| Tints | `tint-purple`, `tint-green`, `tint-orange`, `tint-pink`, `tint-selected` | Icon wells, soft badges, selected option backgrounds |
-| Status chips | `status-success`, `status-pending`, `status-failed`, `status-open` (+ `-foreground`) | Transaction and case statuses |
-| Featured | `featured-border`, `featured-from`, `featured-to`, `featured-fg`, `featured-muted`, `featured-chip`, `featured-chip-fg` | The highlighted package or offer card |
-| Hero | `hero-from`, `hero-via`, `hero-to`, `hero-soft`, `hero-muted`, `hero-dot` | Balance hero gradient and its text |
-| Promo | `promo-from`, `promo-to`, `promo-foreground`, `promo-ink` | Sidebar upgrade card and white link buttons |
-| Overlays | `scrim`, `toast`, `toast-foreground`, `chat-canvas`, `chip-border` | Dialog scrim, SMS toast, assistant canvas, suggestion chips |
-| Third party | `bkash`, `nagad` | Payment option marks |
-| Avatars | `persona-1-from` to `persona-5-to`, `brand-start` | Persona and logo gradients (same in both themes) |
-| Sidebar | `sidebar*` | Admin sidebar, dark in both themes |
+| Group        | Tokens                                                                                                                  | Use                                                                                                  |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Palette      | `brand`, `brand2`, `mint`, `orange`, `red`                                                                              | Brand and accents (`bg-brand`, `text-mint`)                                                          |
+| Surfaces     | `background`, `surface`, `surface2`, `line`, `card`, `muted`, `accent`                                                  | Page, panels, hairlines, hover and selected rows                                                     |
+| Brand text   | `brand-text`                                                                                                            | Indigo text that stays readable in dark (`#a9a3ff`); use instead of `text-brand` for links and icons |
+| Tints        | `tint-purple`, `tint-green`, `tint-orange`, `tint-pink`, `tint-selected`                                                | Icon wells, soft badges, selected option backgrounds                                                 |
+| Status chips | `status-success`, `status-pending`, `status-failed`, `status-open` (+ `-foreground`)                                    | Transaction and case statuses                                                                        |
+| Featured     | `featured-border`, `featured-from`, `featured-to`, `featured-fg`, `featured-muted`, `featured-chip`, `featured-chip-fg` | The highlighted package or offer card                                                                |
+| Hero         | `hero-from`, `hero-via`, `hero-to`, `hero-soft`, `hero-muted`, `hero-dot`                                               | Balance hero gradient and its text                                                                   |
+| Promo        | `promo-from`, `promo-to`, `promo-foreground`, `promo-ink`                                                               | Sidebar upgrade card and white link buttons                                                          |
+| Overlays     | `scrim`, `toast`, `toast-foreground`, `chat-canvas`, `chip-border`                                                      | Dialog scrim, SMS toast, assistant canvas, suggestion chips                                          |
+| Third party  | `bkash`, `nagad`                                                                                                        | Payment option marks                                                                                 |
+| Avatars      | `persona-1-from` to `persona-5-to`, `brand-start`                                                                       | Persona and logo gradients (same in both themes)                                                     |
+| Sidebar      | `sidebar*`                                                                                                              | Admin sidebar, dark in both themes                                                                   |
 
 Only drop-shadow alpha literals such as `shadow-[0_25px_70px_#0003]` stay inline.
 
@@ -78,39 +77,3 @@ states invite the next action.
 Visible focus everywhere (`focus-visible:ring-ring/60 ring-[3px]`). Icon-only buttons have an
 `aria-label`. Motion answers an action and is wrapped in `motion-safe:`. Text contrast at least
 4.5:1 in both themes.
-
-## Widget isolation
-
-`app/(widget)/layout.tsx` (the `/chat` page) renders `<div data-surface="widget">`. While it is mounted,
-`:root:has([data-surface='widget'])` in `globals.css` restores the original neutral tokens for
-the whole document (so its portals match), and `getStyles()` injects the configurable accent at
-the same specificity. The chat bubble's panel (`components/chat-bubble/`) is mounted on every
-public page, so it uses `data-surface="widget-panel"` instead: the same tokens and accent
-(`getStyles(config, 'panel')`), scoped to the panel element so the page around it keeps the
-brand look. Don't add brand styling to the widget through these tokens.
-
-### Call screen
-
-The in-call view (`components/agents-ui/blocks/agent-session-view-01`, pieces in
-`components/app/call/`) is the exception: it is always dark and uses the brand tokens. Its
-section carries `.dark` and `data-surface="call"`, which override the widget tokens above (and
-the configurable accent) inside the call only. It has two parts:
-
-- **Call UI**: the agent's avatar, Mic / End call / Speaker, and the latest search result or a
-  booking form over the call. A new search fades the previous result out.
-- **Conversation UI**: the transcript and message box. The chat bubble in the call's corner
-  opens it as a 400px pane on the right, like a meeting's chat. On a narrow screen it covers the
-  call instead.
-
-The rules for this screen:
-
-- Orange is the agent's voice: avatar ripples, the waveform while the agent speaks and the
-  thinking arc. It is never used on buttons.
-- Indigo (`--primary`) is the caller: the halo and waveform while they speak, the open chat
-  bubble and Send.
-- The ripples and waveform are the only ambient motion, and they always mean that someone is
-  speaking. With reduced motion, they change opacity only.
-- The Call UI follows its own width (`@container`). From `@5xl` up, results sit in a 420px
-  column on the left and the agent shifts right to stay clear of them. Below that, results rise
-  as a sheet from the bottom.
-- The chat bubble's panel goes fullscreen when a call starts. A call has no docked size.

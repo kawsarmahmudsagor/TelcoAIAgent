@@ -3,13 +3,10 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Loader2Icon, RotateCwIcon } from 'lucide-react';
-import { AssistantBubble } from '@/components/portal/assistant/assistant-bubble';
-import { AssistantProvider } from '@/components/portal/assistant/assistant-provider';
 import { PortalMeProvider } from '@/components/portal/portal-me-context';
 import { MobileDrawer } from '@/components/portal/shell/mobile-drawer';
 import { Sidebar } from '@/components/portal/shell/sidebar';
 import { Topbar } from '@/components/portal/shell/topbar';
-import { Toaster } from '@/components/ui/sonner';
 import { portalApi } from '@/lib/portal-api';
 import { usePortalQuery } from '@/lib/portal-sync';
 
@@ -54,23 +51,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <PortalMeProvider me={me.data}>
-      {/* The AI assistant's one LiveKit session: it wraps the whole shell, so a chat or call
-          survives navigation and the bubble and /portal/assistant share it. */}
-      <AssistantProvider>
-        <div className="bg-background tablet:grid-cols-[215px_minmax(0,1fr)] phone:grid-cols-1 grid min-h-svh grid-cols-[244px_minmax(0,1fr)]">
-          <Sidebar />
-          <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
-          <div className="min-w-0">
-            <Topbar onOpenMenu={() => setDrawerOpen(true)} />
-            <main className="tablet:p-6 phone:px-[15px] phone:pt-5 phone:pb-[30px] mx-auto max-w-[1600px] px-[34px] pt-7 pb-10">
-              {children}
-            </main>
-          </div>
+      {/* The assistant session and its bubble come from the customer layout above, so a chat
+          survives navigation, logging in included, and the bubble and /portal/assistant share
+          it. */}
+      <div className="bg-background tablet:grid-cols-[215px_minmax(0,1fr)] phone:grid-cols-1 grid min-h-svh grid-cols-[244px_minmax(0,1fr)]">
+        <Sidebar />
+        <MobileDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+        <div className="min-w-0">
+          <Topbar onOpenMenu={() => setDrawerOpen(true)} />
+          <main className="tablet:p-6 phone:px-[15px] phone:pt-5 phone:pb-[30px] mx-auto max-w-[1600px] px-[34px] pt-7 pb-10">
+            {children}
+          </main>
         </div>
-        <AssistantBubble />
-        {/* Lifted clear of the assistant's launcher. */}
-        <Toaster position="bottom-right" offset={{ bottom: 88 }} mobileOffset={{ bottom: 88 }} />
-      </AssistantProvider>
+      </div>
     </PortalMeProvider>
   );
 }

@@ -8,21 +8,30 @@ function uuidOrUndefined(value: unknown): string | undefined {
 /**
  * The job metadata for an inbound chat dispatch of the telco agent (read by
  * backend/app/agent/session_context.py). `subscriberId` must come from a server-verified
- * `portal_session`, never from the browser; `visitorId` and `nudgeId` are browser-supplied, so
- * they are kept only when they are UUIDs. `textStart` (the attribute "1") marks a session opened
- * by a typed message: the agent answers it without a greeting.
+ * `portal_session`, never from the browser; `visitorId`, `nudgeId` and `resumeConversationId` are
+ * browser-supplied, so they are kept only when they are UUIDs. `textStart` (the attribute "1")
+ * marks a session opened by a typed message: the agent answers it without a greeting.
+ * `resumeConversationId` is an earlier chat to carry on; the agent reopens it only if it belongs
+ * to this visitor or subscriber.
  */
 export function buildDispatchMetadata(
   subscriberId: string | null,
-  extras: { visitorId?: string; nudgeId?: string; textStart?: string }
+  extras: {
+    visitorId?: string;
+    nudgeId?: string;
+    textStart?: string;
+    resumeConversationId?: string;
+  }
 ): string {
   const visitorId = uuidOrUndefined(extras.visitorId);
   const nudgeId = uuidOrUndefined(extras.nudgeId);
+  const resumeConversationId = uuidOrUndefined(extras.resumeConversationId);
   return JSON.stringify({
     channel: 'inbound_chat',
     ...(subscriberId ? { subscriber_id: subscriberId } : {}),
     ...(visitorId ? { visitor_id: visitorId } : {}),
     ...(nudgeId ? { nudge_id: nudgeId } : {}),
     ...(extras.textStart === '1' ? { text_start: true } : {}),
+    ...(resumeConversationId ? { resume_conversation_id: resumeConversationId } : {}),
   });
 }

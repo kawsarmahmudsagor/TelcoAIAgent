@@ -42,21 +42,11 @@ agent-starter-react/
 └── package.json
 ```
 
-Business logic lives within the `components/app` folder. It's here where the application's state and behavior is managed and the various Shadcn UI components are composed together.
-
-| File                  | Description                                                                                                                                           |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session-view.tsx`    | Initializes the application, and LiveKit session. Renders the view controller and session UI including chat transcript, media tiles, and control bar. |
-| `view-controller.tsx` | Manages the transitions between the welcome and session views based on the LiveKit session state.                                                     |
-| `welcome-view.tsx`    | Renders the welcome UI when the LiveKit session is not connected.                                                                                     |
-| `chat-transcript.tsx` | Manages the chat transcript transitions.                                                                                                              |
-| `tile-layout.tsx`     | Manages the layout and transition of media tiles in various application states.                                                                       |
-
 ### Component usage
 
 Most Agents UI components require access to a LiveKit session object for access to values like agent state or audio tracks. A Session object can be created from a [TokenSource](/reference/client-sdk-js/variables/TokenSource.html), and provided by wrapping the component in an [AgentSessionProvider](/reference/components/shadcn/component/agent-session-provider).
 
-See [`components/app/app.tsx`](./components/app/app.tsx) for an example of how this is done in this app.
+See [`components/chat-bubble/chat-bubble-context.tsx`](./components/chat-bubble/chat-bubble-context.tsx) for how this app creates its one session.
 
 ### Customizing components
 

@@ -33,7 +33,7 @@ type UserTurnMessage = Extract<ReceivedMessage, { type: 'userTranscript' }>;
  * useAgent().attributes (components-react 2.9) holds only the keys of the
  * latest change event, so the agent's next state update would wipe it.
  */
-function useAgentAttribute(key: string): string | undefined {
+export function useAgentAttribute(key: string): string | undefined {
   const { agent } = useVoiceAssistant();
   const [value, setValue] = useState<string | undefined>(() => agent?.attributes[key]);
 

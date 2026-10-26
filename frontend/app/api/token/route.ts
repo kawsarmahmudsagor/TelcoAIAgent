@@ -3,6 +3,7 @@ import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-s
 import { RoomAgentDispatch, RoomConfiguration } from '@livekit/protocol';
 import { isAdminSession } from '@/lib/admin-session';
 import { buildDispatchMetadata } from '@/lib/agent-dispatch';
+import { resolveSubscriberId } from '@/lib/portal-session';
 
 type ConnectionDetails = {
   serverUrl: string;
@@ -18,9 +19,6 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL;
 // Must match app.config.Settings.agent_name on the backend — this is how the
 // telco agent worker gets explicitly dispatched into rooms this route creates.
 const AGENT_NAME = process.env.AGENT_NAME || 'telco_agent';
-// Server-to-server: this route asks FastAPI directly who the portal cookie belongs to.
-const FASTAPI_INTERNAL_URL = process.env.FASTAPI_INTERNAL_URL || 'http://localhost:8011';
-const PORTAL_COOKIE = 'portal_session';
 
 // don't cache the results
 export const revalidate = 0;
@@ -74,12 +72,14 @@ export async function POST(req: NextRequest) {
     // `portal_session` cookie as verified by FastAPI, so a guest (no cookie or a rejected one)
     // gets none. The browser's anonymous visitor id (a participant attribute set by useSession)
     // and the nudge being answered (`nudge_id`) are passed through only when they are UUIDs;
-    // `text_start` says a typed message opened the session.
+    // `text_start` says a typed message opened the session, and `resume_conversation_id` (a UUID too)
+    // names an earlier chat to carry on -- the agent checks it is this visitor's or subscriber's.
     const subscriberId = await resolveSubscriberId(req);
     const metadata = buildDispatchMetadata(subscriberId, {
       visitorId: body?.participant_attributes?.visitor_id,
       nudgeId: body?.participant_attributes?.nudge_id ?? body?.nudge_id,
       textStart: body?.participant_attributes?.text_start,
+      resumeConversationId: body?.participant_attributes?.resume_conversation_id,
     });
     for (const agent of roomConfig.agents) {
       // useSession adds a bare dispatch when the app config names the agent.
@@ -118,28 +118,6 @@ export async function POST(req: NextRequest) {
       console.error(error);
       return new NextResponse(error.message, { status: 500 });
     }
-  }
-}
-
-/**
- * The signed-in customer's subscriber id, verified by FastAPI's `GET /api/me` against the
- * `portal_session` cookie; null (a guest) without the cookie or on any non-200 answer.
- */
-async function resolveSubscriberId(req: NextRequest): Promise<string | null> {
-  const session = req.cookies.get(PORTAL_COOKIE)?.value;
-  if (!session) return null;
-  try {
-    const res = await fetch(`${FASTAPI_INTERNAL_URL}/api/me`, {
-      headers: { cookie: `${PORTAL_COOKIE}=${session}` },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.status !== 200) return null;
-    const me = (await res.json()) as { subscriber_id?: unknown };
-    return typeof me.subscriber_id === 'string' ? me.subscriber_id : null;
-  } catch (error) {
-    console.error('Could not resolve the portal session; dispatching as a guest.', error);
-    return null;
   }
 }
 

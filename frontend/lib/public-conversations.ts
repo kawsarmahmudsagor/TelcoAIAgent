@@ -1,3 +1,5 @@
+import type { Participant } from 'livekit-client';
+import type { ReceivedMessage } from '@livekit/components-react';
 import type { VisitorConversationDetail, VisitorConversationPage } from '@/lib/types';
 
 // Same-origin `/backend`, proxied to FastAPI (see lib/api-client.ts).
@@ -36,4 +38,24 @@ export function getVisitorConversation(
     visitorId,
     signal
   );
+}
+
+/**
+ * A stored chat's messages in the live transcript's shape, so the panel shows them the same way.
+ * Only `from.isLocal` is read off the sender (customer vs agent), so a stand-in is enough.
+ */
+export function toReceivedMessages(detail: VisitorConversationDetail): ReceivedMessage[] {
+  const customer = { isLocal: true } as Participant;
+  return detail.messages
+    .filter((m) => m.text?.trim())
+    .map(
+      (m) =>
+        ({
+          type: 'chatMessage',
+          id: `history-${detail.id}-${m.seq}`,
+          timestamp: new Date(m.created_at).getTime(),
+          message: m.text ?? '',
+          from: m.role === 'user' ? customer : undefined,
+        }) as ReceivedMessage
+    );
 }

@@ -20,7 +20,7 @@
  */
 :root {
   --radius: 0.625rem;
-  /* Fixed base for the rounded-* scale, so the widget's --radius override below can't shift it. */
+  /* Fixed base for the rounded-* scale. */
   --radius-base: 0.625rem;
 
   /* Reference palette. */
@@ -201,76 +201,6 @@
   --sidebar-ring: var(--brand2);
 }
 
-/*
- * The voice/chat widget keeps the original neutral LiveKit starter look, in two places:
- * - the standalone chat page (app/(widget)/chat) renders a `[data-surface='widget']` element, so
- *   these rules apply to the whole document (portals included) only while it is on screen;
- * - the chat bubble's panel is `[data-surface='widget-panel']`. It is mounted on every public
- *   page, so its tokens are scoped to the panel itself and never recolour the page around it.
- * `--primary` is deliberately absent: the widget's accent comes from getStyles() in lib/utils.ts.
- */
-:root:has([data-surface='widget']),
-[data-surface='widget-panel'] {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --hairline: color-mix(in oklab, var(--foreground) 20%, transparent);
-}
-
-.dark:has([data-surface='widget']),
-.dark [data-surface='widget-panel'] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.269 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-}
-
-/*
- * The in-call screen (components/agents-ui/blocks/agent-session-view-01) is always dark: the
- * section carries `.dark`, which restores the brand's dark tokens over the widget
- * overrides above. `.dark` doesn't set --hairline, so it is reset here for default borders. The
- * /chat page's hover theme toggle would sit over End call, so it's hidden during a call, and its corner logo uses the dark-theme mark.
- */
-[data-surface='call'] {
-  --hairline: var(--border);
-}
-
-:root:has([data-surface='call']) [data-theme-toggle-zone],
-:root:has([data-surface='call']) [data-logo='light'] {
-  display: none;
-}
-:root:has([data-surface='call']) [data-logo='dark'] {
-  display: block;
-}
-
 @theme inline {
   --font-sans:
     var(--font-inter), ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
@@ -424,17 +354,6 @@
     html {
       scroll-behavior: auto;
     }
-  }
-}
-
-/* The welcome view's call mark: brass arcs pulsing off the sun (components/app/welcome-view.tsx). */
-@keyframes horizon-wave {
-  0%,
-  100% {
-    opacity: 0.12;
-  }
-  50% {
-    opacity: 0.9;
   }
 }
 

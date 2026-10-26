@@ -62,24 +62,27 @@ export function useVisitorId(): string | null {
  * as a participant attribute -- the token route moves it into the agent's dispatch metadata, so
  * the conversation row records it. A `nudgeId` (the notification the customer opened) rides along
  * the same way, for one session, and so does `textStart` (a typed message opened the session, so
- * the agent skips its greeting). Memoized: useSession compares the attributes by reference and
- * refetches the token when they change.
+ * the agent skips its greeting), and so does `resumeConversationId` (an earlier chat picked from
+ * the history, which the agent carries on). Memoized: useSession compares the attributes by
+ * reference and refetches the token when they change.
  */
 export function useVisitorSessionOptions(
   agentName: string | undefined,
   visitorId: string | null,
   nudgeId: string | null = null,
-  textStart = false
+  textStart = false,
+  resumeConversationId: string | null = null
 ) {
   return useMemo(() => {
     const attributes = {
       ...(visitorId ? { visitor_id: visitorId } : {}),
       ...(nudgeId ? { nudge_id: nudgeId } : {}),
       ...(textStart ? { text_start: '1' } : {}),
+      ...(resumeConversationId ? { resume_conversation_id: resumeConversationId } : {}),
     };
     return {
       ...(agentName ? { agentName } : {}),
       ...(Object.keys(attributes).length > 0 ? { participantAttributes: attributes } : {}),
     };
-  }, [agentName, visitorId, nudgeId, textStart]);
+  }, [agentName, visitorId, nudgeId, textStart, resumeConversationId]);
 }
