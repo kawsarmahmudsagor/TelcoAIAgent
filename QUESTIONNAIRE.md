@@ -70,6 +70,11 @@ issued per 15 minutes.
 | A6 | Samiha | Start voice and talk over the greeting ("hello? hello?") | The greeting isn't cut off, and nothing said during it is answered afterwards | | |
 | A7 | Samiha | After the greeting, say "Hi" | Doesn't greet or introduce itself again. Asks briefly how it can help | | |
 | A8 | Any | Ask "Are you a bot?" | "Yes, I'm an AI assistant for telco." or the Bangla equivalent, and nothing about how it works | | |
+| A9 ★ | Guest, then Samiha | On the home page bubble ask "What's my balance?". When the bot asks you to log in, click **Log in** and pick Samiha, leaving the chat open | The chat stays connected through the login, with no reconnect and no new greeting. The bot says she's logged in and answers 486.50 taka without being asked again | | |
+| A10 | Samiha | *continue from A9:* "Which pack do I have?" | Answers from her account (Smart 15 GB + 300 min), so the account tools work in the same chat | | |
+| A11 | Samiha | *continue from A9:* log out from the profile menu | The chat session ends. A new chat afterwards is a guest chat | | |
+| A12 | Samiha | Chat as Samiha, then go to `/signin` and pick Rafi without logging out | Samiha's chat ends. It never continues as Rafi | | |
+| A13 | Admin | After A9, open the conversation in admin Conversations | One conversation under Samiha, including the guest messages from before the login | | |
 
 ## B. Language and style
 

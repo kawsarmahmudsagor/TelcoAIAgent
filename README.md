@@ -116,7 +116,7 @@ pnpm dev
 ```
 
 Open http://localhost:3001 for the public home page (see "Customer portal" below),
-http://localhost:3001/chat for the standalone full-screen chat page, and http://localhost:3001/login for the
+and http://localhost:3001/login for the
 admin dashboard (credentials from `.env`). `run-local.bat` starts the API, agent worker,
 scheduler and frontend together.
 
@@ -206,7 +206,7 @@ different commands, and `frontend`); `postgres` and `livekit/livekit-server` are
 
 ## Verification checklist
 
-Guest-mode checks (no persona logged in; see "Agent" above). Open `/chat` and connect.
+Guest-mode checks (no persona logged in; see "Agent" above). Open the chat bubble on the home page `/`.
 The logged-in flows are the demo checklist under "Customer portal".
 
 1. Ask for a data pack (e.g. "৩০ দিনের ১০ জিবির কোনো প্যাক আছে?") — the agent searches the
