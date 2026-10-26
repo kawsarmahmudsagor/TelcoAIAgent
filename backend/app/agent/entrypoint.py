@@ -15,6 +15,7 @@ from livekit.agents.beta.tools.end_call import EndCallTool
 from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 
 from app.agent import (
+    account_link,
     action_rpc,
     browser_end_call,
     elevenlabs_keys,
@@ -28,6 +29,7 @@ from app.agent import (
     session_context,
     snapshot_refresh,
     usage_log,
+    voice_mode,
 )
 from app.agent.persona import build_system_prompt
 from app.agent.prompt_defaults import (
@@ -41,7 +43,7 @@ from app.agent.speech_numbers import speak_numbers_as_words
 from app.agent.speech_words import respell_words_for_speech
 from app.agent.tools.search_knowledge_base import build_search_knowledge_base
 from app.agent.tools import registry
-from app.agent.transcript import TranscriptRecorder
+from app.agent.transcript import TranscriptRecorder, load_resume_history
 from app.agent.userdata import SessionUserdata
 from app.config import Settings, get_settings
 from app.services import agent_config_service
@@ -516,6 +518,14 @@ def _open_run_log(settings: Settings, label: str) -> run_log.RunLog | None:
         return None
 
 
+def _resume_chat_ctx(history: list[tuple[str, str]]) -> llm_utils.ChatContext:
+    """The reopened conversation's messages, for the agent to carry on from."""
+    chat_ctx = llm_utils.ChatContext.empty()
+    for role, text in history:
+        chat_ctx.add_message(role=role, content=text)
+    return chat_ctx
+
+
 def _build_session(
     settings: Settings,
     userdata: SessionUserdata,
@@ -561,6 +571,8 @@ def _build_session(
         ),
         "tools": _session_tools(userdata, config),
     }
+    if userdata.resume_history:
+        agent_kwargs["chat_ctx"] = _resume_chat_ctx(userdata.resume_history)
     if not gated:
         if room is not None and settings.turn_pause_enabled:
             # The pause lives in the gate; ungated, the library's own interruption
@@ -645,8 +657,10 @@ def _greet(
     the LLM with greeting_nudge; otherwise the default inbound greeting is a
     canned line, named or guest, and a customised one goes through the LLM.
     A session the browser opened with a typed message (userdata.text_start)
-    has no greeting: it opens to input at once and answers that message."""
-    if userdata.text_start and not userdata.nudge_text:
+    has no greeting: it opens to input at once and answers that message. Nor
+    does one carrying on an earlier conversation (userdata.resume_history):
+    the customer is mid-chat already."""
+    if (userdata.text_start or userdata.resume_history) and not userdata.nudge_text:
         asyncio.ensure_future(_open_without_greeting(session, agent, userdata, room, on_done))
         return
     values = {
@@ -705,6 +719,13 @@ async def entrypoint(ctx: JobContext) -> None:
 
     userdata = session_context.resolve(ctx.job.metadata, ctx.room)
     await _load_customer(userdata)
+    try:
+        # After _load_customer: only a verified subscriber widens what may be reopened.
+        await asyncio.to_thread(load_resume_history, userdata)
+    except Exception:
+        logger.exception("could not load the conversation to resume; starting a new one")
+        userdata.resume_conversation_id = None
+        userdata.resume_history = []
     config = _load_agent_config()
     el_keys = await _elevenlabs_keys_for_call(settings, config)
     gate_key = _gate_api_key(settings, config)
@@ -731,6 +752,13 @@ async def entrypoint(ctx: JobContext) -> None:
     # greeting has played out.
     userdata.linked_identity = _linked_identity(session, caller.identity)
     await session.start(agent=agent, room=ctx.room, room_options=gated_agent.room_options())
+    try:
+        await voice_mode.apply(session, agent, userdata, config, ctx.room)
+    except Exception:
+        # Never leave a guest with voice: text in, text out.
+        logger.exception("could not apply the voice mode; text only")
+        session.input.set_audio_enabled(False)
+        session.output.set_audio_enabled(False)
     action_rpc.ActionRpc(
         session=session,
         userdata=userdata,
@@ -748,14 +776,22 @@ async def entrypoint(ctx: JobContext) -> None:
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent):
         # A filler is said outside the chat context, so the recorder never sees it.
         agent.gate.on_filler_store = recorder.record_assistant_after
-    if userdata.subscriber_id is not None:
-        refresher = snapshot_refresh.SnapshotRefresher(
-            session=session,
-            agent=agent,
-            userdata=userdata,
-            interval_s=settings.snapshot_refresh_s,
-        )
-        refresher.attach()
-        refresher.start()
+    # A guest's refresher idles until a login links the session to an account.
+    refresher = snapshot_refresh.SnapshotRefresher(
+        session=session,
+        agent=agent,
+        userdata=userdata,
+        interval_s=settings.snapshot_refresh_s,
+    )
+    refresher.attach()
+    refresher.start()
+    account_link.AccountLink(
+        session=session, agent=agent, userdata=userdata, room=ctx.room, config=config
+    ).attach()
+    try:
+        # Tells the browser whose session this is (it links or ends it on login/logout).
+        await account_link.publish_account(ctx.room, userdata)
+    except Exception:
+        logger.exception("could not publish the account attribute")
     idle = _idle_checkin(ctx, settings, session)
     _greet(session, agent, userdata, config, room=ctx.room, on_done=idle.start if idle else None)
