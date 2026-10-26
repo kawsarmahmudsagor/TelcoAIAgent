@@ -17,10 +17,11 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.agent import highlights
 from app.agent.telco_format import format_amount, format_data, format_day
 from app.bss import accounts, network
 from app.bss.notifications import case_status_words
-from app.bss.clock import utc_now
+from app.bss.clock import local_tz, utc_now
 from app.bss.errors import SubscriberNotFound
 from app.bss.types import AccountSummary
 from app.db.session import SessionLocal
@@ -32,12 +33,17 @@ GUEST_SNAPSHOT = """\
 ACCOUNT SNAPSHOT — none: the customer is not logged in (a guest). You can still talk about
 packages, network status (ask which district they are in) and general questions. For anything
 about their own account (balance, packs, recharge, offers and reward points, transactions,
-cases), ask them to log in first; never ask for their number or any code to identify them."""
+cases), tell them to log in with the "Log in" button at the top of the page and that you'll answer
+straight after, then offer one thing you can do now (find a pack, check the network, SIM or store
+questions). They can browse packs, but buying, recharging or redeeming needs a login too: when a
+guest likes a pack, say so instead of asking which one to buy. Never ask for their number or any
+code to identify them."""
 
 _SNAPSHOT_HEAD = """\
-ACCOUNT SNAPSHOT — sample demo data, refreshed from the account during this conversation. Use it
-for quick answers; call a tool for details, and right after a change trust the tool's figures
-over these."""
+ACCOUNT SNAPSHOT — sample demo data, re-read from the account each time the customer speaks.
+Answer balance, data, minutes, SMS, pack and points questions from it directly, no tool call.
+Usage history, transactions and offers need their tools; right after a change, trust the tool's
+figures over these."""
 
 
 @dataclass(frozen=True)
@@ -97,7 +103,14 @@ def _read_snapshot(
     except Exception:
         logger.exception("network status lookup failed; keeping the customer logged in")
         incidents = None
-    return summary, _snapshot_text(summary, incidents)
+    try:
+        # Answers come from the snapshot, so it gets the same notes and hooks as the tool.
+        note = highlights.points_note(db, subscriber_id, summary.reward_points, now)
+        extra = highlights.block(highlights.account_highlights(db, summary, now))
+    except Exception:
+        logger.exception("account highlights failed; snapshot without them")
+        note, extra = "", ""
+    return summary, _snapshot_text(summary, incidents, now, note) + extra
 
 
 def _first_name(full_name: str) -> str | None:
@@ -105,7 +118,10 @@ def _first_name(full_name: str) -> str | None:
     return parts[0] if parts else None
 
 
-def _snapshot_text(s: AccountSummary, incidents: list | None) -> str:
+def _snapshot_text(
+    s: AccountSummary, incidents: list | None, now: datetime, points_note: str = ""
+) -> str:
+    today = now.astimezone(local_tz()).date()
     lines = [
         _SNAPSHOT_HEAD,
         f"Customer: {s.full_name}, number {s.masked_msisdn}, {s.plan_type.value}, "
@@ -119,13 +135,16 @@ def _snapshot_text(s: AccountSummary, incidents: list | None) -> str:
         lines.append("Active packs:")
         for v in s.subscriptions:
             renew = ", auto-renew on" if v.auto_renew else ""
+            expires = format_day(v.expires_at)
+            if when := highlights.relative_day(v.expires_at, today):
+                expires = f"{when} ({expires})"
             lines.append(
                 f"- {v.package_name}: {format_data(v.data_left_mb)} data, {v.minutes_left} minutes, "
-                f"{v.sms_left} SMS left, expires {format_day(v.expires_at)}{renew}."
+                f"{v.sms_left} SMS left, expires {expires}{renew}."
             )
     else:
         lines.append("No active packs.")
-    lines.append(f"Reward points: {s.reward_points:,}.")
+    lines.append(f"Reward points: {s.reward_points:,}{points_note}.")
     lines.append(f"Open support cases: {s.open_cases}.")
     if incidents is None:
         lines.append(f"Network status in {s.district} is unavailable right now.")

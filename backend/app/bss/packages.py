@@ -111,13 +111,22 @@ def recommend(
     return [
         Recommendation(
             package=_view(p),
-            reason=(
-                f"Covers about {round(cov * 100)}% of your last 30 days' use "
-                f"for ৳{cost:.0f}/month"
-            ),
+            reason=f"Covers {_coverage_words(cov)} your last 30 days' use for ৳{cost:.0f}/month",
         )
         for cov, cost, p in scored[:limit]
     ]
+
+
+def _coverage_words(coverage: float) -> str:
+    """How much of their usage a pack covers, as a person would say it: the
+    agent reads this out, and "86%" sounds like a spreadsheet."""
+    if coverage >= 0.95:
+        return "all of"
+    if coverage >= 0.7:
+        return "most of"
+    if coverage >= 0.4:
+        return "about half of"
+    return "a small part of"
 
 
 def _lock_balance(db: Session, subscriber_id: uuid.UUID) -> Balance | None:

@@ -25,6 +25,7 @@ def resolve(raw_metadata: str | None, room: rtc.Room) -> SessionUserdata:
         nudge_id=parse_uuid(meta.get("nudge_id")),
         visitor_id=parse_visitor_id(meta.get("visitor_id")),
         text_start=meta.get("text_start") is True,
+        resume_conversation_id=parse_uuid(meta.get("resume_conversation_id")),
     )
 
 

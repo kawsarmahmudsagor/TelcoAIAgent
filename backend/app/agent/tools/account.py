@@ -7,11 +7,12 @@ from decimal import Decimal
 
 from livekit.agents import RunContext, function_tool
 
+from app.agent import highlights
 from app.agent.telco_format import format_amount, format_data, format_day
 from app.agent.tools._common import parse_enum, run_read
 from app.agent.userdata import SessionUserdata
 from app.bss import accounts
-from app.bss.clock import utc_now
+from app.bss.clock import local_tz, utc_now
 from app.bss.errors import InvalidRequest
 from app.models.telco import PlanType, UsageKind
 
@@ -24,7 +25,9 @@ def _day_name(d: date) -> str:
 
 async def run_get_account_summary(userdata: SessionUserdata) -> str:
     def build(db, sid):
-        s = accounts.get_account_summary(db, sid)
+        now = utc_now()
+        today = now.astimezone(local_tz()).date()
+        s = accounts.get_account_summary(db, sid, now=now)
         lines = [
             f"Customer: {s.full_name}, number {s.masked_msisdn}, {s.plan_type.value}, "
             f"district {s.district}."
@@ -33,7 +36,8 @@ async def run_get_account_summary(userdata: SessionUserdata) -> str:
             lines.append(f"Main balance: {format_amount(s.main_balance)}.")
         else:
             lines.append(f"Bill due: {format_amount(s.postpaid_due)}.")
-        lines.append(f"Reward points: {s.reward_points}.")
+        note = highlights.points_note(db, sid, s.reward_points, now)
+        lines.append(f"Reward points: {s.reward_points}{note}.")
         if s.subscriptions:
             t = s.totals
             lines.append(
@@ -42,9 +46,12 @@ async def run_get_account_summary(userdata: SessionUserdata) -> str:
             )
             for v in s.subscriptions[:_DETAIL]:
                 renew = ", auto-renew on" if v.auto_renew else ""
+                expires = format_day(v.expires_at)
+                if when := highlights.relative_day(v.expires_at, today):
+                    expires = f"{when} ({expires})"
                 lines.append(
                     f"- {v.package_name}: {format_data(v.data_left_mb)}, {v.minutes_left} minutes, "
-                    f"{v.sms_left} SMS left, expires {format_day(v.expires_at)}{renew}."
+                    f"{v.sms_left} SMS left, expires {expires}{renew}."
                 )
             if len(s.subscriptions) > _DETAIL:
                 lines.append(f"{len(s.subscriptions) - _DETAIL} more active packs not listed.")
@@ -56,7 +63,7 @@ async def run_get_account_summary(userdata: SessionUserdata) -> str:
                 f"Network incidents in their district: {s.district_incidents} "
                 "(use check_network_status for details)."
             )
-        return "\n".join(lines)
+        return "\n".join(lines) + highlights.block(highlights.account_highlights(db, s, now))
 
     return await run_read(userdata, build)
 
@@ -65,9 +72,8 @@ async def run_get_usage_breakdown(
     userdata: SessionUserdata, period_days: int = 30, kind: str | None = None
 ) -> str:
     def build(db, sid):
-        b = accounts.get_usage_breakdown(
-            db, sid, period_days=period_days, kind=parse_enum(UsageKind, kind)
-        )
+        usage_kind = parse_enum(UsageKind, kind)
+        b = accounts.get_usage_breakdown(db, sid, period_days=period_days, kind=usage_kind)
         if not b.totals:
             return f"No usage in the last {b.period_days} days."
         lines = [f"Usage in the last {b.period_days} days:"]
@@ -77,7 +83,10 @@ async def run_get_usage_breakdown(
         peak = max(b.daily, key=lambda d: d[1], default=None)
         if peak and peak[1] > 0:
             lines.append(f"Heaviest data day: {_day_name(peak[0])}, {format_data(int(peak[1]))}.")
-        return "\n".join(lines)
+        extra = []
+        if usage_kind in (None, UsageKind.data):
+            extra = highlights.usage_highlights(db, sid, utc_now())
+        return "\n".join(lines) + highlights.block(extra)
 
     return await run_read(userdata, build)
 
@@ -105,10 +114,11 @@ async def run_explain_deductions(userdata: SessionUserdata, days: int = 7) -> st
 
 @function_tool(name="get_account_summary")
 async def get_account_summary(ctx: RunContext[SessionUserdata]) -> str:
-    """Get the logged-in customer's live account: balance (or bill due for
+    """Re-read the logged-in customer's account: balance (or bill due for
     postpaid), active packs with data, minutes and SMS left and their expiry,
-    reward points and open support cases. Use it for any question about balance,
-    remaining data or when a pack expires; the prompt snapshot may be out of date.
+    reward points and open support cases. The ACCOUNT SNAPSHOT already has all of
+    this and is kept current, so answer from it; call this only right after a
+    purchase, recharge or redemption, or when the customer says a figure is wrong.
     """
     return await run_get_account_summary(ctx.userdata)
 

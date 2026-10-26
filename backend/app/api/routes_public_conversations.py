@@ -6,14 +6,16 @@ metadata), which stores it on the conversation row. The id is a bearer-like
 secret: it travels in the X-Visitor-Id header (not the query string, so it
 stays out of access logs), nothing is listed without it, a conversation of
 another visitor is a plain 404, and phone-call conversations are never
-returned. Responses carry no internal fields (room, client, schedule ids)."""
+returned. A logged-in customer (a valid `portal_session` cookie) also sees
+their own chats from other browsers. Responses carry no internal fields (room,
+client, schedule ids)."""
 
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_optional_subscriber
 from app.api.routes_conversations import _preview
 from app.repositories import conversation_repo
 from app.schemas.conversation import (
@@ -38,6 +40,7 @@ def visitor_id_header(x_visitor_id: uuid.UUID = Header(...)) -> uuid.UUID:
 def list_visitor_conversations(
     response: Response,
     visitor_id: uuid.UUID = Depends(visitor_id_header),
+    subscriber_id: uuid.UUID | None = Depends(get_optional_subscriber),
     db: Session = Depends(get_db),
     limit: int = Query(default=3, ge=1, le=MAX_PAGE),
     offset: int = Query(default=0, ge=0),
@@ -46,7 +49,12 @@ def list_visitor_conversations(
 ) -> VisitorConversationPage:
     response.headers.update(_NO_STORE)
     rows, total = conversation_repo.list_for_visitor(
-        db, visitor_id, limit=limit, offset=offset, exclude_room=exclude_room
+        db,
+        visitor_id,
+        limit=limit,
+        offset=offset,
+        exclude_room=exclude_room,
+        subscriber_id=subscriber_id,
     )
     return VisitorConversationPage(
         items=[
@@ -73,6 +81,7 @@ def get_visitor_conversation(
     conversation_id: str,
     response: Response,
     visitor_id: uuid.UUID = Depends(visitor_id_header),
+    subscriber_id: uuid.UUID | None = Depends(get_optional_subscriber),
     db: Session = Depends(get_db),
 ) -> VisitorConversationDetail:
     response.headers.update(_NO_STORE)
@@ -80,7 +89,9 @@ def get_visitor_conversation(
         parsed = uuid.UUID(conversation_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="conversation not found") from None
-    conversation = conversation_repo.get_for_visitor(db, visitor_id, parsed)
+    conversation = conversation_repo.get_for_visitor(
+        db, visitor_id, parsed, subscriber_id=subscriber_id
+    )
     if conversation is None:
         raise HTTPException(status_code=404, detail="conversation not found")
     messages = conversation_repo.list_visible_messages(db, conversation.id)

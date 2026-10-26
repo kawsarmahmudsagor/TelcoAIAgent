@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import Date, cast, delete, func, select, update
+from sqlalchemy import Date, cast, delete, false, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models.conversation import (
@@ -78,6 +78,36 @@ def end(
     if subscriber_id is not None:
         values["subscriber_id"] = subscriber_id
     db.execute(update(Conversation).where(Conversation.id == conversation_id).values(**values))
+    db.commit()
+
+
+def reopen(db: Session, conversation_id: uuid.UUID, *, room_name: str | None) -> int:
+    """An earlier conversation the customer picked up again in a new room: active
+    again, in that room. Returns the highest message `seq` so far, for the
+    recorder to number new messages after it."""
+    db.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id)
+        .values(status=ConversationStatus.active.value, ended_at=None, room_name=room_name)
+    )
+    db.commit()
+    return (
+        db.scalar(
+            select(func.max(ConversationMessage.seq)).where(
+                ConversationMessage.conversation_id == conversation_id
+            )
+        )
+        or 0
+    )
+
+
+def link_subscriber(db: Session, conversation_id: uuid.UUID, subscriber_id: uuid.UUID) -> None:
+    """A guest conversation whose visitor logged in: it now belongs to them."""
+    db.execute(
+        update(Conversation)
+        .where(Conversation.id == conversation_id, Conversation.subscriber_id.is_(None))
+        .values(subscriber_id=subscriber_id)
+    )
     db.commit()
 
 
@@ -185,10 +215,19 @@ def daily_counts(db: Session, start: datetime, end: datetime, tz_name: str) -> d
 _VISIBLE_ROLES = (MessageRole.user.value, MessageRole.assistant.value)
 
 
-def _visitor_filters(visitor_id: uuid.UUID) -> list:
-    """A browser visitor's own chat conversations: never phone calls."""
+def _visitor_filters(visitor_id: uuid.UUID | None, subscriber_id: uuid.UUID | None = None) -> list:
+    """Chat conversations (never phone calls) a browser may list and reopen: its
+    guest chats (by visitor id, no subscriber) and, with a server-verified
+    `subscriber_id`, that customer's own chats from any browser. A chat that
+    belongs to another account stays hidden even on the browser it ran in (a
+    shared computer, a switched persona)."""
+    owner = []
+    if visitor_id is not None:
+        owner.append((Conversation.visitor_id == visitor_id) & Conversation.subscriber_id.is_(None))
+    if subscriber_id is not None:
+        owner.append(Conversation.subscriber_id == subscriber_id)
     return [
-        Conversation.visitor_id == visitor_id,
+        or_(false(), *owner),
         Conversation.channel == "inbound_chat",
         Conversation.is_phone_call.is_(False),
     ]
@@ -201,11 +240,13 @@ def list_for_visitor(
     limit: int,
     offset: int = 0,
     exclude_room: str | None = None,
+    subscriber_id: uuid.UUID | None = None,
 ) -> tuple[list[tuple[Conversation, str | None, int]], int]:
     """Newest first, only conversations where the customer said something (a
     greeting-only session is noise). Rows are (conversation, first user message,
     number of user + assistant messages); `exclude_room` drops the session the
-    browser is in right now."""
+    browser is in right now. `subscriber_id` widens the list as in
+    _visitor_filters."""
     has_user_message = (
         select(ConversationMessage.id)
         .where(
@@ -214,7 +255,7 @@ def list_for_visitor(
         )
         .exists()
     )
-    filters = [*_visitor_filters(visitor_id), has_user_message]
+    filters = [*_visitor_filters(visitor_id, subscriber_id), has_user_message]
     if exclude_room:
         filters.append(
             (Conversation.room_name != exclude_room) | Conversation.room_name.is_(None)
@@ -240,12 +281,16 @@ def list_for_visitor(
 
 
 def get_for_visitor(
-    db: Session, visitor_id: uuid.UUID, conversation_id: uuid.UUID
+    db: Session,
+    visitor_id: uuid.UUID | None,
+    conversation_id: uuid.UUID,
+    *,
+    subscriber_id: uuid.UUID | None = None,
 ) -> Conversation | None:
-    """The conversation only if it belongs to this visitor (else None, never a hint
-    that it exists)."""
+    """The conversation only if it belongs to this visitor, or to `subscriber_id`
+    (else None, never a hint that it exists)."""
     stmt = select(Conversation).where(
-        Conversation.id == conversation_id, *_visitor_filters(visitor_id)
+        Conversation.id == conversation_id, *_visitor_filters(visitor_id, subscriber_id)
     )
     return db.scalars(stmt).first()
 

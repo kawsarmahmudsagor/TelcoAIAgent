@@ -7,9 +7,11 @@ import pytest
 from sqlalchemy import text
 
 from app.agent import session_context
-from app.agent.transcript import TranscriptRecorder
+from app.agent.transcript import TranscriptRecorder, load_resume_history
 from app.agent.userdata import Channel, SessionUserdata
+from app.api.deps import get_optional_subscriber
 from app.db.session import SessionLocal
+from app.main import app
 from app.repositories import conversation_repo
 
 ROOM_PREFIX = "pytest-visitor-conv-"
@@ -38,6 +40,7 @@ def _conversation(
     is_phone_call: bool = False,
     started_minutes_ago: int = 0,
     room_name: str | None = None,
+    subscriber_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     db = SessionLocal()
     try:
@@ -47,6 +50,7 @@ def _conversation(
             room_name=room_name or _room(),
             is_phone_call=is_phone_call,
             visitor_id=visitor_id,
+            subscriber_id=subscriber_id,
         )
         started = datetime.now(timezone.utc) - timedelta(minutes=started_minutes_ago)
         db.execute(
@@ -142,6 +146,37 @@ def test_detail_hides_tool_rows_and_other_visitors(anon_api):
     assert anon_api.get(f"/api/public/conversations/{phone}", headers=_headers(visitor)).status_code == 404
 
 
+@pytest.fixture
+def signed_in_api(anon_api):
+    """Factory: signed_in_api(subscriber_id) -> client whose portal cookie verifies."""
+
+    def make(subscriber_id):
+        app.dependency_overrides[get_optional_subscriber] = lambda: subscriber_id
+        return anon_api
+
+    yield make
+    app.dependency_overrides.pop(get_optional_subscriber, None)
+
+
+def test_logged_in_sees_own_chats_and_this_browsers_guest_chats(bss_world, signed_in_api, anon_api):
+    a, b = bss_world.subscriber(), bss_world.subscriber()
+    visitor = uuid.uuid4()
+    guest = _conversation(visitor, started_minutes_ago=30)
+    a_elsewhere = _conversation(uuid.uuid4(), subscriber_id=a.id, started_minutes_ago=20)
+    b_here = _conversation(visitor, subscriber_id=b.id, started_minutes_ago=10)
+
+    # A guest never sees an account's chats, even ones from this browser.
+    body = anon_api.get("/api/public/conversations", headers=_headers(visitor)).json()
+    assert [i["id"] for i in body["items"]] == [str(guest)]
+    assert anon_api.get(f"/api/public/conversations/{b_here}", headers=_headers(visitor)).status_code == 404
+
+    client = signed_in_api(a.id)
+    body = client.get("/api/public/conversations", headers=_headers(visitor)).json()
+    assert [i["id"] for i in body["items"]] == [str(a_elsewhere), str(guest)]
+    assert client.get(f"/api/public/conversations/{a_elsewhere}", headers=_headers(visitor)).status_code == 200
+    assert client.get(f"/api/public/conversations/{b_here}", headers=_headers(visitor)).status_code == 404
+
+
 @pytest.mark.parametrize("headers", [{}, {"X-Visitor-Id": "not-a-uuid"}, {"X-Visitor-Id": ""}])
 def test_needs_a_valid_visitor_id(anon_api, headers):
     assert anon_api.get("/api/public/conversations", headers=headers).status_code == 422
@@ -190,5 +225,77 @@ def test_transcript_recorder_stores_the_visitor_id():
     db = SessionLocal()
     try:
         assert conversation_repo.get(db, conversation_id).visitor_id == visitor
+    finally:
+        db.close()
+
+
+# --- carrying on an earlier conversation -------------------------------------------
+
+
+def test_session_context_takes_a_valid_resume_id_only():
+    conversation_id = uuid.uuid4()
+    meta = {"channel": "inbound_chat", "resume_conversation_id": str(conversation_id)}
+    assert session_context.resolve(json.dumps(meta), None).resume_conversation_id == conversation_id
+    meta["resume_conversation_id"] = "nope"
+    assert session_context.resolve(json.dumps(meta), None).resume_conversation_id is None
+
+
+def test_load_resume_history_only_for_the_owner(bss_world):
+    visitor = uuid.uuid4()
+    conversation_id = _conversation(visitor)
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat, room=None, visitor_id=visitor, resume_conversation_id=conversation_id
+    )
+    load_resume_history(userdata)
+    assert userdata.resume_conversation_id == conversation_id
+    assert userdata.resume_history == [
+        ("assistant", "Hello!"),
+        ("user", "Any flats in Banani?"),
+        ("assistant", "Two of them."),
+    ]
+
+    owner = bss_world.subscriber()
+    owned = _conversation(visitor, subscriber_id=owner.id)
+    for other_visitor, target in (
+        (uuid.uuid4(), conversation_id),  # another browser's guest chat
+        (visitor, owned),  # an account's chat on this browser, reopened by a guest
+    ):
+        stranger = SessionUserdata(
+            channel=Channel.inbound_chat, room=None, visitor_id=other_visitor, resume_conversation_id=target
+        )
+        load_resume_history(stranger)
+        assert stranger.resume_conversation_id is None and stranger.resume_history == []
+
+
+def test_transcript_recorder_reopens_the_resumed_conversation():
+    class _Session:
+        def on(self, *_args) -> None:
+            pass
+
+    visitor = uuid.uuid4()
+    conversation_id = _conversation(visitor)
+    db = SessionLocal()
+    try:
+        conversation_repo.end(db, conversation_id)
+    finally:
+        db.close()
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat, room=None, visitor_id=visitor, resume_conversation_id=conversation_id
+    )
+    new_room = _room()
+
+    async def run() -> TranscriptRecorder:
+        recorder = await TranscriptRecorder.start(_Session(), userdata, new_room)
+        assert recorder is not None
+        return recorder
+
+    recorder = asyncio.run(run())
+    assert recorder.conversation_id == conversation_id == userdata.conversation_id
+    assert recorder._seq == 4  # new messages are numbered after the old ones
+    db = SessionLocal()
+    try:
+        conversation = conversation_repo.get(db, conversation_id)
+        assert conversation.status == "active" and conversation.ended_at is None
+        assert conversation.room_name == new_room
     finally:
         db.close()
