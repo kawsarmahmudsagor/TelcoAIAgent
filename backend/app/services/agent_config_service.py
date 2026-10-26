@@ -100,6 +100,8 @@ class ResolvedAgentConfig:
     reasoning_effort: str = "minimal"
     operator_phone: str = ""
     operator_address: str = ""
+    # Voice replies for logged-in browser customers (app.agent.voice_mode).
+    voice_replies_enabled: bool = True
     # Quick replies (app.agent.quick_reply): off unless the dashboard turns them on.
     quick_reply_enabled: bool = False
     quick_fast_answer: bool = True
@@ -185,6 +187,7 @@ def resolve(row: AgentConfig | None, settings: Settings | None = None) -> Resolv
         reasoning_effort=row.reasoning_effort or settings.llm_reasoning_effort,
         operator_phone=row.operator_phone or settings.operator_phone,
         operator_address=row.operator_address or settings.operator_address,
+        voice_replies_enabled=row.voice_replies_enabled is not False,
         quick_reply_enabled=bool(row.quick_reply_enabled),
         quick_fast_answer=row.quick_fast_answer is not False,
         quick_filler=row.quick_filler is not False,

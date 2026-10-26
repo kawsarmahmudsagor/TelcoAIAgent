@@ -78,6 +78,11 @@ class AgentConfig(TimestampedBase):
     # elevenlabs/eleven-v4-turbo via OpenRouter), so it resets when that changes.
     elevenlabs_tts_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Browser sessions of logged-in customers answer in voice; off, in text
+    # (app.agent.voice_mode). Guests always get text.
+    voice_replies_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
     # Quick replies (app.agent.quick_reply): the master switch and its two parts.
     quick_reply_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"

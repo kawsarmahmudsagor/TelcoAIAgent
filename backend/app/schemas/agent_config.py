@@ -43,6 +43,8 @@ class AgentConfigOut(BaseModel):
     # In stt_tts_provider's id format; unused with deepgram.
     elevenlabs_tts_model: str
 
+    # Logged-in browser customers get voice replies; off, text. Guests always text.
+    voice_replies_enabled: bool
     # Quick replies (voice, gated calls): the master switch and its two parts.
     quick_reply_enabled: bool
     quick_fast_answer: bool
@@ -95,6 +97,7 @@ class AgentConfigUpdate(BaseModel):
     # Reset to the default when stt_tts_provider changes, unless sent with it.
     elevenlabs_tts_model: str | None = Field(default=None, max_length=100)
 
+    voice_replies_enabled: bool | None = None
     quick_reply_enabled: bool | None = None
     quick_fast_answer: bool | None = None
     quick_filler: bool | None = None

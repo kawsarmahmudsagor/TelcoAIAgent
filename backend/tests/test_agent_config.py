@@ -23,7 +23,7 @@ _COLUMNS = [
     "elevenlabs_tts_model", "rag_enabled", "rag_top_k", "rag_similarity_threshold", "embedding_model", "chunk_size",
     "chunk_overlap", "embedding_migration_status", "embedding_migration_target",
     "embedding_migration_error", "quick_reply_enabled", "quick_fast_answer", "quick_filler",
-    "quick_reply_model",
+    "quick_reply_model", "voice_replies_enabled",
 ]  # fmt: skip
 
 
@@ -185,6 +185,28 @@ def test_quick_replies_round_trip(api):
     assert resolved.quick_reply_enabled is True
     assert resolved.quick_filler is False
     assert resolved.quick_reply_model == "openai/gpt-5.4-nano"
+
+
+def test_voice_replies_default_true(api):
+    db = SessionLocal()
+    try:
+        db.execute(text("update agent_config set voice_replies_enabled = default"))
+        db.commit()
+    finally:
+        db.close()
+    assert api.get("/api/agent-config").json()["voice_replies_enabled"] is True
+    assert agent_config_service.load().voice_replies_enabled is True
+
+
+def test_voice_replies_round_trip(api):
+    body = api.patch("/api/agent-config", json={"voice_replies_enabled": False}).json()
+    assert body["voice_replies_enabled"] is False
+    assert agent_config_service.load().voice_replies_enabled is False
+    body = api.patch("/api/agent-config", json={"voice_replies_enabled": None}).json()
+    assert body["voice_replies_enabled"] is False
+    body = api.patch("/api/agent-config", json={"voice_replies_enabled": True}).json()
+    assert body["voice_replies_enabled"] is True
+    assert agent_config_service.load().voice_replies_enabled is True
 
 
 def test_quick_reply_switches_ignore_null(api):
