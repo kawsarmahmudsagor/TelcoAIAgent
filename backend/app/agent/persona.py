@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.agent import voice_mode
 from app.agent.prompt_defaults import KNOWLEDGE_SCOPE_DEFAULT, KNOWLEDGE_SCOPE_RAG
 from app.agent.snapshot import GUEST_SNAPSHOT
 from app.agent.tools._datetime import agency_tz
@@ -76,4 +77,8 @@ def build_system_prompt(
     task = _INBOUND_TASK
     if userdata.text_start and not userdata.nudge_text:
         task = f"{task}\n{_TEXT_START_NOTE}"
-    return f"{identity}\n{snapshot}\n\n{task}\n{_BROWSER_END_NOTE}"
+    prompt = f"{identity}\n{snapshot}\n\n{task}\n{_BROWSER_END_NOTE}"
+    # Last, so the snapshot block above stays replaceable in place.
+    if note := voice_mode.channel_note(voice_mode.mode_for(userdata, config)):
+        prompt = f"{prompt}\n\n{note}"
+    return prompt

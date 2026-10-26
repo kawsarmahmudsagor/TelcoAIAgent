@@ -10,6 +10,7 @@ from livekit import rtc
 
 if TYPE_CHECKING:
     from app.agent.actions import CaseDraft, PendingAction
+    from app.agent.voice_mode import VoiceMode
 
 
 class Channel(str, Enum):
@@ -27,6 +28,8 @@ class SessionUserdata:
     # main model's reply starts speaking (app.agent.cards), not while a filler
     # line or the lookup is still going.
     defer_cards: bool = False
+    # Set by app.agent.voice_mode.apply once the session runs; None before.
+    voice_mode: "VoiceMode | None" = None
     pending_card: tuple[str, str] | None = None
     # The subscriber this session is about (from the dispatch metadata); the
     # transcript recorder links the conversation to it on close.
@@ -38,6 +41,12 @@ class SessionUserdata:
     text_start: bool = False
     # This session's `conversations` row, once the transcript recorder made it.
     conversation_id: UUID | None = None
+    # An earlier conversation the browser picked from its chat history to carry
+    # on: the agent starts with its messages (resume_history, (role, text) pairs)
+    # and the recorder appends to that row instead of making one. Cleared when it
+    # isn't this customer's to reopen.
+    resume_conversation_id: UUID | None = None
+    resume_history: list[tuple[str, str]] = field(default_factory=list)
     # Set once the first message (the greeting) has played out; until then the
     # session ignores the customer's voice and typed text (entrypoint._greet).
     greeting_done: bool = False
