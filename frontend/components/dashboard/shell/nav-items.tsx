@@ -16,8 +16,11 @@ export interface AdminNavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  /** Shows the open-case count beside the label (the support queue). */
-  badge?: 'openCases';
+  /**
+   * A count beside the label: open cases (the support queue), or KB docs edited since they were
+   * embedded (the knowledge base).
+   */
+  badge?: 'openCases' | 'kbChanges';
 }
 
 export interface AdminNavGroup {
@@ -42,7 +45,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'AGENT',
     items: [
       { href: '/dashboard/chatbot', label: 'Chatbot', icon: BotIcon },
-      { href: '/dashboard/knowledge', label: 'Knowledge base', icon: LibraryBigIcon },
+      {
+        href: '/dashboard/knowledge',
+        label: 'Knowledge base',
+        icon: LibraryBigIcon,
+        badge: 'kbChanges',
+      },
       { href: '/dashboard/conversations', label: 'Conversations', icon: MessagesSquareIcon },
       { href: '/dashboard/offers', label: 'Offers', icon: TagIcon },
     ],

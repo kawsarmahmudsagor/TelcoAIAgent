@@ -45,6 +45,8 @@ export interface RagSource {
   updated_at: DateTimeString;
   /** The newest job, for progress display and retry. */
   latest_job: EmbeddingJob | null;
+  /** A seeded KB doc whose file was edited: a reindex embeds the new text. */
+  file_changed: boolean;
 }
 
 export interface RagSourcePage {
@@ -156,6 +158,8 @@ export interface RagStatus {
   jobs_pending: number;
   jobs_processing: number;
   jobs_failed: number;
+  /** Seeded KB docs edited on disk since they were embedded. */
+  kb_files_changed: number;
   embedding_migration_status: EmbeddingMigrationStatus | null;
   embedding_migration_target: string | null;
   embedding_migration_error: string | null;

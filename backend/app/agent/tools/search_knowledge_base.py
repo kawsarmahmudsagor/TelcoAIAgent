@@ -1,6 +1,7 @@
 """search_knowledge_base: the agent's lookup into the knowledge base (FAQ
 documents, crawled pages, text notes): the operator's policies, terms, data
-rollover, SIM replacement, roaming and coverage notes.
+rollover, SIM replacement, roaming and coverage notes, contact channels, stores,
+new SIMs and eSIM, MNP, SIM ownership and privacy.
 
 Built per session from the resolved agent config (top-k, threshold, model,
 source scope), and only registered when the knowledge base is enabled -- see
@@ -81,7 +82,10 @@ def build_search_knowledge_base(config: ResolvedAgentConfig):
     @function_tool(name=TOOL_NAME)
     async def search_knowledge_base(ctx: RunContext[SessionUserdata], query: str) -> str:
         """Look up the operator's policies and FAQs in its knowledge base: terms,
-        charges, data rollover, SIM replacement, roaming and coverage. Use it
+        charges, data rollover, SIM replacement, roaming, coverage, contact
+        channels and hotline, stores and care centres, buying a new SIM or eSIM,
+        moving a number from another operator (MNP), SIM ownership and inactive
+        numbers, and privacy. Use it
         before answering any such question, not for the customer's own account.
         Only the facts it returns may be stated; if it finds nothing, don't say
         you lack it: point the customer to the hotline.

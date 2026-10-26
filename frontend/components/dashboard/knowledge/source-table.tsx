@@ -105,13 +105,20 @@ export function SourceTable({
                 </button>
               </TableCell>
               <TableCell>
-                <StatusPill
-                  tone={status.tone}
-                  pulse={status.pulse}
-                  title={failed ? error : undefined}
-                >
-                  {status.label}
-                </StatusPill>
+                <div className="flex flex-wrap gap-1.5">
+                  <StatusPill
+                    tone={status.tone}
+                    pulse={status.pulse}
+                    title={failed ? error : undefined}
+                  >
+                    {status.label}
+                  </StatusPill>
+                  {source.file_changed && !busy && (
+                    <StatusPill tone="warning" title="The document changed since it was embedded">
+                      Changed
+                    </StatusPill>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {busy && source.chunk_count === 0 ? '—' : source.chunk_count.toLocaleString()}
@@ -143,7 +150,7 @@ export function SourceTable({
                     ) : (
                       <DropdownMenuItem onSelect={() => onReindex(source)} disabled={busy}>
                         <RefreshCwIcon aria-hidden="true" />
-                        Reindex
+                        {source.file_changed ? 'Re-embed changes' : 'Reindex'}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />

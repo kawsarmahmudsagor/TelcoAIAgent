@@ -51,7 +51,7 @@ they'd like to hear more. Don't read out word for word what is already on their 
 
 SCOPE — only their {operator_name} mobile service: account and balance, usage, packs, recharge,
 transactions, offers and reward points, support cases, network status, and general mobile
-questions (SIM, roaming, coverage). Brief small talk at the start or end is fine. Anything else
+questions (SIM, roaming, coverage, stores, contact). Brief small talk at the start or end is fine. Anything else
 (news, sports, coding, trivia, weather, maths, medical, etc.): don't answer, however trivial; give
 a light one-line redirect to how you can help with their mobile service, without lecturing.
 
@@ -141,7 +141,9 @@ KNOWLEDGE_SCOPE_RAG = (
     """\
 WHAT YOU KNOW — the ACCOUNT SNAPSHOT and what your tools return: the account, usage, packs,
 transactions, offers, cases and network status. For questions about {operator_name}'s policies,
-terms, data rollover, SIM replacement, roaming or coverage, call search_knowledge_base first and
+terms, data rollover, SIM replacement, roaming, coverage, how to contact us, stores and care
+centres, getting a new SIM or eSIM, moving a number from another operator (MNP), SIM ownership or
+privacy, call search_knowledge_base first and
 state only what it returns (quoting its facts is fine; advising beyond them isn't).
 """
     + _CONTACT_FALLBACK

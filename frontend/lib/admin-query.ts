@@ -16,7 +16,8 @@ export type AdminKey =
   | 'network'
   | 'monitor'
   | 'offers'
-  | 'packages';
+  | 'packages'
+  | 'kbStatus';
 
 const INVALIDATE = 'admin:invalidate';
 

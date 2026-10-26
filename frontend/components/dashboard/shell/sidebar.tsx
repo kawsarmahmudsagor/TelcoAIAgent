@@ -7,6 +7,7 @@ import { ADMIN_NAV, isAdminNavActive } from '@/components/dashboard/shell/nav-it
 import { TelcoBrand } from '@/components/portal/telco-brand';
 import { adminApi } from '@/lib/admin-api';
 import { useAdminQuery } from '@/lib/admin-query';
+import { api } from '@/lib/api-client';
 import { cn } from '@/lib/shadcn/utils';
 
 const FOCUS = 'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60';
@@ -49,6 +50,22 @@ function OpenCasesBadge() {
     <span className="bg-red/15 text-red ml-auto rounded-full px-2 py-0.5 text-[11px] leading-none font-extrabold tabular-nums">
       {open}
       <span className="sr-only"> open cases</span>
+    </span>
+  );
+}
+
+/** The count of KB docs edited since they were embedded, beside "Knowledge base". Hidden at zero. */
+function KbChangesBadge() {
+  const status = useAdminQuery('kbStatus', api.dashboard.ragStatus);
+  const changed = status.data?.kb_files_changed ?? 0;
+  if (changed === 0) return null;
+  return (
+    <span
+      title="Documents changed since they were embedded"
+      className="bg-warning/12 text-warning ml-auto rounded-full px-2 py-0.5 text-[11px] leading-none font-extrabold tabular-nums"
+    >
+      {changed}
+      <span className="sr-only"> documents need re-embedding</span>
     </span>
   );
 }
@@ -106,6 +123,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       </span>
                       <span className="truncate">{item.label}</span>
                       {item.badge === 'openCases' && <OpenCasesBadge />}
+                      {item.badge === 'kbChanges' && <KbChangesBadge />}
                     </Link>
                   </li>
                 );

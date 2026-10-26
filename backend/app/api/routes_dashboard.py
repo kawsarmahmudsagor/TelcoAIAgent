@@ -101,6 +101,7 @@ def rag_status(db: Session = Depends(get_db)) -> RagStatus:
         jobs_pending=jobs["pending"],
         jobs_processing=jobs["processing"],
         jobs_failed=jobs["failed"],
+        kb_files_changed=len(rag_service.changed_kb_sources(db)),
         embedding_migration_status=row.embedding_migration_status if row else None,
         embedding_migration_target=row.embedding_migration_target if row else None,
         embedding_migration_error=row.embedding_migration_error if row else None,

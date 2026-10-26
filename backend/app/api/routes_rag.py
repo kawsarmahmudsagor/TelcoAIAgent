@@ -22,7 +22,7 @@ from app.schemas.rag import (
     ReindexAllResponse,
     TextSourceCreate,
 )
-from app.services import agent_config_service, rag_service
+from app.services import agent_config_service, kb_files, rag_service
 from app.services.rag_service import ConflictError, NotFoundError, RagServiceError
 
 logger = logging.getLogger("api.rag")
@@ -41,6 +41,7 @@ def _http_error(exc: RagServiceError) -> HTTPException:
 def _source_out(source: RagSource, job: EmbeddingJob | None) -> RagSourceOut:
     out = RagSourceOut.model_validate(source)
     out.latest_job = EmbeddingJobOut.model_validate(job) if job else None
+    out.file_changed = kb_files.changed_text(source) is not None
     return out
 
 

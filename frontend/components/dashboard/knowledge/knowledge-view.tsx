@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CircleAlertIcon, PlusIcon } from 'lucide-react';
+import { CircleAlertIcon, FilePenLineIcon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import { PageHeader } from '@/components/dashboard/page-header';
@@ -10,6 +10,7 @@ import { Panel, TableState } from '@/components/dashboard/table-state';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLoad } from '@/hooks/useLoad';
+import { invalidateAdmin } from '@/lib/admin-query';
 import { type RagSource, type RagSourceType, api } from '@/lib/api-client';
 import { AddSourceDialog } from './add-source-dialog';
 import { RetrievalTester } from './retrieval-tester';
@@ -38,6 +39,7 @@ export function KnowledgeView() {
   const [deleting, setDeleting] = useState<RagSource | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [pollMs, setPollMs] = useState<number | null>(null);
+  const [reembedding, setReembedding] = useState(false);
 
   const sources = useLoad(
     async () => {
@@ -63,12 +65,15 @@ export function KnowledgeView() {
     return result;
   }, [all]);
   const shown = filter === 'all' ? all : all.filter((s) => s.source_type === filter);
+  const changed = all.filter((s) => s.file_changed && !isBusy(s));
   const embeddingReady = status.data?.embedding_ready ?? true;
 
   function refreshSoon() {
     setPollMs(POLL_MS);
     void sources.reload();
     void status.reload();
+    // The sidebar's changed-docs badge.
+    invalidateAdmin(['kbStatus']);
   }
 
   async function reindex(source: RagSource) {
@@ -81,6 +86,19 @@ export function KnowledgeView() {
         description: err instanceof Error ? err.message : undefined,
       });
     }
+  }
+
+  async function reembedChanged() {
+    setReembedding(true);
+    const results = await Promise.allSettled(changed.map((s) => api.rag.reindexSource(s.id)));
+    setReembedding(false);
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    if (failed > 0) {
+      toast.error(`Could not re-embed ${failed} of ${changed.length} documents`);
+    } else {
+      toast.success(`Re-embedding ${changed.length} changed documents`);
+    }
+    refreshSoon();
   }
 
   async function retry(source: RagSource) {
@@ -141,6 +159,30 @@ export function KnowledgeView() {
             </Link>
             .
           </p>
+        </div>
+      )}
+      {changed.length > 0 && (
+        <div
+          role="status"
+          className="border-warning/30 bg-warning/12 mb-6 flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm"
+        >
+          <FilePenLineIcon className="text-warning size-4 shrink-0" aria-hidden="true" />
+          <p className="min-w-0 flex-1">
+            <span className="font-medium">
+              {changed.length === 1
+                ? '1 document needs to be re-embedded.'
+                : `${changed.length} documents need to be re-embedded.`}
+            </span>{' '}
+            Edited since the agent last read it: {changed.map((s) => s.name).join(', ')}. The agent
+            answers from the old text until it is re-embedded.
+          </p>
+          <Button
+            size="sm"
+            onClick={() => void reembedChanged()}
+            disabled={reembedding || !embeddingReady}
+          >
+            {changed.length === 1 ? 'Re-embed' : `Re-embed all ${changed.length}`}
+          </Button>
         </div>
       )}
       {status.data && !status.data.rag_enabled && embeddingReady && (

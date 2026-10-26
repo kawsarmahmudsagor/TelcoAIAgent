@@ -43,6 +43,8 @@ class RagSourceOut(BaseModel):
     updated_at: datetime
     # The newest job, so the UI can show progress and offer a retry.
     latest_job: EmbeddingJobOut | None = None
+    # A seeded KB doc whose file was edited: a reindex embeds the new text.
+    file_changed: bool = False
 
 
 class RagSourcePageOut(BaseModel):
@@ -140,6 +142,8 @@ class RagStatus(BaseModel):
     jobs_pending: int
     jobs_processing: int
     jobs_failed: int
+    # Seeded KB docs edited on disk since they were embedded.
+    kb_files_changed: int = 0
     embedding_migration_status: str | None
     embedding_migration_target: str | None
     embedding_migration_error: str | None

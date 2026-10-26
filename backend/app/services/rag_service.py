@@ -37,6 +37,7 @@ from app.rag.config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, RAG_SOURCE_ID_K
 from app.rag.crawler import DEFAULT_MAX_DEPTH, DEFAULT_MAX_PAGES, MAX_DEPTH_CAP, MAX_PAGES_CAP
 from app.rag.net import UnsafeURLError, assert_scheme_and_host
 from app.repositories import agent_config_repo
+from app.services import kb_files
 
 logger = logging.getLogger("rag.service")
 
@@ -354,13 +355,33 @@ def job_counts(db: Session) -> dict[str, int]:
 # --------------------------------------------------------------------------- #
 
 
+def _refresh_from_kb_file(source: RagSource) -> None:
+    """A seeded KB source whose file was edited takes the file's new text."""
+    if (text := kb_files.changed_text(source)) is not None:
+        source.content = text
+        source.size_bytes = len(text.encode("utf-8"))
+
+
+def changed_kb_sources(db: Session) -> list[RagSource]:
+    """Seeded KB sources whose file was edited since they were last given its text."""
+    rows = db.scalars(
+        select(RagSource).where(
+            RagSource.source_type == RagSourceType.text.value,
+            RagSource.name.startswith(kb_files.NAME_PREFIX),
+        )
+    ).all()
+    return [row for row in rows if kb_files.changed_text(row) is not None]
+
+
 def reindex_source(db: Session, source_id: uuid.UUID) -> tuple[RagSource, EmbeddingJob]:
-    """Re-embeds a source with the current model and chunk settings. Reuses a
-    job that's still waiting rather than queueing a second one."""
+    """Re-embeds a source with the current model and chunk settings, with a
+    seeded KB doc's edited text. Reuses a job that's still waiting rather than
+    queueing a second one."""
     source = get_source(db, source_id)
     job = open_job(db, source.id)
     if job is not None and job.status == EmbeddingJobStatus.processing.value:
         raise ConflictError("This source is being processed right now; try again shortly")
+    _refresh_from_kb_file(source)
     source.status = RagSourceStatus.pending.value
     source.error = None
     if job is None:
@@ -379,6 +400,7 @@ def reindex_all(db: Session) -> int:
     for source in sources:
         if open_job(db, source.id) is not None:
             continue
+        _refresh_from_kb_file(source)
         source.status = RagSourceStatus.pending.value
         source.error = None
         enqueue_job(db, EmbeddingJobType.reindex, rag_source_id=source.id, priority=-1)
