@@ -40,6 +40,7 @@ ERROR_TEXT: dict[str, str] = {
         "Tell the customer this and ask them to wait a few minutes before trying again."
     ),
     "invalid_msisdn": "That is not a valid mobile number. Ask for an 11-digit number starting with 01.",
+    "msisdn_taken": "That number already has an account. Suggest they log in or reset the password.",
     "otp_expired": "The code has expired and the action was cancelled. Offer to start again.",
     "otp_invalid": (
         "The code did not match. Ask them to check the SMS shown on screen and say the code again."

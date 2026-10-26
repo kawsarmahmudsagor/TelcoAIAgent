@@ -26,7 +26,8 @@ export function showSmsToast({ code, to, expiresAt }: SmsToastInput): string | n
   );
 }
 
-function SmsCard({
+/** The SMS notification card itself, for pages that show it inline instead of as a toast. */
+export function SmsCard({
   code,
   to,
   expiresAt,

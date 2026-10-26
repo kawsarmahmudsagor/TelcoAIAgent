@@ -36,6 +36,11 @@ class InvalidMsisdn(BssError):
     default_message = "Invalid mobile number"
 
 
+class MsisdnTaken(BssError):
+    code = "msisdn_taken"
+    default_message = "That number already has an account"
+
+
 class OtpExpired(BssError):
     code = "otp_expired"
     default_message = "The code has expired"

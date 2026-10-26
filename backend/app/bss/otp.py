@@ -118,12 +118,17 @@ def verify(
     code: str,
     now: datetime | None = None,
     actor: Actor = Actor.system,
+    single_use: bool = False,
 ) -> None:
+    """Consume the code. A consumed code passes again (an action retry) unless
+    `single_use`, where it raises OtpInvalid."""
     now = now or utc_now()
     row = _get(db, subscriber_id, action_id, lock=True)
     if row is None:
         raise NoPendingAction()
     if row.consumed_at is not None:
+        if single_use:
+            raise OtpInvalid("Code already used")
         return
     if row.expires_at <= now:
         raise OtpExpired()

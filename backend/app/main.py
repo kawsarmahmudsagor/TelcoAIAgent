@@ -7,6 +7,7 @@ from app.api import (
     routes_auth,
     routes_catalog,
     routes_conversations,
+    routes_customer_auth,
     routes_dashboard,
     routes_demo,
     routes_me,
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_public_conversations.router)
     app.include_router(routes_rag.router)
     app.include_router(routes_demo.router)
+    app.include_router(routes_customer_auth.router)
     app.include_router(routes_catalog.router)
     app.include_router(routes_me.router)
     app.include_router(routes_me_actions.router)

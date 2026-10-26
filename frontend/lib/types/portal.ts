@@ -28,7 +28,24 @@ export interface PersonaCard {
   headline: string;
 }
 
-/** The signed-in customer (`GET /api/me`, `POST /api/demo/login`). */
+/** `POST /api/auth/customer/signup`. */
+export interface SignupRequest {
+  full_name: string;
+  /** Local 11-digit number, `01…`. */
+  msisdn: string;
+  district: string;
+  plan_type: PlanType;
+  /** 8 to 72 characters. */
+  password: string;
+}
+
+/** `POST /api/auth/customer/reset/start`: the reset id and the simulated SMS. */
+export interface ResetStart {
+  reset_id: UUID;
+  otp: OtpSms;
+}
+
+/** The signed-in customer (`GET /api/me`, `POST /api/demo/login`, the customer auth routes). */
 export interface PortalMe {
   subscriber_id: UUID;
   full_name: string;

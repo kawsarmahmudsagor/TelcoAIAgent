@@ -18,6 +18,7 @@ _STATUS_BY_CODE: dict[str, int] = {
     "offer_not_eligible": 409,
     "limit_exceeded": 422,
     "invalid_msisdn": 422,
+    "msisdn_taken": 409,
     "invalid_request": 422,
     "otp_invalid": 400,
     "otp_expired": 410,

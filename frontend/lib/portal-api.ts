@@ -15,6 +15,8 @@ import type {
   PortalCaseCreate,
   PortalMe,
   Recommendation,
+  ResetStart,
+  SignupRequest,
   TransactionParams,
   TransactionView,
   UsageBreakdown,
@@ -38,6 +40,16 @@ export const portalApi = {
   /** Signs in as a persona (sets the `portal_session` cookie). */
   login: (msisdn: string) => post<PortalMe>('/api/demo/login', { msisdn }),
   logout: () => post<{ ok: boolean }>('/api/demo/logout'),
+  /** Creates an account with the welcome bonus and signs in. 409 `msisdn_taken` if it exists. */
+  signup: (body: SignupRequest) => post<PortalMe>('/api/auth/customer/signup', body),
+  /** Number + password sign-in. Any miss is 401 `invalid_credentials`. */
+  passwordLogin: (msisdn: string, password: string) =>
+    post<PortalMe>('/api/auth/customer/login', { msisdn, password }),
+  /** Sends a reset code (returned here as a simulated SMS). */
+  resetStart: (msisdn: string) => post<ResetStart>('/api/auth/customer/reset/start', { msisdn }),
+  /** Sets the new password with the code and signs in. */
+  resetConfirm: (body: { msisdn: string; reset_id: string; code: string; new_password: string }) =>
+    post<PortalMe>('/api/auth/customer/reset/confirm', body),
   /** Unauthenticated: the active pack catalog, for the public home page. */
   catalog: (kind?: PackageKind) => get<PackageView[]>(`/api/catalog/packages${qs({ kind })}`),
 

@@ -156,6 +156,8 @@ class Subscriber(TimestampedBase):
     joined_on: Mapped[date] = mapped_column(Date)
     reward_points: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     preferred_language: Mapped[str] = mapped_column(String(2), default="bn", server_default="bn")
+    # bcrypt hash; NULL for the seeded personas until they reset a password.
+    password_hash: Mapped[str | None] = mapped_column(String(60), nullable=True)
 
 
 class Balance(Base):

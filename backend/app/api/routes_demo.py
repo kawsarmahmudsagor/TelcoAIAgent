@@ -6,14 +6,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import PORTAL_COOKIE, get_db
+from app.api.deps import PORTAL_COOKIE, get_db, set_portal_session
 from app.api.routes_me import portal_me
 from app.api.schemas_me import PortalMe
 from app.bss.accounts import mask_msisdn
-from app.config import get_settings
 from app.data.personas import PERSONA_HEADLINES
 from app.models.telco import PlanType, Subscriber
-from app.services.auth_service import create_access_token
 
 router = APIRouter(prefix="/api/demo", tags=["demo"])
 _NO_STORE = {"Cache-Control": "no-store"}
@@ -63,15 +61,7 @@ def login(
         sub = db.scalar(select(Subscriber).where(Subscriber.msisdn == payload.msisdn))
     if sub is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown persona")
-    settings = get_settings()
-    response.set_cookie(
-        PORTAL_COOKIE,
-        create_access_token(str(sub.id), "customer"),
-        httponly=True,
-        samesite="lax",
-        secure=False,  # set True once served over HTTPS
-        max_age=settings.jwt_expire_minutes * 60,
-    )
+    set_portal_session(response, sub.id)
     return portal_me(sub)
 
 
