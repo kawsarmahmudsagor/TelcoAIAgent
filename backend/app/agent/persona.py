@@ -7,6 +7,13 @@ from app.agent.userdata import SessionUserdata
 from app.services import agent_config_service
 from app.services.agent_config_service import ResolvedAgentConfig, render_template
 
+# A session opened by a typed message has no greeting (entrypoint._greet), so
+# the first reply mustn't make up for it.
+_TEXT_START_NOTE = """TYPED START: the customer opened this chat by typing a message, and you haven't greeted them.
+Answer that message directly: don't greet, don't say Salam and don't introduce yourself. Reply in
+the language of their message.
+"""
+
 _INBOUND_TASK = (
     "Help the customer with their mobile service using your tools and the ACCOUNT SNAPSHOT.\n"
 )
@@ -66,4 +73,7 @@ def build_system_prompt(
 
     # The session's account snapshot (app.agent.snapshot), never editable.
     snapshot = userdata.snapshot_text or GUEST_SNAPSHOT
-    return f"{identity}\n{snapshot}\n\n{_INBOUND_TASK}\n{_BROWSER_END_NOTE}"
+    task = _INBOUND_TASK
+    if userdata.text_start and not userdata.nudge_text:
+        task = f"{task}\n{_TEXT_START_NOTE}"
+    return f"{identity}\n{snapshot}\n\n{task}\n{_BROWSER_END_NOTE}"

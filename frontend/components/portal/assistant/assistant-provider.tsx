@@ -52,8 +52,8 @@ export interface AssistantContextValue {
   /** Typed text waiting for the agent to be ready (shown greyed out in the transcript). */
   queued: string[];
   /**
-   * Sends a chat message. With no session it starts a text-only one first; until the agent has
-   * greeted, the text waits in `queued`.
+   * Sends a chat message. With no session it starts a text-only one first, where the agent skips
+   * its greeting; until the agent takes input, the text waits in `queued`.
    */
   sendText(text: string): void;
   micEnabled: boolean;
@@ -154,7 +154,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       }
       setQueued((prev) => [...prev, text]);
       if (connectionState === ConnectionState.Disconnected && !autoConnecting) {
-        void startSession({ voice: false, openPanel: false }).then((ok) => {
+        void startSession({ voice: false, openPanel: false, textStart: true }).then((ok) => {
           if (!ok) setQueued([]);
         });
       }

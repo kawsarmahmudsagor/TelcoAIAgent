@@ -275,11 +275,16 @@ async def _greet(
     config=None,
     customer_name=None,
     nudge_text=None,
+    text_start=False,
 ):
     session = GreetSession(handle, closed=closed)
     agent = GreetAgent()
     userdata = SessionUserdata(
-        channel=Channel.inbound_chat, room=room, customer_name=customer_name, nudge_text=nudge_text
+        channel=Channel.inbound_chat,
+        room=room,
+        customer_name=customer_name,
+        nudge_text=nudge_text,
+        text_start=text_start,
     )
     config = config or agent_config_service.resolve(None)
     entrypoint._greet(session, agent, userdata, config, room=room)
@@ -297,6 +302,27 @@ def test_greeting_is_uninterruptible_and_unlocks_the_session():
         assert session.cleared == 1
         assert agent.greeting_done_calls == 1
         assert room.attributes == {"greeting_done": "1"}
+
+    asyncio.run(go())
+
+
+def test_a_text_start_skips_the_greeting_and_unlocks_the_session():
+    async def go():
+        room = AttributeRoom()
+        session, agent, userdata = await _greet(FakeHandle(), room=room, text_start=True)
+        assert session.replies == []
+        assert userdata.greeting_done
+        assert agent.greeting_done_calls == 1
+        assert room.attributes == {"greeting_done": "1"}
+
+    asyncio.run(go())
+
+
+def test_a_text_start_from_a_nudge_still_greets():
+    async def go():
+        session, _, userdata = await _greet(FakeHandle(), nudge_text="low balance", text_start=True)
+        assert [r["kind"] for r in session.replies] == ["generate_reply"]
+        assert userdata.greeting_done
 
     asyncio.run(go())
 

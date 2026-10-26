@@ -79,6 +79,18 @@ async def _await_greeting(
             on_done()
 
 
+async def _open_without_greeting(
+    session: AgentSession,
+    agent: Agent,
+    userdata: SessionUserdata,
+    room: rtc.Room | None,
+    on_done: Callable[[], None] | None = None,
+) -> None:
+    await _mark_greeting_done(session, agent, userdata, room)
+    if on_done is not None:
+        on_done()
+
+
 async def _mark_greeting_done(
     session: AgentSession,
     agent: Agent,
@@ -630,7 +642,12 @@ def _greet(
 
     A session opened from a notification (userdata.nudge_text) greets through
     the LLM with greeting_nudge; otherwise the default inbound greeting is a
-    canned line, named or guest, and a customised one goes through the LLM."""
+    canned line, named or guest, and a customised one goes through the LLM.
+    A session the browser opened with a typed message (userdata.text_start)
+    has no greeting: it opens to input at once and answers that message."""
+    if userdata.text_start and not userdata.nudge_text:
+        asyncio.ensure_future(_open_without_greeting(session, agent, userdata, room, on_done))
+        return
     values = {
         "agent_name": config.assistant_name,
         "operator_name": config.operator_name,

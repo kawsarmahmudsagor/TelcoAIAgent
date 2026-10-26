@@ -33,6 +33,9 @@ class SessionUserdata:
     subscriber_id: UUID | None = None
     # The proactive nudge that started this session, if any.
     nudge_id: UUID | None = None
+    # The browser opened this session with a typed message: no greeting, the
+    # agent answers that message straight away (a nudge session still greets).
+    text_start: bool = False
     # This session's `conversations` row, once the transcript recorder made it.
     conversation_id: UUID | None = None
     # Set once the first message (the greeting) has played out; until then the

@@ -73,11 +73,13 @@ export async function POST(req: NextRequest) {
     // Whatever metadata the client sent is discarded: `subscriber_id` comes only from the
     // `portal_session` cookie as verified by FastAPI, so a guest (no cookie or a rejected one)
     // gets none. The browser's anonymous visitor id (a participant attribute set by useSession)
-    // and the nudge being answered (`nudge_id`) are passed through only when they are UUIDs.
+    // and the nudge being answered (`nudge_id`) are passed through only when they are UUIDs;
+    // `text_start` says a typed message opened the session.
     const subscriberId = await resolveSubscriberId(req);
     const metadata = buildDispatchMetadata(subscriberId, {
       visitorId: body?.participant_attributes?.visitor_id,
       nudgeId: body?.participant_attributes?.nudge_id ?? body?.nudge_id,
+      textStart: body?.participant_attributes?.text_start,
     });
     for (const agent of roomConfig.agents) {
       // useSession adds a bare dispatch when the app config names the agent.

@@ -325,6 +325,10 @@ dashboard), the agent **speaks one of the canned Bangla lines word for word**, p
 with no LLM call. A greeting customised on the dashboard is an instruction to `generate_reply`
 instead, with "Open with আসসালামু আলাইকুম" added. No greeting can be interrupted.
 
+**Typed start**: a portal session opened by a typed message (dispatch metadata `text_start`) has
+no greeting. It opens to input at once, and the system prompt gets a `TYPED START` note: answer
+the message directly, with no greeting, Salam or introduction. A nudge session still greets.
+
 **Inbound**: `SPOKEN_GREETINGS_INBOUND`, or `DEFAULT_GREETING_INBOUND` when customised
 ```text
 In Bangla, greet the customer warmly, introduce yourself and {agency_name}, and ask what kind of place they're looking for.

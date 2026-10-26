@@ -211,6 +211,19 @@ def test_prompt_rules_present():
     assert GUEST_SNAPSHOT in guest
 
 
+def test_a_text_start_prompt_answers_cold():
+    config = agent_config_service.resolve(None)
+    typed = SessionUserdata(channel=Channel.inbound_chat, room=None, text_start=True)
+    assert "TYPED START" in build_system_prompt(typed, config)
+    plain = SessionUserdata(channel=Channel.inbound_chat, room=None)
+    assert "TYPED START" not in build_system_prompt(plain, config)
+    # A nudge session still opens with the nudge greeting.
+    nudged = SessionUserdata(
+        channel=Channel.inbound_chat, room=None, text_start=True, nudge_text="low balance"
+    )
+    assert "TYPED START" not in build_system_prompt(nudged, config)
+
+
 def test_greeting_defaults_fit_the_operator():
     assert "{nudge_text}" in DEFAULT_GREETING_NUDGE
     assert len(SPOKEN_GREETINGS_INBOUND) == 3

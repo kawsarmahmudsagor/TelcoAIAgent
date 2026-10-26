@@ -24,6 +24,8 @@ export interface StartSessionOptions {
   voice: boolean;
   /** Show the bubble's panel once connected. */
   openPanel: boolean;
+  /** A typed message opens the session: the agent answers it instead of greeting. */
+  textStart?: boolean;
 }
 
 interface ChatBubbleContextValue {
@@ -86,7 +88,19 @@ export function ChatBubbleProvider({
   // is a normal one.
   const [nudgeId, setNudgeId] = useState<string | null>(null);
   const pendingNudgeRef = useRef<((ok: boolean) => void) | null>(null);
-  const sessionOptions = useVisitorSessionOptions(appConfig.agentName, visitorId, nudgeId);
+  // Whether the latest start was a typed message's. It rides in the token request, so a start
+  // that changes it waits for the options to re-render first (deferredStartRef).
+  const [textStart, setTextStart] = useState(false);
+  const deferredStartRef = useRef<{
+    options: StartSessionOptions;
+    resolve: (ok: boolean) => void;
+  } | null>(null);
+  const sessionOptions = useVisitorSessionOptions(
+    appConfig.agentName,
+    visitorId,
+    nudgeId,
+    textStart
+  );
   const session = useSession(tokenSource, sessionOptions);
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -98,10 +112,20 @@ export function ChatBubbleProvider({
   const [voiceRequested, setVoiceRequested] = useState(false);
 
   const startSession = useCallback(
-    async ({ voice, openPanel }: StartSessionOptions): Promise<boolean> => {
+    async (options: StartSessionOptions): Promise<boolean> => {
+      const { voice, openPanel, textStart: typed = false } = options;
       if (session.connectionState !== ConnectionState.Disconnected) {
         if (openPanel) setIsOpen(true);
         return true;
+      }
+      if (typed !== textStart) {
+        // Connecting already, as far as callers can tell (no second start meanwhile).
+        setAutoConnecting(true);
+        return new Promise<boolean>((resolve) => {
+          deferredStartRef.current?.resolve(false);
+          deferredStartRef.current = { options, resolve };
+          setTextStart(typed);
+        });
       }
       setVoiceRequested(voice);
       setOpenWhenConnected(openPanel);
@@ -117,8 +141,17 @@ export function ChatBubbleProvider({
         return false;
       }
     },
-    [session]
+    [session, textStart]
   );
+
+  // The token options carry the new textStart by now (useSession's effect runs first): start.
+  useEffect(() => {
+    const deferred = deferredStartRef.current;
+    if (!deferred || (deferred.options.textStart ?? false) !== textStart) return;
+    deferredStartRef.current = null;
+    void startSession(deferred.options).then(deferred.resolve);
+  }, [textStart, startSession]);
+
   const startCall = useCallback(
     () => void startSession({ voice: true, openPanel: true }),
     [startSession]

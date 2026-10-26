@@ -9,11 +9,12 @@ function uuidOrUndefined(value: unknown): string | undefined {
  * The job metadata for an inbound chat dispatch of the telco agent (read by
  * backend/app/agent/session_context.py). `subscriberId` must come from a server-verified
  * `portal_session`, never from the browser; `visitorId` and `nudgeId` are browser-supplied, so
- * they are kept only when they are UUIDs.
+ * they are kept only when they are UUIDs. `textStart` (the attribute "1") marks a session opened
+ * by a typed message: the agent answers it without a greeting.
  */
 export function buildDispatchMetadata(
   subscriberId: string | null,
-  extras: { visitorId?: string; nudgeId?: string }
+  extras: { visitorId?: string; nudgeId?: string; textStart?: string }
 ): string {
   const visitorId = uuidOrUndefined(extras.visitorId);
   const nudgeId = uuidOrUndefined(extras.nudgeId);
@@ -22,5 +23,6 @@ export function buildDispatchMetadata(
     ...(subscriberId ? { subscriber_id: subscriberId } : {}),
     ...(visitorId ? { visitor_id: visitorId } : {}),
     ...(nudgeId ? { nudge_id: nudgeId } : {}),
+    ...(extras.textStart === '1' ? { text_start: true } : {}),
   });
 }

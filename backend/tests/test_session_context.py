@@ -22,3 +22,10 @@ def test_resolve_bad_ids_become_none():
 
 def test_resolve_no_metadata_is_anonymous_chat():
     assert resolve(None, room=FakeRoom()).subscriber_id is None
+
+
+def test_resolve_reads_text_start():
+    assert resolve(json.dumps({"text_start": True}), room=FakeRoom()).text_start
+    # Only a JSON true counts.
+    for meta in ({}, {"text_start": "1"}, {"text_start": 1}, {"text_start": False}):
+        assert not resolve(json.dumps(meta), room=FakeRoom()).text_start, meta
