@@ -146,3 +146,61 @@ def test_snapshot_replaceable_with_note():
     assert GUEST_SNAPSHOT in prompt
     swapped = prompt.replace(GUEST_SNAPSHOT, "X", 1)
     assert swapped.endswith(f"\n\n{CHANNEL_TEXT_NOTE}")
+
+
+class FlakyRoom(FakeRoom):
+    """set_attributes fails the first `failures` times."""
+
+    def __init__(self, failures):
+        super().__init__()
+        self.failures = failures
+
+    async def set_attributes(self, attributes):
+        if self.failures:
+            self.failures -= 1
+            raise RuntimeError("network")
+        await super().set_attributes(attributes)
+
+
+def test_apply_publish_failure_changes_no_audio():
+    session, agent, room = FakeSession(), FakeAgent("PROMPT"), FlakyRoom(failures=1)
+    userdata = _userdata(True, mode=VoiceMode.off)
+    with pytest.raises(RuntimeError):
+        asyncio.run(apply(session, agent, userdata, _config(True), room))
+    assert session.input.calls == [] and session.output.calls == []
+    assert userdata.voice_mode is VoiceMode.off
+
+
+def test_apply_or_text_only_falls_back_to_off():
+    session, agent, room = FakeSession(), FakeAgent("PROMPT"), FlakyRoom(failures=1)
+    userdata = _userdata(True)
+    mode = asyncio.run(
+        voice_mode.apply_or_text_only(session, agent, userdata, _config(True), room)
+    )
+    assert mode is VoiceMode.off
+    assert session.input.calls[-1] is False and session.output.calls[-1] is False
+    assert userdata.voice_mode is VoiceMode.off
+    assert room.attributes == {VOICE_ATTRIBUTE: "off"}
+
+
+class StubAudioStream:
+    def __init__(self):
+        self.events: list[str] = []
+
+    def on_attached(self):
+        self.events.append("attached")
+
+    def on_detached(self):
+        self.events.append("detached")
+
+
+def test_close_input_detaches_a_stream_assigned_later():
+    from livekit.agents.voice.io import AgentInput
+
+    class Session:
+        input = AgentInput(video_changed=lambda: None, audio_changed=lambda: None)
+
+    voice_mode.close_input(Session)
+    stream = StubAudioStream()
+    Session.input.audio = stream
+    assert stream.events == ["detached"]

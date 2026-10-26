@@ -751,14 +751,9 @@ async def entrypoint(ctx: JobContext) -> None:
     # Both paths use the gate's text callback: it drops text sent before the
     # greeting has played out.
     userdata.linked_identity = _linked_identity(session, caller.identity)
+    voice_mode.close_input(session)
     await session.start(agent=agent, room=ctx.room, room_options=gated_agent.room_options())
-    try:
-        await voice_mode.apply(session, agent, userdata, config, ctx.room)
-    except Exception:
-        # Never leave a guest with voice: text in, text out.
-        logger.exception("could not apply the voice mode; text only")
-        session.input.set_audio_enabled(False)
-        session.output.set_audio_enabled(False)
+    await voice_mode.apply_or_text_only(session, agent, userdata, config, ctx.room)
     action_rpc.ActionRpc(
         session=session,
         userdata=userdata,
