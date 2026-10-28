@@ -1,13 +1,13 @@
-"""How a browser session uses voice. Guests type and read; a logged-in
-customer may speak, and hears the reply or reads it by the dashboard's Voice
+"""How a browser session uses voice. Every browser visitor, guest or logged
+in, may speak, and hears the reply or reads it by the dashboard's Voice
 responses switch (agent_config.voice_replies_enabled). A phone call is always
-full voice.
+full voice. `off` (text only) is left for when the mode cannot be applied.
 
 The agent enforces the mode: with session input audio off nothing is
 transcribed, even if the browser publishes a mic track, and with output audio
 off livekit runs no TTS and the reply goes out as text only (fillers too).
-The session is built with STT and TTS either way, so a guest who logs in
-mid-chat is switched in place (account_link)."""
+The session is built with STT and TTS either way, so the mode can be
+re-applied in place when a guest logs in mid-chat (account_link)."""
 
 import logging
 from enum import Enum
@@ -38,8 +38,6 @@ class VoiceMode(str, Enum):
 def mode_for(userdata: SessionUserdata, config: ResolvedAgentConfig) -> VoiceMode:
     if userdata.is_phone_call:
         return VoiceMode.full
-    if userdata.subscriber_id is None:
-        return VoiceMode.off
     return VoiceMode.full if config.voice_replies_enabled else VoiceMode.text_reply
 
 

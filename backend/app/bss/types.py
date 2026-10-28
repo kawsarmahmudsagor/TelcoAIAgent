@@ -133,6 +133,7 @@ class RechargeQuote(_Base):
     target_msisdn: str
     is_own_number: bool
     cashback: Decimal
+    points_earned: int
 
 
 class RechargeResult(_Base):
@@ -142,6 +143,9 @@ class RechargeResult(_Base):
     target_msisdn: str
     main_balance: Decimal | None
     postpaid_due: Decimal | None
+    points_earned: int
+    # The payer's points after this recharge.
+    reward_points: int
 
 
 class TransactionView(_Base):
@@ -155,6 +159,7 @@ class TransactionView(_Base):
     created_at: datetime
     package_name: str | None
     points_spent: int | None = None
+    points_earned: int | None = None
 
 
 class OfferView(_Base):

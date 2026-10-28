@@ -54,6 +54,7 @@ TELCO_TOOL_NAMES = {
     "create_support_case",
     "get_case_status",
     "check_network_status",
+    "find_care_centre",
     "request_human_agent",
     "verify_otp",
     "cancel_pending_action",

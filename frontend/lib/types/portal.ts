@@ -117,6 +117,8 @@ export interface TransactionView {
   package_name: string | null;
   /** The offer's points cost on a redeem row, else null. */
   points_spent: number | null;
+  /** Reward points a recharge row earned, else null. */
+  points_earned: number | null;
 }
 
 export interface TransactionParams {
@@ -242,6 +244,8 @@ export interface ActionStart {
   pay_from: string | null;
   target: string | null;
   points_cost: number | null;
+  /** Reward points a recharge will earn (1 per full ৳10), else null. */
+  points_earned: number | null;
   expires_at: DateTimeString;
   otp: OtpSms;
 }
@@ -253,6 +257,8 @@ export interface ActionResult {
   main_balance: number | null;
   postpaid_due: number | null;
   reward_points: number | null;
+  /** Reward points the recharge earned, else null. */
+  points_earned: number | null;
 }
 
 export type NotificationKind = 'pack_expiring' | 'low_balance' | 'low_data' | 'case_update';

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import random
 import sys
+import uuid
 
 # Bangla log lines would crash a Windows console's default code page.
 if sys.platform == "win32":
@@ -61,6 +62,10 @@ from app.services.agent_config_service import ResolvedAgentConfig, render_templa
 logger = logging.getLogger("agent.entrypoint")
 
 GREETING_DONE_ATTRIBUTE = "greeting_done"
+# This session's `conversations` row id, so the browser can carry the chat on
+# after the session ends. Must match CONVERSATION_ATTRIBUTE in
+# frontend/components/portal/assistant/assistant-provider.tsx.
+CONVERSATION_ATTRIBUTE = "conversation_id"
 
 # How long the gate's OpenRouter connections (Jev, the router) stay open idle.
 _GATE_KEEPALIVE_S = 200.0
@@ -136,6 +141,13 @@ async def _announce_user_turns(room: rtc.Room) -> None:
         await room.local_participant.set_attributes({gated_agent.GATE_ATTRIBUTE: "1"})
     except Exception:
         logger.exception("could not publish the turn_gate attribute")
+
+
+async def _announce_conversation(room: rtc.Room, conversation_id: uuid.UUID) -> None:
+    try:
+        await room.local_participant.set_attributes({CONVERSATION_ATTRIBUTE: str(conversation_id)})
+    except Exception:
+        logger.exception("could not publish the conversation_id attribute")
 
 
 def _load_agent_config() -> ResolvedAgentConfig:
@@ -864,6 +876,8 @@ async def entrypoint(ctx: JobContext) -> None:
         if agent.prefetcher:
             agent.prefetcher.warm()
     recorder =await TranscriptRecorder.start(session, userdata, ctx.room.name)
+    if recorder is not None:
+        await _announce_conversation(ctx.room, recorder.conversation_id)
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent) and agent.prefetcher:
         # Prefetched lookups never fire function_tools_executed, which is how the
         # recorder stores the LLM's own tool calls.

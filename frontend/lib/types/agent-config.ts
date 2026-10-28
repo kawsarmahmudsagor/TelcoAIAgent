@@ -49,8 +49,7 @@ export interface AgentConfig {
   /** 'auto' (Bangla or English, detected per turn), 'bn' or 'en'. */
   elevenlabs_stt_language: string;
 
-  /** Logged-in customers hear the agent's replies; off, they read them (and can still speak).
-   * Guests always chat in text. */
+  /** Customers and guests hear the agent's replies; off, they read them (and can still speak). */
   voice_replies_enabled: boolean;
   /** Quick replies on gated voice calls: a small model answers turns that need no lookup
    * (quick_fast_answer) and speaks a short line while a lookup runs (quick_filler). */

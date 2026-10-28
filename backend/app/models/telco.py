@@ -260,6 +260,8 @@ class Transaction(TimestampedBase):
     cashback: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0"), server_default="0"
     )
+    # Reward points a recharge earned the payer (1 per full ৳10).
+    points_earned: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     status: Mapped[TxnStatus] = mapped_column(Enum(TxnStatus, name="txn_status"))
     failure_reason: Mapped[str | None] = mapped_column(String(160), nullable=True)
 

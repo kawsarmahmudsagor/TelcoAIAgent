@@ -237,45 +237,49 @@ function EmptyState({ compact }: { compact: boolean }) {
     );
   }
 
+  // Scrolls when the greeting outgrows a short widget; justify-end on a fixed
+  // height would push the overflow up over the header.
   return (
-    <div className={cn('flex h-full flex-col justify-end gap-4', compact ? 'p-4' : 'p-5')}>
-      <div className="flex max-w-[86%] items-end gap-2">
-        <BotAvatar size="sm" />
-        <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
-          {me ? (
-            <p lang="bn">
-              আসসালামু আলাইকুম, {me.first_name}! আমি telco.-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
-              ইউসেজের হিসাব, প্যাক খোঁজা বা রিচার্জ, সবকিছুতেই হেল্প করতে পারি।
+    <div className="h-full overflow-y-auto">
+      <div className={cn('flex min-h-full flex-col justify-end gap-4', compact ? 'p-4' : 'p-5')}>
+        <div className="flex max-w-[86%] items-end gap-2">
+          <BotAvatar size="sm" />
+          <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
+            {me ? (
+              <p lang="bn">
+                আসসালামু আলাইকুম, {me.first_name}! আমি telco.-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
+                ইউসেজের হিসাব, প্যাকেজ খোঁজা বা রিচার্জ, সবকিছুতেই হেল্প করতে পারি।
+              </p>
+            ) : (
+              <p lang="bn">
+                আসসালামু আলাইকুম! আমি telco.-এর অ্যাসিস্ট্যান্ট। প্যাকেজ খোঁজা, আপনার এলাকার
+                নেটওয়ার্ক চেক, বা সিম, স্টোর আর আমাদের পলিসি নিয়ে যেকোনো প্রশ্নে হেল্প করতে পারি।
+                নিজের ব্যালেন্স দেখতে বা প্যাকেজ কিনতে লগইন করুন।
+              </p>
+            )}
+            <p lang="bn" className="mt-2">
+              কীভাবে হেল্প করতে পারি?
             </p>
-          ) : (
-            <p lang="bn">
-              আসসালামু আলাইকুম! আমি telco.-এর অ্যাসিস্ট্যান্ট। প্যাক খোঁজা, আপনার এলাকার নেটওয়ার্ক
-              চেক, বা সিম, স্টোর আর আমাদের পলিসি নিয়ে যেকোনো প্রশ্নে হেল্প করতে পারি। নিজের
-              ব্যালেন্স দেখতে বা প্যাক কিনতে লগইন করুন।
-            </p>
-          )}
-          <p lang="bn" className="mt-2">
-            কীভাবে হেল্প করতে পারি?
-          </p>
-          <QuestionChips
-            onAsk={sendText}
-            questions={me ? POPULAR_QUESTIONS : GUEST_QUESTIONS}
-            className="mt-2.5"
-          />
+            <QuestionChips
+              onAsk={sendText}
+              questions={me ? POPULAR_QUESTIONS : GUEST_QUESTIONS}
+              className="mt-2.5"
+            />
+          </div>
         </div>
+        {voiceMode !== 'off' && (
+          <button
+            type="button"
+            onClick={toggleMic}
+            className="border-line bg-surface text-foreground hover:border-mint focus-visible:ring-ring/60 mx-auto inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-xs font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
+          >
+            <span className="bg-tint-green text-mint grid size-6 place-items-center rounded-full">
+              <MicIcon className="size-3.5" aria-hidden="true" />
+            </span>
+            Talk instead of typing
+          </button>
+        )}
       </div>
-      {voiceMode !== 'off' && (
-        <button
-          type="button"
-          onClick={toggleMic}
-          className="border-line bg-surface text-foreground hover:border-mint focus-visible:ring-ring/60 mx-auto inline-flex min-h-10 items-center gap-2 rounded-full border px-4 text-xs font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
-        >
-          <span className="bg-tint-green text-mint grid size-6 place-items-center rounded-full">
-            <MicIcon className="size-3.5" aria-hidden="true" />
-          </span>
-          Talk instead of typing
-        </button>
-      )}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import json
 import logging
 import re
 import time
+import unicodedata
 from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
@@ -175,76 +176,313 @@ class QuickReplyRuntime:
 # everyday spoken Bangla with the English words people use (চেক, প্যাক,
 # ব্যালেন্স, ওকে), no literary words, no question, no number or price.
 
+
 _GENERIC_BN = (
-    "জি, একটু চেক করছি।",
+    "জি, একটু দেখছি।",
+    "আচ্ছা, চেক করে নিচ্ছি।",
+    "ওকে, একটু সময় দিন।",
+    "হ্যাঁ, দেখছি।",
+    "ঠিক আছে, চেক করছি।",
+    "আচ্ছা, ব্যাপারটা দেখছি।",
+    "বুঝেছি, একটু দেখছি।",
+    "জি, দেখে জানাচ্ছি।",
+    "ওকে, চেক করে বলছি।",
+    "আচ্ছা, এক্ষুনি দেখছি।",
+    "ঠিক আছে, একটু দেখে নিই।",
+    "বুঝলাম, চেক করছি।",
     "জি, এক সেকেন্ড।",
-    "শিওর, চেক করছি।",
-    "একটু ওয়েট করুন, প্লিজ।",
-    "ওকে, দেখছি।",
-    "ওকে, এক্ষুনি দেখছি।",
-    "একটু দেখে নিই।",
-    "বুঝেছি, চেক করছি।",
+    "ওকে, ব্যাপারটা চেক করছি।",
+    "আচ্ছা, তথ্যটা দেখে নিচ্ছি।",
+    "ঠিক আছে, একটু চেক করে দেখছি।",
+    "জি, একবার দেখে নিচ্ছি।",
+    "আচ্ছা, চেক করে জানাচ্ছি।",
+    "ওকে, একটু সময় দিন, দেখছি।",
+    "বুঝেছি, দেখে বলছি।",
 )
+
 _GENERIC_EN = (
     "Sure, one moment.",
     "Okay, checking that now.",
     "Of course, let me check.",
-    "Got it, one moment please.",
-    "Alright, looking into it.",
+    "Got it, just a moment.",
+    "Alright, looking into that.",
+    "Let me take a quick look.",
+    "Sure, I'll check that for you.",
+    "Okay, let me look that up.",
+    "Alright, give me a second.",
+    "Got it, checking now.",
+    "Let me quickly check that.",
+    "No problem, I'll look into it.",
+    "Okay, let me find that for you.",
+    "Right, I'll check that.",
+    "Just a moment while I check.",
+    "Sure, let me look into that.",
+    "Alright, I'll take a look.",
+    "Understood, checking that now.",
+    "Okay, let me verify that for you.",
+    "One moment, I'll get that checked.",
 )
+
+
 _TOPIC_LINES_BN: dict[str, tuple[str, ...]] = {
-    "data": ("ডাটা প্যাকগুলো দেখছি।", "ওকে, ইন্টারনেট প্যাকগুলো দেখছি।"),
-    "voice": ("মিনিট প্যাকগুলো দেখছি।", "ওকে, মিনিট প্যাকগুলো চেক করছি।"),
-    "bundle": ("কম্বো প্যাকগুলো দেখছি।", "জি, কম্বো প্যাকগুলো চেক করছি।"),
-    "sms": ("এসএমএস প্যাকগুলো দেখছি।",),
-    "pack": ("জি, প্যাকগুলো দেখছি।", "ওকে, প্যাকগুলো চেক করছি।"),
-    "balance": ("ব্যালেন্সটা চেক করছি।", "জি, আপনার ব্যালেন্সটা দেখছি।"),
-    "usage": ("জি, ইউসেজটা চেক করছি।", "আপনার ইউসেজটা দেখছি।"),
-    "recharge": ("রিচার্জটা চেক করছি।", "ওকে, রিচার্জটা দেখছি।"),
-    "offer": ("অফারগুলো দেখছি।", "জি, আপনার অফারগুলো চেক করছি।"),
-    "points": ("পয়েন্টগুলো চেক করছি।", "জি, আপনার পয়েন্টগুলো দেখছি।"),
-    "transactions": ("ট্রানজেকশনগুলো চেক করছি।", "ওকে, কোথায় কাটল দেখছি।"),
-    "network": ("আপনার এলাকার নেটওয়ার্কটা চেক করছি।", "আপনার এলাকার নেটওয়ার্কটা দেখছি।"),
-    "complaint": ("বুঝতে পেরেছি, দেখছি।", "ওকে, ব্যাপারটা দেখছি।"),
-    "policy": ("ওকে, এক সেকেন্ড।", "জি, দেখে বলছি।"),
-}
-_TOPIC_LINES_EN: dict[str, tuple[str, ...]] = {
-    "data": ("Checking the data packs.", "Okay, looking at internet packs."),
-    "voice": ("Checking the minute packs.", "Okay, looking at voice packs."),
-    "bundle": ("Checking the combo packs.",),
-    "sms": ("Checking the SMS packs.",),
-    "pack": ("Checking the packs for you.", "Okay, looking at the packs."),
-    "balance": ("Checking your balance.", "Sure, looking at your balance."),
-    "usage": ("Checking your usage.", "Sure, looking at your usage."),
-    "recharge": ("Sure, looking at the recharge.",),
-    "offer": ("Checking your offers.", "Sure, looking at the offers."),
-    "points": ("Checking your points.",),
-    "transactions": ("Checking your transactions.", "Okay, looking at the deductions."),
-    "network": ("Checking the network in your area.", "Okay, looking at the network status."),
-    "complaint": ("I understand, let me look into it.", "Sorry about that, checking now."),
-    "policy": ("Let me check that for you.", "Sure, checking the details."),
+    "data": (
+        "ডাটা প্যাকেজগুলো দেখছি।",
+        "আচ্ছা, ইন্টারনেট প্যাকেজগুলো চেক করছি।",
+        "আপনার জন্য কী কী ডাটা প্যাকেজ আছে, দেখে নিচ্ছি।",
+        "একটু দেখি, কোন কোন ডাটা প্যাকেজ পাওয়া যাচ্ছে।",
+        "ইন্টারনেট প্যাকেজের অপশনগুলো বের করছি।",
+        "ঠিক আছে, ডাটা প্যাকেজের লিস্টটা দেখছি।",
+    ),
+    "voice": (
+        "মিনিট প্যাকেজগুলো দেখছি।",
+        "আচ্ছা, মিনিটের প্যাকেজগুলো চেক করছি।",
+        "কোন কোন মিনিট প্যাকেজ আছে, একটু দেখি।",
+        "আপনার জন্য মিনিট প্যাকেজের অপশনগুলো বের করছি।",
+        "ঠিক আছে, মিনিট প্যাকেজের লিস্টটা দেখছি।",
+        "একটু সময় দিন, মিনিট প্যাকেজগুলো দেখে নিচ্ছি।",
+    ),
+    "bundle": (
+        "কম্বো প্যাকেজগুলো দেখছি।",
+        "আচ্ছা, কম্বো প্যাকেজের অপশনগুলো চেক করছি।",
+        "ডাটা আর মিনিট একসাথে কী কী প্যাকেজ আছে, দেখি।",
+        "আপনার জন্য কোন কোন কম্বো প্যাকেজ আছে, বের করছি।",
+        "ঠিক আছে, কম্বো প্যাকেজের লিস্টটা দেখছি।",
+        "একটু দেখি, কোন কম্বো প্যাকেজগুলো পাওয়া যাচ্ছে।",
+    ),
+    "sms": (
+        "এসএমএস প্যাকেজগুলো দেখছি।",
+        "আচ্ছা, এসএমএসের প্যাকেজগুলো চেক করছি।",
+        "কোন কোন এসএমএস প্যাকেজ আছে, একটু দেখি।",
+        "এসএমএস প্যাকেজের অপশনগুলো বের করছি।",
+        "ঠিক আছে, এসএমএস প্যাকেজের লিস্টটা দেখছি।",
+        "একটু সময় দিন, এসএমএস প্যাকেজগুলো দেখে নিচ্ছি।",
+    ),
+    "pack": (
+        "জি, প্যাকেজগুলো দেখছি।",
+        "আচ্ছা, কী কী প্যাকেজ আছে একটু দেখি।",
+        "প্যাকেজের অপশনগুলো চেক করছি।",
+        "আপনার জন্য কোন কোন প্যাকেজ আছে, বের করছি।",
+        "ঠিক আছে, প্যাকেজের লিস্টটা দেখছি।",
+        "একটু দেখি, কোন প্যাকেজগুলো আপনার জন্য আছে।",
+    ),
+    "balance": (
+        "ব্যালেন্সটা চেক করছি।",
+        "আচ্ছা, আপনার ব্যালেন্সটা দেখছি।",
+        "আপনার অ্যাকাউন্টের ব্যালেন্সটা বের করছি।",
+        "একটু সময় দিন, ব্যালেন্সটা দেখে নিচ্ছি।",
+        "ঠিক আছে, কত ব্যালেন্স আছে চেক করছি।",
+        "জি, আপনার এখনকার ব্যালেন্সটা চেক করছি।",
+    ),
+    "usage": (
+        "জি, আপনার ইউসেজটা চেক করছি।",
+        "আচ্ছা, কতটুকু ব্যবহার হয়েছে দেখে নিচ্ছি।",
+        "আপনার ব্যবহার করা ডাটা আর মিনিটের হিসাবটা দেখছি।",
+        "একটু দেখি, এখন পর্যন্ত কতটুকু ইউসেজ হয়েছে।",
+        "ঠিক আছে, ইউসেজের হিসাবটা বের করছি।",
+        "আপনার ব্যবহার সংক্রান্ত তথ্যগুলো চেক করছি।",
+    ),
+    "recharge": (
+        "রিচার্জটা চেক করছি।",
+        "আচ্ছা, রিচার্জের তথ্যটা দেখছি।",
+        "আপনার রিচার্জটা ঠিকমতো হয়েছে কি না, দেখে নিচ্ছি।",
+        "একটু দেখি, রিচার্জের আপডেট কী।",
+        "ঠিক আছে, রিচার্জের স্ট্যাটাসটা চেক করছি।",
+        "রিচার্জের বিস্তারিত তথ্য বের করছি।",
+    ),
+    "offer": (
+        "অফারগুলো দেখছি।",
+        "আচ্ছা, আপনার জন্য কী কী অফার আছে দেখি।",
+        "আপনার নম্বরে কোন অফারগুলো পাওয়া যাচ্ছে, চেক করছি।",
+        "একটু দেখি, আপনার জন্য কোনো ভালো অফার আছে কি না।",
+        "ঠিক আছে, অফারের লিস্টটা বের করছি।",
+        "আপনার নম্বরে থাকা অফারগুলো দেখে নিচ্ছি।",
+    ),
+    "points": (
+        "পয়েন্টগুলো চেক করছি।",
+        "আচ্ছা, আপনার পয়েন্টের হিসাবটা দেখছি।",
+        "আপনার মোট কত পয়েন্ট আছে, বের করছি।",
+        "একটু দেখি, আপনার পয়েন্টের আপডেট কী।",
+        "ঠিক আছে, পয়েন্টের বিস্তারিত দেখছি।",
+        "আপনার জমা হওয়া পয়েন্টগুলো চেক করছি।",
+    ),
+    "transactions": (
+        "ট্রানজেকশনগুলো চেক করছি।",
+        "আচ্ছা, কোথায় কেটেছে দেখে নিচ্ছি।",
+        "আপনার লেনদেনের হিসাবটা একটু দেখি।",
+        "কোন ট্রানজেকশনে কেটেছে, খুঁজে দেখছি।",
+        "ঠিক আছে, লেনদেনের বিস্তারিত বের করছি।",
+        "একটু সময় দিন, ট্রানজেকশন হিস্ট্রিটা চেক করছি।",
+    ),
+    "network": (
+        "আপনার এলাকার নেটওয়ার্কটা চেক করছি।",
+        "আচ্ছা, আপনার এলাকায় নেটওয়ার্কের অবস্থা দেখি।",
+        "আপনার লোকেশনে নেটওয়ার্ক সংক্রান্ত কোনো সমস্যা আছে কি না, দেখছি।",
+        "একটু দেখি, আপনার এলাকায় নেটওয়ার্ক কেমন কাজ করছে।",
+        "ঠিক আছে, নেটওয়ার্কের অবস্থাটা চেক করছি।",
+        "আপনার এলাকার নেটওয়ার্ক আপডেটটা বের করছি।",
+    ),
+    "complaint": (
+        "বুঝতে পেরেছি, ব্যাপারটা দেখছি।",
+        "আচ্ছা, কী হয়েছে একটু খতিয়ে দেখি।",
+        "বুঝলাম, সমস্যাটা চেক করছি।",
+        "ঠিক আছে, বিষয়টা একটু চেক করে নিচ্ছি।",
+        "আপনার সমস্যাটা বুঝেছি, একটু দেখছি কী করা যায়।",
+        "আচ্ছা, ব্যাপারটা দেখে আপনাকে জানাচ্ছি।",
+    ),
+    "policy": (
+        "আচ্ছা, একটু দেখে বলছি।",
+        "জি, বিষয়টা চেক করছি।",
+        "একটু সময় দিন, তথ্যটা দেখে নিচ্ছি।",
+        "আচ্ছা, এটার নিয়মটা একটু দেখি।",
+        "ঠিক আছে, সঠিক তথ্যটা বের করছি।",
+        "একটু চেক করে আপনাকে জানাচ্ছি।",
+    ),
 }
 
-# Ordered: a pack kind before "pack", which is before what the pack is about.
+
+_TOPIC_LINES_EN: dict[str, tuple[str, ...]] = {
+    "data": (
+        "Checking the data packages.",
+        "Okay, let me look at the internet packages.",
+        "Let me see which data packages are available.",
+        "I'll pull up the available data options.",
+        "Sure, checking the internet package options.",
+        "Let's see what data packages are available for you.",
+    ),
+    "voice": (
+        "Checking the minute packages.",
+        "Okay, let me look at the voice packages.",
+        "Let me see which minute packages are available.",
+        "I'll pull up the available minute options.",
+        "Sure, checking the voice package options.",
+        "Let's see what minute packages are available for you.",
+    ),
+    "bundle": (
+        "Checking the combo packages.",
+        "Okay, let me look at the combo options.",
+        "Let me see which combo packages are available.",
+        "I'll pull up the available combo deals.",
+        "Sure, checking the data and voice bundles.",
+        "Let's see what combo packages we have for you.",
+    ),
+    "sms": (
+        "Checking the SMS packages.",
+        "Okay, let me look at the SMS options.",
+        "Let me see which SMS packages are available.",
+        "I'll pull up the available SMS packages.",
+        "Sure, checking the SMS package options.",
+        "Let's see what SMS packages are available for you.",
+    ),
+    "pack": (
+        "Checking the packages for you.",
+        "Okay, let me look at the available packages.",
+        "Let me see what options we have.",
+        "I'll pull up the available packages.",
+        "Sure, checking the package options.",
+        "Let's see which packages might work for you.",
+    ),
+    "balance": (
+        "Checking your balance.",
+        "Sure, let me look up your balance.",
+        "I'll check how much balance you have.",
+        "Let me pull up your current balance.",
+        "Okay, checking your account balance.",
+        "I'll get your balance details for you.",
+    ),
+    "usage": (
+        "Checking your usage.",
+        "Sure, let me look at your usage details.",
+        "I'll check how much you've used so far.",
+        "Let me pull up your usage information.",
+        "Okay, checking your data and minute usage.",
+        "I'll get your usage details for you.",
+    ),
+    "recharge": (
+        "Checking your recharge details.",
+        "Okay, let me look up that recharge.",
+        "I'll check the status of your recharge.",
+        "Let me see if your recharge went through.",
+        "Sure, checking the recharge status.",
+        "I'll pull up the recharge details for you.",
+    ),
+    "offer": (
+        "Checking your offers.",
+        "Sure, let me look at your available offers.",
+        "I'll see which offers are available for your number.",
+        "Let me pull up your current offers.",
+        "Okay, checking the offers you can access.",
+        "Let's see what offers are available for you.",
+    ),
+    "points": (
+        "Checking your points.",
+        "Let me look up your current points balance.",
+        "I'll check how many points you've earned.",
+        "Okay, pulling up your points details.",
+        "Sure, checking your reward points.",
+        "Let me see your latest points total.",
+    ),
+    "transactions": (
+        "Checking your transactions.",
+        "Okay, let me look at your recent transactions.",
+        "I'll check where the deduction came from.",
+        "Let me pull up your transaction history.",
+        "Sure, looking into the charge on your account.",
+        "I'll check the details of your recent deductions.",
+    ),
+    "network": (
+        "Checking the network in your area.",
+        "Okay, let me look at the local network status.",
+        "I'll check for any network issues in your area.",
+        "Let me look into the network coverage near you.",
+        "Sure, checking the network status for your location.",
+        "I'll see if there are any reported network issues nearby.",
+    ),
+    "complaint": (
+        "I understand. Let me look into that.",
+        "Sorry about that. I'll check what's going on.",
+        "Got it. Let me investigate the issue.",
+        "I understand the problem. Let me check that for you.",
+        "Sorry you're experiencing this. I'll look into it.",
+        "Let me check what might be causing the issue.",
+    ),
+    "policy": (
+        "Let me check that for you.",
+        "Sure, checking the details.",
+        "I'll verify that information for you.",
+        "Let me look up the relevant details.",
+        "Okay, I'll check the policy on that.",
+        "I'll confirm the details and get back to you.",
+    ),
+}
+
+
+# Word lists shared by the topics below, so each topic knows the same words.
+# Bangla is matched in the decomposed য় (য + nukta) that NFC gives.
+_PACK = r"(?:প্যাক|প্যাকেজ|\bpacks?\b|\bpackages?\b)"
+_DATA = r"(?:ডাটা|ডেটা|ইন্টারনেট|নেট|জিবি|এমবি|\bdata\b|\binternet\b|\bgb\b|\bmb\b)"
+_MINUTES = r"(?:মিনিট|টকটাইম|\bminutes?\b|\bvoice\b|\btalk\s*time\b)"
+# "How much is left": asks about the customer's own pack, not packs to buy.
+_LEFT = r"(?:বাকি|কতটুকু|\bleft\b|\bremaining\b|\bbaki\b)"
+
+# Ordered: a dropped call before a money cut ("কেটে" means both), what is left
+# before a pack kind, a pack kind before "pack", which is before what the pack
+# is about. A turn no topic fits gets a generic line, which is never wrong.
 _TOPIC_RES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("network", re.compile(
-        r"নেটওয়ার্ক|নেটওয়ার্ক|সিগন্যাল|নেট\s*(?:নেই|পাচ্ছি\s*না|স্লো)|কল\s*ড্রপ|"
-        r"\bnetwork\b|\bsignal\b|\bslow\b|call\s*drop|\bnetwork\s*nai\b", re.I)),
+        r"নেটওয়ার্ক|সিগন্যাল|নেট\s*(?:নেই|পাচ্ছি\s*না|স্লো)|(?:কল|লাইন).{0,15}(?:ড্রপ|কেটে)|"
+        r"\bnetwork\b|\bsignal\b|\b(?:net|internet|data)\b.{0,15}\bslow\b|call\s*drop|"
+        r"\bnetwork\s*nai\b", re.I)),
     ("transactions", re.compile(
-        r"লেনদেন|কেটে|কাটল|কাটছে|কাটা|ডিডাক্ট|\btransactions?\b|\bdeduct|\bcharged?\b|\bkete\b",
+        r"লেনদেন|(?:টাকা|ব্যালেন্স).{0,15}(?:কেটে|কাট)|ডিডাক্ট|"
+        r"\btransactions?\b|\bdeduct|\bcharged?\b|\b(?:taka|balance)\b.{0,15}\bkete\b",
         re.I)),
     ("bundle", re.compile(r"কম্বো|বান্ডেল|\bcombo\b|\bbundle\b", re.I)),
     ("sms", re.compile(r"এসএমএস|\bsms\b", re.I)),
-    ("pack_data", re.compile(
-        r"(?:ডাটা|ডেটা|ইন্টারনেট|নেট|জিবি|এমবি|\bdata\b|\binternet\b|\bgb\b|\bmb\b)"
-        r".*(?:প্যাক|প্যাকেজ|\bpacks?\b|\bpackages?\b)|"
-        r"(?:প্যাক|প্যাকেজ|\bpacks?\b|\bpackages?\b).*(?:ডাটা|ডেটা|ইন্টারনেট|\bdata\b|\binternet\b)",
-        re.I)),
-    ("pack_voice", re.compile(
-        r"(?:মিনিট|টকটাইম|\bminutes?\b|\bvoice\b|\bminute\b).*(?:প্যাক|প্যাকেজ|\bpacks?\b)|"
-        r"(?:প্যাক|প্যাকেজ|\bpacks?\b).*(?:মিনিট|\bminutes?\b|\bvoice\b)",
-        re.I)),
-    ("pack", re.compile(r"প্যাক|প্যাকেজ|\bpacks?\b|\bpackages?\b", re.I)),
+    ("usage", re.compile(
+        rf"(?:{_DATA}|{_MINUTES}).*{_LEFT}|{_LEFT}.*(?:{_DATA}|{_MINUTES})", re.I)),
+    ("pack_data", re.compile(rf"{_DATA}.*{_PACK}|{_PACK}.*{_DATA}", re.I)),
+    ("pack_voice", re.compile(rf"{_MINUTES}.*{_PACK}|{_PACK}.*{_MINUTES}", re.I)),
+    ("pack", re.compile(_PACK, re.I)),
     ("balance", re.compile(r"ব্যালেন্স|\bbalance\b", re.I)),
     ("usage", re.compile(
         r"(?:ডাটা|ডেটা|ইন্টারনেট|মিনিট|\bdata\b|\bminutes?\b|\binternet\b).*"
@@ -252,7 +490,7 @@ _TOPIC_RES: tuple[tuple[str, re.Pattern[str]], ...] = (
         r"ইউসেজ|খরচ|\busage\b",
         re.I)),
     ("recharge", re.compile(r"রিচার্জ|টপ\s*আপ|\brecharge\b|\btop\s*up\b", re.I)),
-    ("points", re.compile(r"পয়েন্ট|পয়েন্ট|রিওয়ার্ড|রিডিম|\bpoints?\b|\brewards?\b|\bredeem\b", re.I)),
+    ("points", re.compile(r"পয়েন্ট|রিওয়ার্ড|রিডিম|\bpoints?\b|\brewards?\b|\bredeem\b", re.I)),
     ("offer", re.compile(r"অফার|\boffers?\b", re.I)),
     ("complaint", re.compile(r"অভিযোগ|সমস্যা|কমপ্লেইন|\bcomplain|\bproblem\b|\bissue\b", re.I)),
 )
@@ -267,6 +505,8 @@ _BANGLISH_RE = re.compile(
 
 
 def _filler_topic(utterance: str, lookup: str | None) -> str | None:
+    # NFC splits a precomposed য় (U+09DF) the way the patterns spell it.
+    utterance = unicodedata.normalize("NFC", utterance)
     for name, pattern in _TOPIC_RES:
         if pattern.search(utterance):
             return _PACK_KIND_TOPIC.get(name, name)

@@ -1,11 +1,11 @@
-"""Recharge: validation, limits, cashback and OTP-gated execution."""
+"""Recharge: validation, limits, cashback, reward points and OTP-gated execution."""
 
 import re
 import uuid
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,14 @@ _MSISDN = re.compile(r"^01[3-9]\d{8}$")
 MIN_AMOUNT = Decimal("20")
 MAX_AMOUNT = Decimal("1000")
 DAILY_CAP = Decimal("5000")
+# One reward point per full ৳10 recharged; the remainder earns nothing and is
+# not carried over to the next recharge (৳45 earns 4, ৳9.99 of it is dropped).
+TAKA_PER_POINT = Decimal("10")
+
+
+def points_for(amount: Decimal) -> int:
+    """Reward points a recharge of `amount` earns the payer."""
+    return int((amount / TAKA_PER_POINT).to_integral_value(rounding=ROUND_DOWN))
 
 
 def _normalise(raw: str) -> str:
@@ -102,12 +110,20 @@ def preview_recharge(
     db: Session, subscriber_id: uuid.UUID, req: RechargeRequest, *, now: datetime | None = None
 ) -> RechargeQuote:
     _, target, own, cashback = _check(db, subscriber_id, req, now or utc_now())
-    return RechargeQuote(request=req, target_msisdn=target, is_own_number=own, cashback=cashback)
+    return RechargeQuote(
+        request=req,
+        target_msisdn=target,
+        is_own_number=own,
+        cashback=cashback,
+        points_earned=points_for(req.amount),
+    )
 
 
 def _result_from(db: Session, txn: Transaction) -> RechargeResult:
     bal = db.get(Balance, txn.subscriber_id)
     db.refresh(bal)
+    sub = db.get(Subscriber, txn.subscriber_id)
+    db.refresh(sub)
     return RechargeResult(
         transaction_ref=txn.ref,
         amount=txn.amount,
@@ -115,6 +131,8 @@ def _result_from(db: Session, txn: Transaction) -> RechargeResult:
         target_msisdn=txn.target_msisdn,
         main_balance=bal.main_balance,
         postpaid_due=bal.postpaid_due,
+        points_earned=txn.points_earned,
+        reward_points=sub.reward_points,
     )
 
 
@@ -175,6 +193,16 @@ def execute_recharge(
                 tbal.main_balance = tbal.main_balance + req.amount + (cashback if own else 0)
             else:
                 tbal.postpaid_due = max(Decimal("0"), tbal.postpaid_due - req.amount)
+    # The payer earns the points, whichever number was recharged. An atomic
+    # increment, so a concurrent redemption's locked read-modify-write can't
+    # lose it.
+    points = points_for(req.amount)
+    if points:
+        db.execute(
+            update(Subscriber)
+            .where(Subscriber.id == subscriber_id)
+            .values(reward_points=Subscriber.reward_points + points)
+        )
     ref = _txn.next_ref(db)
     db.add(
         Transaction(
@@ -186,6 +214,7 @@ def execute_recharge(
             amount=req.amount,
             target_msisdn=target,
             cashback=cashback,
+            points_earned=points,
             status=TxnStatus.success,
             created_at=now,
         )
@@ -201,6 +230,7 @@ def execute_recharge(
             "channel": req.channel.value,
             "target_masked": mask_msisdn(target),
             "cashback": str(cashback),
+            "points_earned": points,
             "ref": ref,
         },
     )
@@ -226,6 +256,7 @@ def execute_recharge(
             raise
         return _result_from(db, existing)
     db.refresh(own_bal)
+    db.refresh(caller)
     return RechargeResult(
         transaction_ref=ref,
         amount=req.amount,
@@ -233,4 +264,6 @@ def execute_recharge(
         target_msisdn=target,
         main_balance=own_bal.main_balance,
         postpaid_due=own_bal.postpaid_due,
+        points_earned=points,
+        reward_points=caller.reward_points,
     )

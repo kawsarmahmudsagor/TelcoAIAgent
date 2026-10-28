@@ -112,7 +112,7 @@ class AccountLink:
             if (conversation_id := self.userdata.conversation_id) is not None:
                 await asyncio.to_thread(_link_conversation, conversation_id, ctx.subscriber_id)
             await publish_account(self.room, self.userdata)
-            # The guest's text-only mode gives way to the customer's: the mic opens.
+            # Re-applied so the note in the new instructions matches the mode.
             await voice_mode.apply_or_text_only(
                 self.session, self.agent, self.userdata, self.config, self.room
             )

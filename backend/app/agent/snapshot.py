@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.agent import highlights
 from app.agent.telco_format import format_amount, format_data, format_day
-from app.bss import accounts, network
+from app.bss import accounts, care_centres, network
 from app.bss.notifications import case_status_words
 from app.bss.clock import local_tz, utc_now
 from app.bss.errors import SubscriberNotFound
@@ -153,6 +153,8 @@ def _snapshot_text(
         lines.extend(f"- {i.area}: {i.kind.value}, {i.status.value}." for i in incidents)
     else:
         lines.append(f"No network incidents in {s.district}.")
+    if care := care_centres.snapshot_line(s.district):
+        lines.append(care)
     return "\n".join(lines)
 
 

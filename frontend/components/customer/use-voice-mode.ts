@@ -1,11 +1,10 @@
 'use client';
 
-import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
 import { useAgentAttribute } from '@/lib/livekit-text-streams';
 
 /**
- * How the assistant session uses voice: `off` (a guest: type and read), `text_reply` (a
- * customer may speak; replies are text) or `full` (voice both ways).
+ * How the assistant session uses voice: `off` (type and read, when the agent could not apply
+ * a mode), `text_reply` (the visitor may speak; replies are text) or `full` (voice both ways).
  */
 export type VoiceMode = 'off' | 'text_reply' | 'full';
 
@@ -16,13 +15,11 @@ const MODES: readonly string[] = ['off', 'text_reply', 'full'] satisfies VoiceMo
 
 /**
  * The agent's published voice mode. Before the agent has published one (no session yet, or still
- * joining) the login decides: a signed-in customer may speak, anyone else (including while the
- * login is still being checked) types. The agent enforces the mode either way; this only drives
- * what the UI offers.
+ * joining) anyone, guest or signed in, may speak. The agent enforces the mode either way; this
+ * only drives what the UI offers.
  */
 export function useVoiceMode(): VoiceMode {
   const published = useAgentAttribute(VOICE_ATTRIBUTE);
-  const me = useOptionalPortalMe();
   if (published !== undefined && MODES.includes(published)) return published as VoiceMode;
-  return me ? 'full' : 'off';
+  return 'full';
 }

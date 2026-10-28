@@ -1,5 +1,5 @@
-"""Voice modes: guests type and read, logged-in customers speak and hear voice
-or text replies by the dashboard's Voice responses switch."""
+"""Voice modes: browser visitors, guests and logged-in customers alike, speak
+and hear voice or text replies by the dashboard's Voice responses switch."""
 
 import asyncio
 import uuid
@@ -67,8 +67,8 @@ def _apply(userdata, config, instructions="PROMPT"):
 @pytest.mark.parametrize(
     ("logged_in", "voice_replies", "phone", "expected"),
     [
-        (False, True, False, VoiceMode.off),
-        (False, False, False, VoiceMode.off),
+        (False, True, False, VoiceMode.full),
+        (False, False, False, VoiceMode.text_reply),
         (True, True, False, VoiceMode.full),
         (True, False, False, VoiceMode.text_reply),
         (False, False, True, VoiceMode.full),
@@ -84,14 +84,22 @@ def test_channel_note_only_in_text_modes():
     assert channel_note(VoiceMode.text_reply) == CHANNEL_TEXT_NOTE
 
 
-def test_apply_guest_disables_both_and_publishes_off():
+def test_apply_guest_gets_full_voice():
     userdata = _userdata(False)
     mode, session, _, room = _apply(userdata, _config(True))
-    assert mode is VoiceMode.off
-    assert session.input.calls == [False]
+    assert mode is VoiceMode.full
+    assert session.input.calls == [True]
+    assert session.output.calls == [True]
+    assert room.attributes == {VOICE_ATTRIBUTE: "full"}
+    assert userdata.voice_mode is VoiceMode.full
+
+
+def test_apply_guest_with_voice_replies_off_can_speak():
+    mode, session, _, room = _apply(_userdata(False), _config(False))
+    assert mode is VoiceMode.text_reply
+    assert session.input.calls == [True]
     assert session.output.calls == [False]
-    assert room.attributes == {VOICE_ATTRIBUTE: "off"}
-    assert userdata.voice_mode is VoiceMode.off
+    assert room.attributes == {VOICE_ATTRIBUTE: "text_reply"}
 
 
 def test_apply_full_enables_both():
@@ -128,13 +136,14 @@ def test_apply_keeps_single_note_going_to_text_reply():
 
 
 def test_apply_adds_note_when_prompt_lacks_it():
-    _, _, agent, _ = _apply(_userdata(False), _config(True), "PROMPT")
+    _, _, agent, _ = _apply(_userdata(False), _config(False), "PROMPT")
     assert agent.instructions == f"PROMPT\n\n{CHANNEL_TEXT_NOTE}"
 
 
 def test_prompt_has_note_only_in_text_modes():
-    assert CHANNEL_TEXT_NOTE in build_system_prompt(_userdata(False), _config(True))
+    assert CHANNEL_TEXT_NOTE in build_system_prompt(_userdata(False), _config(False))
     assert CHANNEL_TEXT_NOTE in build_system_prompt(_userdata(True), _config(False))
+    assert CHANNEL_TEXT_NOTE not in build_system_prompt(_userdata(False), _config(True))
     assert CHANNEL_TEXT_NOTE not in build_system_prompt(_userdata(True), _config(True))
     assert CHANNEL_TEXT_NOTE not in build_system_prompt(
         _userdata(False, phone=True), _config(False)
@@ -142,7 +151,7 @@ def test_prompt_has_note_only_in_text_modes():
 
 
 def test_snapshot_replaceable_with_note():
-    prompt = build_system_prompt(_userdata(False), _config(True))
+    prompt = build_system_prompt(_userdata(False), _config(False))
     assert GUEST_SNAPSHOT in prompt
     swapped = prompt.replace(GUEST_SNAPSHOT, "X", 1)
     assert swapped.endswith(f"\n\n{CHANNEL_TEXT_NOTE}")

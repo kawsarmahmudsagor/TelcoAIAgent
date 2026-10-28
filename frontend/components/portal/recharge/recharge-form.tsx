@@ -19,6 +19,8 @@ const MIN = 20;
 const MAX = 1000;
 const CHIPS = [100, 200, 300, 500];
 const DEFAULT_CHIP = 200;
+/** Same rule as the backend (`points_for`): 1 point per full ৳10, the rest earns nothing. */
+const TAKA_PER_POINT = 10;
 
 const CHANNELS: PayOption[] = [
   { value: 'bkash', label: 'bKash' },
@@ -200,6 +202,12 @@ export function RechargeForm() {
         >
           {showAmountError || `${formatTaka(MIN)} to ${formatTaka(MAX)} per recharge.`}
         </p>
+        {!amountError && parsed.amount !== undefined && (
+          <p className="text-brand-text mt-1 text-[11px] font-bold">
+            Earns {Math.floor(parsed.amount / TAKA_PER_POINT).toLocaleString('en-IN')} reward points
+            (1 per full ৳{TAKA_PER_POINT}).
+          </p>
+        )}
 
         <PayOptions
           className="mt-4"

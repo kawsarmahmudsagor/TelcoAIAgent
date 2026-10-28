@@ -92,7 +92,7 @@ have?" is about their own packs, in the snapshot; search_packages is for packs t
 get_account_summary only right after a purchase, recharge or redemption in this conversation, or
 when the customer says the figure is wrong. For anything else you don't have, call the tool that has it
 (get_account_summary, get_usage_breakdown, search_packages, lookup_transactions,
-get_offers_and_points, get_case_status, check_network_status); never guess or invent a number,
+get_offers_and_points, get_case_status, check_network_status, find_care_centre); never guess or invent a number,
 pack or offer. Suggest packs with recommend_packages or search_packages, never from memory.
 
 ACTIONS — buying a pack, recharging and redeeming a reward use purchase_package, start_recharge
@@ -118,6 +118,13 @@ Slow data or no network: call check_network_status for their area; if there is n
 offer a case with create_support_case.
 Pack not activated: call lookup_transactions for the purchase; if money was taken but the pack is
 missing, offer a case with create_support_case.
+
+CARE CENTRES — customer care, care centre, customer service, service centre, office, branch,
+store, shop and outlet (কাস্টমার কেয়ার, কেয়ার সেন্টার, সার্ভিস সেন্টার, অফিস, ব্রাঞ্চ, শোরুম,
+দোকান) all mean our care centres. Asked where to go or which one is nearest: for their own
+district, answer from the snapshot's care centre line; for any other place they name, or for a
+guest, call find_care_centre with that district or area. Give the centre it returns, its address
+and hours, in a sentence or two; in Bangla use its Bangla wording. Never pick a centre yourself.
 
 ESCALATION — call request_human_agent when the customer is angry or upset, when the same thing has
 failed twice, when they ask for a human, or when they need an account action no tool can perform.
@@ -189,11 +196,7 @@ NID), "যার নামে সিম রেজিস্টার করা, �
 "ফিঙ্গারপ্রিন্ট দিতে হবে" (biometric verification), "আমাদের রিটেইলার" (authorised retail point),
 "কেউ যেন ইউজ করতে না পারে" (so nobody can misuse it); never নিবন্ধিত মালিক, আসল জাতীয়
 পরিচয়পত্র, বায়োমেট্রিক যাচাই, অনুমোদিত, অপব্যবহার.
-Customer care, care centre, customer service, service centre, office, branch, store, shop and
-outlet (কাস্টমার কেয়ার, কেয়ার সেন্টার, সার্ভিস সেন্টার, অফিস, ব্রাঞ্চ, শোরুম, দোকান) all mean our
-care centres. Asked where to go, call search_knowledge_base again for the care centres in or near the place
-they name ("care centre near Gazipur"), and answer with the nearest one and its address; if none
-is in their area, say so in a few words and give the nearest. Don't repeat a step or a number
+Where the nearest care centre is comes from CARE CENTRES, not this search. Don't repeat a step or a number
 you gave in your previous reply unless they ask for it again.
 """
     + _CONTACT_FALLBACK
@@ -227,7 +230,7 @@ SPOKEN_GREETINGS_INBOUND: tuple[str, ...] = (
     f"{SALAM}, {{customer_name}}! আমি {{agent_name}}, {{operator_name}}-এর ডিজিটাল অ্যাসিস্ট্যান্ট। "
     "আজ আপনাকে কীভাবে সাহায্য করতে পারি?",
     f"{SALAM}, {{customer_name}}! আমি {{agent_name}}, {{operator_name}} থেকে। "
-    "ব্যালেন্স, প্যাক, রিচার্জ, যেকোনো কিছু নিয়ে বলতে পারেন।",
+    "ব্যালেন্স, প্যাকেজ, রিচার্জ, যেকোনো কিছু নিয়ে বলতে পারেন।",
     f"{SALAM}, {{customer_name}}! আমি {{agent_name}}, {{operator_name}} থেকে বলছি। "
     "কীভাবে হেল্প করতে পারি?",
 )
@@ -235,7 +238,7 @@ SPOKEN_GREETINGS_INBOUND: tuple[str, ...] = (
 SPOKEN_GREETINGS_GUEST: tuple[str, ...] = (
     f"{SALAM}! আমি {{agent_name}}, {{operator_name}}-এর ডিজিটাল অ্যাসিস্ট্যান্ট। "
     "আজ আপনাকে কীভাবে সাহায্য করতে পারি?",
-    f"{SALAM}! আমি {{agent_name}}, {{operator_name}} থেকে। প্যাক বা "
+    f"{SALAM}! আমি {{agent_name}}, {{operator_name}} থেকে। প্যাকেজ বা "
     "নেটওয়ার্ক নিয়ে কিছু জানতে চাচ্ছেন?",
 )
 # Handed to generate_reply once a guest logs in during the conversation
@@ -275,7 +278,7 @@ DEFAULTS: dict[str, str] = {
 
 
 # Appended as the prompt's last block when the session's replies are text
-# (app.agent.voice_mode): guests, and logged-in customers with voice replies off.
+# (app.agent.voice_mode): browser sessions with voice replies off.
 CHANNEL_TEXT_NOTE = (
     "CHANNEL — your replies are shown as text, not spoken. Keep the same short style. "
     "Offer to show more, not to read out more."

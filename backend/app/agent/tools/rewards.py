@@ -17,7 +17,11 @@ async def run_get_offers_and_points(userdata: SessionUserdata) -> str:
     def build(db, sid):
         res = rewards.get_offers_and_points(db, sid)
         userdata.offer_ids = [o.id for o in res.offers]
-        lines = [f"Reward points: {res.reward_points}."]
+        lines = [
+            f"Reward points: {res.reward_points}.",
+            "Earning: every recharge earns the payer 1 point per full ৳10 "
+            "(৳45 earns 4; the leftover taka earns nothing and is not carried over).",
+        ]
         if not res.offers:
             lines.append("No offers available for them right now.")
             return "\n".join(lines)

@@ -13,7 +13,7 @@ _BENCH = Path(__file__).resolve().parents[2] / "scripts"
 _ROUTER = _BENCH / "router_bench" / "cases.json"
 _JUDGE = _BENCH / "judge_bench" / "cases.json"
 
-_LOOKUPS = {"packages", "knowledge_base", "none"}
+_LOOKUPS = {"packages", "knowledge_base", "care_centre", "none"}
 _PACKAGE_KEYS = set(turn_router._SCHEMA["properties"]["packages"]["properties"])
 _TOOLS = {t.info.name for t in telco_tools()} | {"search_knowledge_base"}
 

@@ -257,7 +257,7 @@ def test_transaction_text_no_repeated_type(bss_world):
 
 def test_registry_lists_read_tools():
     names = [t.info.name for t in registry.telco_tools()]
-    assert len(names) == 16
+    assert len(names) == 17
     assert set(names) == {
         "get_account_summary",
         "get_usage_breakdown",
@@ -268,6 +268,7 @@ def test_registry_lists_read_tools():
         "get_offers_and_points",
         "get_case_status",
         "check_network_status",
+        "find_care_centre",
         "purchase_package",
         "start_recharge",
         "redeem_reward",

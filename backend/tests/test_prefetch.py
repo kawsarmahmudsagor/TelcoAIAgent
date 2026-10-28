@@ -363,3 +363,23 @@ def test_the_fast_rules_only_answer_a_package_lookup(monkeypatch, tools):
     p, _ = _prefetcher(monkeypatch, _KB)
     _run(p, "১০ জিবি ডাটা প্যাক", Judgement(0.9, "knowledge_base", 0.97))
     assert tools == [("knowledge_base", _KB_ARGS)]
+
+
+def test_a_care_centre_lookup_runs_the_finder_with_the_named_place(monkeypatch, tools):
+    p, session = _prefetcher(monkeypatch, RouterArgs(care_place="Gazipur"))
+    session.userdata = SimpleNamespace(subscriber_id=None)
+    lookups, turn_ctx, _ = _run(p, "গাজীপুরে কেয়ার সেন্টার কোথায়?", Judgement(0.9, "care_centre", 0.97))
+
+    assert tools == []  # no knowledge-base or package search
+    (lookup,) = lookups
+    assert lookup.name == "find_care_centre" and lookup.args == {"place": "Gazipur"}
+    assert "Uttara care centre" in lookup.output
+    _, call, output = turn_ctx.items
+    assert call.name == "find_care_centre" and "Uttara" in output.output
+
+
+def test_a_care_centre_lookup_without_a_place_asks_a_guest(monkeypatch, tools):
+    p, session = _prefetcher(monkeypatch, RouterArgs())
+    session.userdata = SimpleNamespace(subscriber_id=None)
+    (lookup,), _, _ = _run(p, "care centre kothay?", Judgement(0.9, "care_centre", 0.97))
+    assert lookup.args == {} and "which district" in lookup.output

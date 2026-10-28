@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { ConnectionState, RoomEvent } from 'livekit-client';
+import { ConnectionState, type Room, RoomEvent } from 'livekit-client';
 import { toast } from 'sonner';
 import {
   type AgentState,
@@ -28,15 +28,43 @@ import {
   useOptionalChatBubble,
 } from '@/components/chat-bubble/chat-bubble-context';
 import { type VoiceMode, useVoiceMode } from '@/components/customer/use-voice-mode';
+import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
 import { useAgentEndCall } from '@/hooks/useAgentEndCall';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { turnOnMicrophone, useMicOnConnect } from '@/hooks/useMicOnConnect';
-import { useGreetingDone, useVisibleMessages } from '@/lib/livekit-text-streams';
+import { useAgentAttribute, useGreetingDone, useVisibleMessages } from '@/lib/livekit-text-streams';
 import { getVisitorConversation, toReceivedMessages } from '@/lib/public-conversations';
 import { type ConfirmState, type TelcoCard, useTelcoTopics } from '@/lib/telco-topics';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
+
+// Must match CONVERSATION_ATTRIBUTE in backend/app/agent/entrypoint.py: the session's
+// conversation row id.
+const CONVERSATION_ATTRIBUTE = 'conversation_id';
+// Must match ACCOUNT_ATTRIBUTE in backend/app/agent/account_link.py: the session's subscriber
+// id, "" for a guest.
+const ACCOUNT_ATTRIBUTE = 'account';
+
+/**
+ * An agent attribute that outlives the agent leaving the room, for reading once the session has
+ * ended. Cleared when the next session connects.
+ */
+function useLastAgentAttribute(room: Room, key: string) {
+  const value = useAgentAttribute(key);
+  const ref = useRef<string | null>(null);
+  if (value !== undefined) ref.current = value;
+  useEffect(() => {
+    const clear = () => {
+      ref.current = null;
+    };
+    room.on(RoomEvent.Connected, clear);
+    return () => {
+      room.off(RoomEvent.Connected, clear);
+    };
+  }, [room]);
+  return ref;
+}
 
 export interface AssistantContextValue {
   /**
@@ -129,14 +157,18 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
   const liveMessagesRef = useRef(liveMessages);
   liveMessagesRef.current = liveMessages;
   const hideCurrentLive = useCallback(
-    () => setHiddenIds(new Set(liveMessagesRef.current.map((m) => m.id))),
+    () => setHiddenIds((prev) => new Set([...prev, ...liveMessagesRef.current.map((m) => m.id)])),
     []
   );
+  // A guest's ended sessions: kept on screen until a new chat (or a reload), never carried on.
+  const [earlier, setEarlier] = useState<ReceivedMessage[]>([]);
+  const earlierRef = useRef(earlier);
+  earlierRef.current = earlier;
   const messages = useMemo(() => {
     const live =
       hiddenIds.size > 0 ? liveMessages.filter((m) => !hiddenIds.has(m.id)) : liveMessages;
-    return resumed ? [...resumed.messages, ...live] : live;
-  }, [resumed, liveMessages, hiddenIds]);
+    return [...(resumed ? resumed.messages : earlier), ...live];
+  }, [resumed, earlier, liveMessages, hiddenIds]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { cards, confirm } = useTelcoTopics(room, agentState);
   const greetingDone = useGreetingDone();
@@ -245,6 +277,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       await endLive();
       setQueued([]);
       hideCurrentLive();
+      setEarlier([]);
       setResumed({ id, messages: toReceivedMessages(detail) });
       setHistoryOpen(false);
       return true;
@@ -256,28 +289,61 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     void endLive().then(() => {
       setQueued([]);
       hideCurrentLive();
+      setEarlier([]);
       setResumed(null);
       setHistoryOpen(false);
     });
   }, [endLive, hideCurrentLive, setResumed]);
 
-  // A carried-on chat whose session ends: the room drops the live transcript, so what was said
-  // joins the stored messages (the next session reopens the same conversation).
+  const me = useOptionalPortalMe();
+  const subscriberId = me?.subscriber_id ?? null;
+  const subscriberIdRef = useRef(subscriberId);
+  subscriberIdRef.current = subscriberId;
+  const conversationIdRef = useLastAgentAttribute(room, CONVERSATION_ATTRIBUTE);
+  const accountRef = useLastAgentAttribute(room, ACCOUNT_ATTRIBUTE);
+
+  // A customer who logs out (or another who logs in) no longer sees the kept chat.
+  const shownForRef = useRef(subscriberId);
+  useEffect(() => {
+    const before = shownForRef.current;
+    shownForRef.current = subscriberId;
+    if (before === null || before === subscriberId) return;
+    setEarlier([]);
+    setResumed(null);
+  }, [subscriberId, setResumed]);
+
+  // A session that ends leaves its chat in the panel until a new one starts (the room drops the
+  // live transcript, so what was said is kept here). Signed in, it joins `resumed` and the next
+  // session reopens the same conversation. A guest's only stays on screen. A session that
+  // belonged to another customer (ended by a logout) is dropped.
   const resumedId = resumed?.id ?? null;
   useEffect(() => {
-    if (!resumedId) return;
     const keep = () => {
       const said = liveMessagesRef.current;
       if (said.length === 0) return;
-      setResumed((prev) =>
-        prev?.id === resumedId ? { id: prev.id, messages: [...prev.messages, ...said] } : prev
-      );
+      hideCurrentLive();
+      const owner = accountRef.current || null;
+      const mine = subscriberIdRef.current;
+      if (owner !== null && owner !== mine) return;
+      if (resumedId) {
+        setResumed((prev) =>
+          prev?.id === resumedId ? { id: prev.id, messages: [...prev.messages, ...said] } : prev
+        );
+        return;
+      }
+      const conversationId = conversationIdRef.current;
+      if (mine !== null && conversationId) {
+        setResumed({ id: conversationId, messages: [...earlierRef.current, ...said] });
+        setEarlier([]);
+      } else {
+        setEarlier((prev) => [...prev, ...said]);
+      }
     };
     room.on(RoomEvent.Disconnected, keep);
     return () => {
       room.off(RoomEvent.Disconnected, keep);
     };
-  }, [room, resumedId, setResumed]);
+  }, [room, resumedId, setResumed, hideCurrentLive, accountRef, conversationIdRef]);
 
   const value = useMemo<AssistantContextValue>(
     () => ({

@@ -82,8 +82,8 @@ class AgentConfig(TimestampedBase):
     elevenlabs_stt_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     elevenlabs_stt_language: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
-    # Browser sessions of logged-in customers answer in voice; off, in text
-    # (app.agent.voice_mode). Guests always get text.
+    # Browser sessions, guests' too, answer in voice; off, in text
+    # (app.agent.voice_mode).
     voice_replies_enabled: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
     )

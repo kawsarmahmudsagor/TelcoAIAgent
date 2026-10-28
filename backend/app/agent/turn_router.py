@@ -30,7 +30,7 @@ usage_logger = logging.getLogger("agent.usage")
 
 _SYSTEM = """You fill in the arguments of a mobile operator's package search from a \
 conversation with a customer in Bangladesh. The customer speaks Bangla, English or both. \
-Fill both fields for the customer's latest message; the caller decides which one runs.
+Fill every field for the customer's latest message; the caller decides which one runs.
 
 packages -- arguments for searching the operator's packages:
 - Use only criteria the customer has stated or confirmed in this conversation: the \
@@ -46,7 +46,11 @@ pack it described is not something the customer asked for).
 "সাপ্তাহিক" -> 7).
 
 knowledge_query: the latest message as a short English search query about the operator's \
-services, policies, coverage or how something works, or null."""
+services, policies, coverage or how something works, or null.
+
+care_place: the district or area of Bangladesh the customer names for finding a care centre, \
+in English spelling and without other words ("গাজীপুরে কোথায়?" -> "Gazipur", "Mirpur 10" -> \
+"Mirpur"), from the latest message or an earlier one they haven't changed; null if they name none."""
 
 _NULLABLE_STRING = {"type": ["string", "null"]}
 _NULLABLE_NUMBER = {"type": ["number", "null"]}
@@ -55,7 +59,7 @@ _NULLABLE_INTEGER = {"type": ["integer", "null"]}
 _SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["packages", "knowledge_query"],
+    "required": ["packages", "knowledge_query", "care_place"],
     "properties": {
         "packages": {
             "type": "object",
@@ -72,6 +76,7 @@ _SCHEMA = {
             },
         },
         "knowledge_query": _NULLABLE_STRING,
+        "care_place": _NULLABLE_STRING,
     },
 }
 
@@ -82,6 +87,7 @@ class RouterArgs:
 
     packages: dict = field(default_factory=dict)
     knowledge_query: str | None = None
+    care_place: str | None = None
 
 
 # ---- fast rules ----
@@ -355,11 +361,12 @@ def parse(content: str) -> RouterArgs | None:
         data = json.loads(content)
         packages = {k: v for k, v in data["packages"].items() if v not in (None, "")}
         query = data.get("knowledge_query") or None
+        place = data.get("care_place") or None
     except (ValueError, KeyError, TypeError, AttributeError):
         return None
-    if query is not None and not isinstance(query, str):
+    if any(v is not None and not isinstance(v, str) for v in (query, place)):
         return None
-    return RouterArgs(packages=packages, knowledge_query=query)
+    return RouterArgs(packages=packages, knowledge_query=query, care_place=place)
 
 
 async def extract(

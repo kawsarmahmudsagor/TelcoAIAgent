@@ -104,7 +104,7 @@ class ResolvedAgentConfig:
     reasoning_effort: str = "minimal"
     operator_phone: str = ""
     operator_address: str = ""
-    # Voice replies for logged-in browser customers (app.agent.voice_mode).
+    # Voice replies for browser sessions, guests too (app.agent.voice_mode).
     voice_replies_enabled: bool = True
     # Quick replies (app.agent.quick_reply): off unless the dashboard turns them on.
     quick_reply_enabled: bool = False

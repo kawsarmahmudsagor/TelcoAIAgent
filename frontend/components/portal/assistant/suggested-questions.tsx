@@ -66,7 +66,7 @@ export function QuestionChips({
           type="button"
           lang={q.lang}
           onClick={() => onAsk(q.text)}
-          className="text-brand-text bg-surface focus-visible:ring-ring/60 hover:bg-tint-purple border-chip-border min-h-8 rounded-lg border px-[9px] py-[7px] text-[11px] font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
+          className="text-brand-text bg-surface focus-visible:ring-ring/60 hover:bg-tint-purple border-chip-border min-h-8 rounded-lg border px-[9px] py-[7px] text-left text-[11px] font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
         >
           {q.text}
         </button>

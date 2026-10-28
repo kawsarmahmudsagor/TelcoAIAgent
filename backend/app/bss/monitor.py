@@ -29,6 +29,7 @@ TOOL_INTENT: dict[str, str] = {
     "get_case_status": "Support",
     "request_human_agent": "Support",
     "check_network_status": "Network",
+    "find_care_centre": "Care centres",
     "search_knowledge_base": "Knowledge base",
 }
 

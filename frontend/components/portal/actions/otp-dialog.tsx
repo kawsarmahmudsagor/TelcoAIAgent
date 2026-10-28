@@ -96,6 +96,9 @@ function OtpContent({
   }
   if (start.pay_from) rows.push(['Pay from', payFromLabel(start.pay_from, me.plan_type)]);
   if (start.target) rows.push(['To', start.target]);
+  if (start.points_earned) {
+    rows.push(['You earn', `${start.points_earned.toLocaleString('en-IN')} pts`]);
+  }
 
   return (
     <DialogPrimitive.Content

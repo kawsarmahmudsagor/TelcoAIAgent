@@ -16,7 +16,7 @@ from app.repositories import agent_config_repo
 from app.services import kb_files, rag_service
 
 PREFIX = "telco KB: "
-DOC_COUNT = 12
+DOC_COUNT = 13
 
 # The KB was written from a real operator's public pages; the bot must only ever
 # speak as telco., so none of its names, products, numbers or addresses may stay.

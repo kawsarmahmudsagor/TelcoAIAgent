@@ -70,6 +70,7 @@ def test_snapshot_for_prepaid_persona(bss_world):
     assert format_day(subscription.expires_at) in text
     assert "PYTEST Mirpur 10" in text and "congestion" in text and "investigating" in text
     assert "Bill due" not in text
+    assert "Care centres in their district (Dhaka)" in text
     assert real_estate_words(text) == []
 
 
@@ -87,6 +88,13 @@ def test_snapshot_for_postpaid_shows_due(bss_world):
     assert "Main balance" not in ctx.snapshot
     assert "No active packs" in ctx.snapshot
     assert "No network incidents" in ctx.snapshot
+    assert "care centre" not in ctx.snapshot.lower()  # district not one we know
+
+
+def test_snapshot_names_the_nearest_care_centre(bss_world):
+    sub = bss_world.subscriber(district="Gazipur")
+    snapshot = load_session_context(sub.id, None).snapshot
+    assert "Nearest care centre to their district: Uttara care centre" in snapshot
 
 
 def test_unknown_subscriber_becomes_guest():

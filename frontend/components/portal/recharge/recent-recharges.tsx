@@ -62,6 +62,7 @@ export function RecentRecharges() {
                     <p className="text-muted-foreground truncate text-[10px]">
                       {formatDayTime(txn.created_at)}
                       {other && ` · to ${txn.target_msisdn}`}
+                      {txn.points_earned ? ` · +${txn.points_earned} pts` : null}
                     </p>
                     {txn.failure_reason && (
                       <p className="text-status-failed-foreground truncate text-[10px]">

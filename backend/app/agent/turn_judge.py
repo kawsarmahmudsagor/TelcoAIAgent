@@ -71,9 +71,13 @@ _LOOKUP_CRITERIA = {
         "Search the operator's packages: the customer asks what packs are available, or "
         "gives or changes what they want (data amount, minutes, price, validity)."
     ),
+    "care_centre": (
+        "The customer asks where a care centre, customer care, office, branch or store is, "
+        "or which one is nearest to them or to a place."
+    ),
     "knowledge_base": (
         "A question about the operator, its policies, coverage, fees or how a service "
-        "works, not about the customer's own account."
+        "works, not about the customer's own account or where a care centre is."
     ),
     "none": (
         "No lookup: a question about the customer's own account (balance, usage, current "

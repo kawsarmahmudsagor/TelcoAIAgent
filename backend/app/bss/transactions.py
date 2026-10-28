@@ -60,4 +60,5 @@ def view(
         created_at=t.created_at,
         package_name=package_name,
         points_spent=points_cost if t.type == TxnType.redeem else None,
+        points_earned=t.points_earned if t.type == TxnType.recharge else None,
     )

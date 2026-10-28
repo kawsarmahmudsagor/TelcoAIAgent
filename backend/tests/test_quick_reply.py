@@ -367,17 +367,43 @@ def test_route_never_fills_over_a_pending_action():
     ("utterance", "lookup", "expected"),
     [
         ("আমার ব্যালেন্স কত আছে?", "none", "ব্যালেন্সটা চেক করছি।"),
-        ("৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী আছে?", "packages", "ডাটা প্যাকগুলো দেখছি।"),
-        ("সাত দিনের মিনিট প্যাক আছে?", "packages", "মিনিট প্যাকগুলো দেখছি।"),
+        ("৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী আছে?", "packages", "ডাটা প্যাকেজগুলো দেখছি।"),
+        ("সাত দিনের মিনিট প্যাক আছে?", "packages", "মিনিট প্যাকেজগুলো দেখছি।"),
         ("আমার নেটওয়ার্ক কাজ করছে না", "none", "আপনার এলাকার নেটওয়ার্কটা চেক করছি।"),
-        ("রোমিং চালু করতে কী লাগে?", "knowledge_base", "ওকে, এক সেকেন্ড।"),
+        ("রোমিং চালু করতে কী লাগে?", "knowledge_base", "আচ্ছা, একটু দেখে বলছি।"),
         ("How much data do I have left?", "none", "Checking your usage."),
-        ("Show me weekly voice packs under 100 taka.", "packages", "Checking the minute packs."),
+        ("Show me weekly voice packs under 100 taka.", "packages", "Checking the minute packages."),
         ("amar balance koto ache?", "none", "ব্যালেন্সটা চেক করছি।"),
     ],
 )
 def test_fast_filler_names_what_was_asked(utterance, lookup, expected):
     assert quick_reply.fast_filler(utterance, lookup) == expected
+
+
+@pytest.mark.parametrize(
+    ("utterance", "expected"),
+    [
+        ("Do you have any minute packages?", "voice"),
+        ("কোনো মিনিট প্যাকেজ আছে?", "voice"),
+        # "slow" alone is not the network.
+        ("My recharge is slow to arrive", "recharge"),
+        ("My internet is very slow", "network"),
+        # "কেটে" is a dropped call before it is a money cut.
+        ("লাইন বারবার কেটে যাচ্ছে", "network"),
+        ("আমার ৫০ টাকা কেটে গেছে", "transactions"),
+        ("amar taka keno kete nilo?", "transactions"),
+        # What is left in their pack, not packs to buy.
+        ("How much data is left in my data pack?", "usage"),
+        ("আমার প্যাকে কতটুকু ডাটা বাকি আছে?", "usage"),
+        ("data pack koto taka?", "data"),
+        ("ব্যালেন্স কত বাকি?", "balance"),
+        # A precomposed য় (U+09DF), as some speech-to-text writes it.
+        ("আমার নেটওয়ার্ক নেই", "network"),
+        ("আমার কত পয়েন্ট আছে?", "points"),
+    ],
+)
+def test_filler_topic_tells_close_topics_apart(utterance, expected):
+    assert quick_reply._filler_topic(utterance, None) == expected
 
 
 def test_fast_filler_varies_its_lines_and_openers():
@@ -387,16 +413,16 @@ def test_fast_filler_varies_its_lines_and_openers():
         assert line not in said
         said.append(line)
     # A topic line first, then the next topic line, then generic ones.
-    assert said[:2] == ["ব্যালেন্সটা চেক করছি।", "জি, আপনার ব্যালেন্সটা দেখছি।"]
+    assert said[:2] == ["ব্যালেন্সটা চেক করছি।", "আচ্ছা, আপনার ব্যালেন্সটা দেখছি।"]
 
 
 def test_fast_filler_prefers_a_line_already_cached(tmp_path):
     from app.agent.audio_cache import AudioCache
 
     cache = AudioCache(tmp_path)
-    cache.save("জি, আপনার ব্যালেন্সটা দেখছি।", b"\x00\x00" * 100, 24000, 1, "voice:model")
+    cache.save("আচ্ছা, আপনার ব্যালেন্সটা দেখছি।", b"\x00\x00" * 100, 24000, 1, "voice:model")
     assert quick_reply.fast_filler("আমার ব্যালেন্স কত আছে?", "none", cache=cache) == (
-        "জি, আপনার ব্যালেন্সটা দেখছি।"
+        "আচ্ছা, আপনার ব্যালেন্সটা দেখছি।"
     )
 
 

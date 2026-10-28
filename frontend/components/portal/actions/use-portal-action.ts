@@ -103,7 +103,11 @@ export function usePortalAction(): { start(a: PortalAction): Promise<void>; dial
       try {
         const result = await portalApi.confirmAction(pending.start.action_id, pending.action, code);
         close(pending);
-        toast.success(`Done — ref ${result.ref}`);
+        toast.success(
+          result.points_earned
+            ? `Done — ref ${result.ref}. +${result.points_earned.toLocaleString('en-IN')} reward points`
+            : `Done — ref ${result.ref}`
+        );
         invalidatePortal();
         return false;
       } catch (err) {

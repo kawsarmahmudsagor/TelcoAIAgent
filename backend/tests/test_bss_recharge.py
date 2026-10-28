@@ -14,6 +14,7 @@ from app.models.telco import (
     Balance,
     OfferAudience,
     PlanType,
+    Subscriber,
     Transaction,
     TxnChannel,
     TxnStatus,
@@ -300,3 +301,39 @@ def test_recharge_confirmed_as_100_executes_as_100_00(bss_world, db):
     out = recharge.execute_recharge(db, s.id, _req("100.00"), action_id=aid, actor=Actor.agent)
     assert out.amount == Decimal("100.00") and str(out.amount) == "100.00"
     assert out.main_balance == Decimal("100") + out.cashback
+
+
+@pytest.mark.parametrize(
+    ("amount", "points"),
+    [("20", 2), ("29.99", 2), ("45", 4), ("45.50", 4), ("50", 5), ("99.99", 9), ("1000", 100)],
+)
+def test_points_for_counts_full_ten_taka_only(amount, points):
+    assert recharge.points_for(Decimal(amount)) == points
+
+
+def test_recharge_earns_points_for_payer(bss_world, db):
+    s = bss_world.subscriber(reward_points=10)
+    t = bss_world.subscriber(reward_points=0)
+    assert recharge.preview_recharge(db, s.id, _req(45)).points_earned == 4
+    out = _do(db, s, _req(45))
+    assert (out.points_earned, out.reward_points) == (4, 14)
+    # Recharging someone else still earns the payer, never the target.
+    out = _do(db, s, _req("99.99", t.msisdn))
+    assert (out.points_earned, out.reward_points) == (9, 23)
+    db.expire_all()
+    assert db.get(Subscriber, t.id).reward_points == 0
+    txns = db.scalars(
+        select(Transaction).where(Transaction.subscriber_id == s.id).order_by(Transaction.ref)
+    ).all()
+    assert [x.points_earned for x in txns] == [4, 9]
+    assert sorted(v.points_earned for v in transactions.lookup(db, s.id)) == [4, 9]
+
+
+def test_recharge_points_not_doubled_on_replay(bss_world, db):
+    s = bss_world.subscriber(plan_type=PlanType.postpaid, postpaid_due=Decimal("500"))
+    req = _req(120)
+    aid = _confirm(db, s, req)
+    first = recharge.execute_recharge(db, s.id, req, action_id=aid, actor=Actor.agent)
+    again = recharge.execute_recharge(db, s.id, req, action_id=aid, actor=Actor.agent)
+    assert first.points_earned == again.points_earned == 12
+    assert first.reward_points == again.reward_points == 12

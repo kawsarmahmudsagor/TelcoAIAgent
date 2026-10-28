@@ -24,7 +24,7 @@ Rangpur: Jahaj Company More care centre, Station Road.
 
 Mymensingh: Ganginarpar care centre, near the town hall.
 
-Opening hours of care centres: Saturday to Thursday, 10 am to 7 pm. Closed on Fridays and on government holidays. Centres are busiest from 12 pm to 3 pm, so come in the morning for a shorter wait.
+Opening hours of care centres: every day, 9 am to 7 pm, including Fridays. Centres are busiest from 12 pm to 3 pm, so come in the morning for a shorter wait.
 
 Retail points: thousands of authorised telco. retail points across all 64 districts sell new SIMs, recharge and packs, and can register a new SIM with a biometric check. Retail points can also replace a lost or damaged SIM. MNP, ownership transfer, eSIM and deregistration are done only at care centres and the Experience Centre.
 
@@ -54,7 +54,7 @@ telco. কাস্টমার কেয়ার সেন্টারে য�
 
 ময়মনসিংহ: গাঙ্গিনারপাড় কেয়ার সেন্টার, টাউন হলের কাছে।
 
-কেয়ার সেন্টারের সময়: শনিবার থেকে বৃহস্পতিবার, সকাল ১০টা থেকে সন্ধ্যা ৭টা। শুক্রবার আর সরকারি ছুটির দিনে বন্ধ। দুপুর ১২টা থেকে ৩টা সবচেয়ে বেশি ভিড় থাকে, তাই কম ওয়েট করতে চাইলে সকালে আসুন।
+কেয়ার সেন্টারের সময়: শুক্রবারসহ প্রতিদিন সকাল ৯টা থেকে সন্ধ্যা ৭টা। দুপুর ১২টা থেকে ৩টা সবচেয়ে বেশি ভিড় থাকে, তাই কম ওয়েট করতে চাইলে সকালে আসুন।
 
 রিটেইলার: ৬৪টা জেলাতেই আমাদের হাজারো রিটেইলার আছে। সেখানে নতুন সিম, রিচার্জ আর প্যাক পাবেন, ফিঙ্গারপ্রিন্ট দিয়ে নতুন সিম রেজিস্টারও করা যায়। হারানো বা নষ্ট সিমও রিটেইলারের কাছে বদলানো যায়। তবে এমএনপি, মালিকানা বদল, ই-সিম আর সিম বাতিল শুধু কেয়ার সেন্টার আর এক্সপেরিয়েন্স সেন্টারে হয়।
 

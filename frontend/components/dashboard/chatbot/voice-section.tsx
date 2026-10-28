@@ -66,7 +66,7 @@ export function VoiceSection({
     >
       <SwitchRow
         label="Voice responses"
-        description="Off: logged-in customers can still speak; the assistant replies in text. Guests always chat in text. Applies to new chats."
+        description="Off: customers and guests can still speak; the assistant replies in text. Applies to new chats."
         checked={draft.voice_replies_enabled}
         onCheckedChange={(value) => set('voice_replies_enabled', value)}
         className="mb-2 border-b pt-0 pb-3"

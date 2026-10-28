@@ -81,6 +81,8 @@ class ActionStart(BaseModel):
     pay_from: str | None
     target: str | None
     points_cost: int | None
+    # Reward points a recharge will earn.
+    points_earned: int | None
     expires_at: datetime
     otp: OtpSms
 
@@ -96,6 +98,7 @@ class ActionResult(BaseModel):
     main_balance: float | None
     postpaid_due: float | None
     reward_points: int | None
+    points_earned: int | None
 
 
 class NotificationList(BaseModel):

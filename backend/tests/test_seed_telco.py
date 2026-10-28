@@ -35,7 +35,7 @@ def _samiha(db) -> Subscriber:
 
 def test_seed_is_idempotent(db):
     first = _fresh(db)
-    assert first["subscribers"] == 5 and first["incidents"] == 2 and first["offers"] == 3
+    assert first["subscribers"] == 5 and first["incidents"] == 2 and first["offers"] == len(seed_telco.OFFERS)
     again = seed_telco.seed(db, now=FIXED_NOW)
     assert set(again.values()) == {0}
 

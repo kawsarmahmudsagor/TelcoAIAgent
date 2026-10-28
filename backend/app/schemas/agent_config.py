@@ -46,7 +46,7 @@ class AgentConfigOut(BaseModel):
     elevenlabs_stt_model: str
     elevenlabs_stt_language: str
 
-    # Logged-in browser customers get voice replies; off, text. Guests always text.
+    # Browser visitors (guests too) get voice replies; off, text.
     voice_replies_enabled: bool
     # Quick replies (voice, gated calls): the master switch and its two parts.
     quick_reply_enabled: bool

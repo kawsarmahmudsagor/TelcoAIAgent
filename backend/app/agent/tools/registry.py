@@ -1,6 +1,7 @@
 """The telco tools registered on the agent (the entrypoint adds them)."""
 
 from app.agent.tools.account import explain_deductions, get_account_summary, get_usage_breakdown
+from app.agent.tools.care_centres import find_care_centre
 from app.agent.tools.network import check_network_status
 from app.agent.tools.packages import purchase_package, recommend_packages, search_packages
 from app.agent.tools.recharge import start_recharge
@@ -21,6 +22,7 @@ def telco_tools() -> list:
         get_offers_and_points,
         get_case_status,
         check_network_status,
+        find_care_centre,
         purchase_package,
         start_recharge,
         redeem_reward,

@@ -107,6 +107,8 @@ def _quote(db: Session, sid: UUID, kind: ActionKind, request, now: datetime) -> 
         )
         if q.cashback:
             text += f" Cashback: {format_amount(q.cashback)}."
+        if q.points_earned:
+            text += f" Earns {q.points_earned} reward points (1 per full ৳10)."
         card = {
             "title": "Recharge",
             "amount": float(q.request.amount),
@@ -227,6 +229,11 @@ def _execute(db: Session, sid: UUID, a: PendingAction, now: datetime) -> tuple[s
         )
         if r.cashback:
             text += f" Cashback credited: {format_amount(r.cashback)}."
+        if r.points_earned:
+            text += (
+                f" Reward points earned: {r.points_earned}; "
+                f"total now {r.reward_points}."
+            )
         text += " " + _balance_line(r.main_balance, r.postpaid_due, a.postpaid)
     else:
         r = rewards.execute_redeem(db, sid, a.request, **kw)

@@ -118,12 +118,12 @@ def test_lookup_question_is_added_only_when_asked():
     routed = build_request("m", [], "৩০০ টাকার প্যাক আছে?", "listening", lookup=True)
     question = routed["questions"][turn_judge.LOOKUP_KEY]
     assert question["type"] == "choice"
-    assert set(question["criteria"]) == {"packages", "none"}  # knowledge_base only with RAG
+    assert set(question["criteria"]) == {"packages", "care_centre", "none"}  # knowledge_base only with RAG
     assert "search" not in routed["state"].lower()
 
     with_kb = build_request("m", [], "hi", "listening", lookup=True, knowledge_base=True)
     criteria = with_kb["questions"][turn_judge.LOOKUP_KEY]["criteria"]
-    assert set(criteria) == {"packages", "knowledge_base", "none"}
+    assert set(criteria) == {"packages", "care_centre", "knowledge_base", "none"}
 
 
 def test_request_takes_no_search_context():

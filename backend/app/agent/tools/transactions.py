@@ -39,6 +39,8 @@ async def run_lookup_transactions(
                 head = f"{t.type.value} {t.package_name}, {format_amount(t.amount)}"
             else:
                 head = f"{t.type.value} of {format_amount(t.amount)}"
+            if t.points_earned:
+                head += f", earned {t.points_earned} points"
             line = (
                 f"- {t.ref}: {head} via "
                 f"{t.channel.value}, {t.status.value}, {format_day(t.created_at, with_time=True)}"

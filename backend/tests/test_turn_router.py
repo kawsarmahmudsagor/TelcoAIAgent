@@ -18,6 +18,7 @@ _BASE = "https://openrouter.ai/api/v1"
 _FULL = {
     "packages": {"kind": "data", "max_price": 300, "min_data_gb": None, "validity_days": 7},
     "knowledge_query": None,
+    "care_place": None,
 }
 
 
@@ -41,7 +42,7 @@ def test_request_asks_for_strict_json_with_no_reasoning():
     assert body["response_format"]["type"] == "json_schema"
     assert body["response_format"]["json_schema"]["strict"] is True
     schema = body["response_format"]["json_schema"]["schema"]
-    assert set(schema["properties"]) == {"packages", "knowledge_query"}
+    assert set(schema["properties"]) == {"packages", "knowledge_query", "care_place"}
     packages = schema["properties"]["packages"]["properties"]
     assert set(packages) == {"kind", "max_price", "min_data_gb", "validity_days"}
     assert packages["kind"]["enum"] == ["data", "voice", "bundle", "sms", None]

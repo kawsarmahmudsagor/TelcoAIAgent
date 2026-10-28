@@ -48,7 +48,13 @@ def start(
     now = utc_now()
     try:
         req, payload = _request(body)
-        fields: dict = {"amount": None, "pay_from": None, "target": None, "points_cost": None}
+        fields: dict = {
+            "amount": None,
+            "pay_from": None,
+            "target": None,
+            "points_cost": None,
+            "points_earned": None,
+        }
         if body.kind == "purchase":
             q = packages.preview_purchase(db, subscriber_id, req)
             fields.update(title=q.package.name, amount=q.price, pay_from=q.pay_from.value)
@@ -59,6 +65,7 @@ def start(
                 amount=r.request.amount,
                 pay_from=r.request.channel.value,
                 target=r.target_msisdn,
+                points_earned=r.points_earned,
             )
         else:
             o = rewards.preview_redeem(db, subscriber_id, req, now=now)
@@ -116,7 +123,12 @@ def confirm(
             out = {"main_balance": r.main_balance, "postpaid_due": r.postpaid_due}
         elif kind == "recharge":
             r = recharge.execute_recharge(db, subscriber_id, req, **kw)
-            out = {"main_balance": r.main_balance, "postpaid_due": r.postpaid_due}
+            out = {
+                "main_balance": r.main_balance,
+                "postpaid_due": r.postpaid_due,
+                "reward_points": r.reward_points,
+                "points_earned": r.points_earned,
+            }
         else:
             r = rewards.execute_redeem(db, subscriber_id, req, **kw)
             out = {"reward_points": r.reward_points}
@@ -131,6 +143,7 @@ def confirm(
             "main_balance": None,
             "postpaid_due": None,
             "reward_points": None,
+            "points_earned": None,
             **out,
         }
     )

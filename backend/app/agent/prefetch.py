@@ -25,7 +25,7 @@ from livekit.agents import AgentSession, llm
 from livekit.agents.llm import ToolError
 
 from app.agent import turn_gate, turn_router
-from app.agent.tools import search_knowledge_base
+from app.agent.tools import care_centres, search_knowledge_base
 from app.agent.tools._common import run_db
 from app.agent.tools.packages import search_packages_text
 from app.agent.turn_judge import Exchange, Judgement
@@ -43,6 +43,7 @@ _WARM_TIMEOUT_S = 10.0
 _LOOKUP_TOOLS = {
     "packages": ("search_packages",),
     "knowledge_base": (search_knowledge_base.TOOL_NAME,),
+    "care_centre": (care_centres.TOOL_NAME,),
 }
 
 
@@ -206,6 +207,12 @@ class Prefetcher:
             if name == "search_packages":
                 call_args = dict(args.packages)
                 output = await run_db(lambda db: search_packages_text(db, **call_args))
+            elif name == care_centres.TOOL_NAME:
+                # No place named: the tool falls back to the customer's district.
+                call_args = {"place": args.care_place} if args.care_place else {}
+                output = await care_centres.run_find_care_centre(
+                    self.session.userdata, args.care_place
+                )
             else:
                 call_args = {"query": args.knowledge_query or text}
                 output = await asyncio.to_thread(

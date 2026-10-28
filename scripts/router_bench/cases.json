@@ -360,6 +360,30 @@
    "utterance": "kal rate amar kete neya taka gulor hishab dao",
    "lookup": "none",
    "expected_tool": "lookup_transactions"
+  },
+  {
+   "id": "r13",
+   "lang": "bn",
+   "h": "start",
+   "utterance": "গাজীপুরে আপনাদের কাস্টমার কেয়ার কোথায়?",
+   "lookup": "care_centre",
+   "expected_tool": "find_care_centre"
+  },
+  {
+   "id": "e13",
+   "lang": "en",
+   "h": "start_en",
+   "utterance": "Where's the nearest care centre to Mirpur?",
+   "lookup": "care_centre",
+   "expected_tool": "find_care_centre"
+  },
+  {
+   "id": "b10",
+   "lang": "bi",
+   "h": "start",
+   "utterance": "amar kache office kothay?",
+   "lookup": "care_centre",
+   "expected_tool": "find_care_centre"
   }
  ]
 }

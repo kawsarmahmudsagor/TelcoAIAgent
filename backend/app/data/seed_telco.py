@@ -1,6 +1,6 @@
 """Demo data for the telco assistant: packages, five personas with balances,
 subscriptions, 30 days of usage, transactions and cases, two network incidents
-and three offers. Written straight through the ORM (history, not replayed into
+and the offers: pack deals, points redemptions and recharge cashback. Written straight through the ORM (history, not replayed into
 balances)."""
 
 import random
@@ -12,6 +12,7 @@ from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.bss._txn import next_ref
+from app.bss.recharge import points_for
 from app.config import get_settings
 from app.data.personas import FARHANA, NUSRAT, RAFI, SAMIHA, TANVIR
 from app.models.telco import (
@@ -45,20 +46,41 @@ D = Decimal
 # code, name, kind, data_mb, minutes, sms, days, price, tag
 PACKAGES = [
     ("D1-1D", "1 GB Daily", "data", 1024, 0, 0, 1, 29, None),
+    ("D2-3D", "2 GB 3 Days", "data", 2048, 0, 0, 3, 49, None),
     ("D3-3D", "3 GB Weekend", "data", 3072, 0, 0, 3, 69, "WEEKEND"),
+    ("D5-7D", "5 GB Weekly", "data", 5120, 0, 0, 7, 109, None),
     ("D8-7D", "8 GB Weekly", "data", 8192, 0, 0, 7, 149, "BEST VALUE"),
+    ("D10-15D", "10 GB 15 Days", "data", 10240, 0, 0, 15, 229, None),
     ("D15-30D", "15 GB Monthly", "data", 15360, 0, 0, 30, 349, None),
     ("D30-30D", "30 GB Monthly", "data", 30720, 0, 0, 30, 549, None),
     ("D50-30D", "50 GB Monthly", "data", 51200, 0, 0, 30, 749, None),
+    ("D100-30D", "100 GB Monthly", "data", 102400, 0, 0, 30, 999, "HEAVY USER"),
+    ("V50-3D", "50 Minutes", "voice", 0, 50, 0, 3, 39, None),
     ("V100-7D", "100 Minutes", "voice", 0, 100, 0, 7, 79, "SHORT CALLS"),
     ("V300-30D", "300 Minutes", "voice", 0, 300, 0, 30, 199, "VOICE"),
     ("V600-30D", "600 Minutes", "voice", 0, 600, 0, 30, 349, None),
+    ("V1000-30D", "1000 Minutes", "voice", 0, 1000, 0, 30, 499, None),
+    ("B2-50", "2 GB + 50 min", "bundle", 2048, 50, 0, 3, 79, "STARTER"),
     ("B5-100", "5 GB + 100 min", "bundle", 5120, 100, 0, 7, 179, None),
+    ("B10-150", "10 GB + 150 min", "bundle", 10240, 150, 0, 15, 299, None),
     ("B15-300", "Smart 15 GB + 300 min", "bundle", 15360, 300, 0, 30, 399, "POPULAR"),
     ("B20-200", "20 GB + 200 min", "bundle", 20480, 200, 0, 30, 449, "EXCLUSIVE"),
     ("B40-500", "40 GB + 500 min", "bundle", 40960, 500, 0, 30, 799, None),
+    ("B60-1000", "60 GB + 1000 min + 100 SMS", "bundle", 61440, 1000, 100, 30, 999, "PREMIUM"),
     ("S100-30D", "100 SMS", "sms", 0, 0, 100, 30, 29, None),
     ("S500-30D", "500 SMS", "sms", 0, 0, 500, 30, 79, None),
+    ("S1000-30D", "1000 SMS", "sms", 0, 0, 1000, 30, 129, None),
+]
+
+# Packs only reward points buy: inactive (not on sale) and free.
+# code, name, kind, data_mb, minutes, sms, days
+REWARD_PACKAGES = [
+    ("RW-500M-1D", "500 MB Bonus (1 day)", "data", 512, 0, 0, 1),
+    ("RW-1G-3D", "1 GB Bonus (3 days)", "data", 1024, 0, 0, 3),
+    ("RW-30MIN-7D", "30 Minutes Bonus (7 days)", "voice", 0, 30, 0, 7),
+    ("RW-3G-7D", "3 GB Bonus (7 days)", "data", 3072, 0, 0, 7),
+    ("RW-B5-7D", "5 GB + 100 min Bonus (7 days)", "bundle", 5120, 100, 0, 7),
+    ("RW-10G-30D", "10 GB Bonus (30 days)", "data", 10240, 0, 0, 30),
 ]
 
 # msisdn, name, plan, district, joined_on, balance, due, points, daily data MB range
@@ -79,17 +101,104 @@ SUBSCRIPTIONS = {
     FARHANA: [("B20-200", 12000, 150, 0, 20)],
 }
 
-REWARD_CODE = "RW-1G-3D"
-PACKAGE_CODES = [p[0] for p in PACKAGES] + [REWARD_CODE]
+PACKAGE_CODES = [p[0] for p in PACKAGES] + [p[0] for p in REWARD_PACKAGES]
+
+# Every offer runs 60 days from the seed day. Keys left out are None; "package"
+# is a code from PACKAGES or REWARD_PACKAGES.
+OFFERS = [
+    # Pack deals.
+    {
+        "title": "20 GB + 200 min exclusive",
+        "description": "Our exclusive bundle: 20 GB data and 200 minutes for 30 days.",
+        "package": "B20-200",
+        "audience": "all",
+    },
+    {
+        "title": "2 GB + 50 min starter",
+        "description": "Try us light: 2 GB data and 50 minutes for 3 days at ৳79.",
+        "package": "B2-50",
+        "audience": "prepaid",
+    },
+    {
+        "title": "60 GB + 1000 min premium",
+        "description": "Our biggest bundle: 60 GB, 1000 minutes and 100 SMS for 30 days.",
+        "package": "B60-1000",
+        "audience": "postpaid",
+    },
+    # Points redemptions, cheapest first.
+    {
+        "title": "500 MB bonus for 300 points",
+        "description": "Redeem 300 reward points for a 500 MB bonus valid for 1 day.",
+        "package": "RW-500M-1D",
+        "points_cost": 300,
+        "audience": "all",
+    },
+    {
+        "title": "30 bonus minutes for 400 points",
+        "description": "Redeem 400 reward points for 30 bonus minutes valid for 7 days.",
+        "package": "RW-30MIN-7D",
+        "points_cost": 400,
+        "audience": "all",
+    },
+    {
+        "title": "1 GB bonus for 700 points",
+        "description": "Redeem 700 reward points for a 1 GB bonus valid for 3 days.",
+        "package": "RW-1G-3D",
+        "points_cost": 700,
+        "audience": "all",
+    },
+    {
+        "title": "3 GB bonus for 1,500 points",
+        "description": "Redeem 1,500 reward points for a 3 GB bonus valid for 7 days.",
+        "package": "RW-3G-7D",
+        "points_cost": 1500,
+        "audience": "all",
+    },
+    {
+        "title": "5 GB + 100 min for 2,500 points",
+        "description": "Redeem 2,500 reward points for 5 GB and 100 minutes valid for 7 days.",
+        "package": "RW-B5-7D",
+        "points_cost": 2500,
+        "audience": "all",
+    },
+    {
+        "title": "10 GB bonus for 4,000 points",
+        "description": "Redeem 4,000 reward points for a 10 GB bonus valid for 30 days.",
+        "package": "RW-10G-30D",
+        "points_cost": 4000,
+        "audience": "all",
+    },
+    # Recharge cashback; a recharge gets the single best one it qualifies for.
+    {
+        "title": "5% cashback on ৳100+ recharge",
+        "description": "Get 5% cashback (up to ৳10) on any recharge of ৳100 or more.",
+        "cashback_percent": "5",
+        "cashback_cap": "10",
+        "min_recharge": "100",
+        "audience": "prepaid",
+    },
+    {
+        "title": "10% cashback on ৳200+ recharge",
+        "description": "Get 10% cashback (up to ৳30) on any recharge of ৳200 or more.",
+        "cashback_percent": "10",
+        "cashback_cap": "30",
+        "min_recharge": "200",
+        "audience": "prepaid",
+    },
+    {
+        "title": "15% cashback on ৳500+ recharge",
+        "description": "Get 15% cashback (up to ৳75) on any recharge of ৳500 or more.",
+        "cashback_percent": "15",
+        "cashback_cap": "75",
+        "min_recharge": "500",
+        "audience": "prepaid",
+    },
+]
 
 # (district, area) of the seeded incidents and the seeded offers' titles, so
 # reset() can find them again.
 INCIDENT_AREAS = [("Sylhet", "Sylhet Sadar"), ("Gazipur", "Gazipur Sadar")]
-OFFER_TITLES = [
-    "20 GB + 200 min exclusive",
-    "1 GB bonus for 700 points",
-    "10% cashback on ৳200+ recharge",
-]
+OFFER_TITLES = [o["title"] for o in OFFERS]
 
 VAS = [
     ("Caller tune renewal", D("5.00")),
@@ -150,21 +259,23 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
             db.add(pkg)
             counts["packages"] += 1
         pkgs[code] = pkg
-    reward = db.scalar(select(Package).where(Package.code == REWARD_CODE))
-    if reward is None:
-        reward = Package(
-            code=REWARD_CODE,
-            name="1 GB Bonus (3 days)",
-            kind=PackageKind.data,
-            data_mb=1024,
-            minutes=0,
-            sms=0,
-            validity_days=3,
-            price=D("0"),
-            is_active=False,
-        )
-        db.add(reward)
-        counts["packages"] += 1
+    for code, name, kind, mb, mins, sms, days in REWARD_PACKAGES:
+        pkg = db.scalar(select(Package).where(Package.code == code))
+        if pkg is None:
+            pkg = Package(
+                code=code,
+                name=name,
+                kind=PackageKind(kind),
+                data_mb=mb,
+                minutes=mins,
+                sms=sms,
+                validity_days=days,
+                price=D("0"),
+                is_active=False,
+            )
+            db.add(pkg)
+            counts["packages"] += 1
+        pkgs[code] = pkg
     db.flush()
 
     subs: dict[str, Subscriber] = {}
@@ -267,6 +378,11 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
                 amount=D(amount),
                 target_msisdn=msisdn if ttype == TxnType.recharge else None,
                 package_id=pkg.id if pkg else None,
+                points_earned=(
+                    points_for(D(amount))
+                    if ttype == TxnType.recharge and status == TxnStatus.success
+                    else 0
+                ),
                 status=status,
                 failure_reason=reason,
                 created_at=when,
@@ -346,40 +462,23 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
     counts["incidents"] = 2
 
     ends = today + timedelta(days=60)
-    db.add(
-        Offer(
-            title=OFFER_TITLES[0],
-            description="Our exclusive bundle: 20 GB data and 200 minutes for 30 days.",
-            package_id=pkgs["B20-200"].id,
-            audience=OfferAudience.all,
-            starts_on=today,
-            ends_on=ends,
+    for o in OFFERS:
+        cashback = o.get("cashback_percent")
+        db.add(
+            Offer(
+                title=o["title"],
+                description=o["description"],
+                package_id=pkgs[o["package"]].id if "package" in o else None,
+                points_cost=o.get("points_cost"),
+                cashback_percent=D(cashback) if cashback else None,
+                cashback_cap=D(o["cashback_cap"]) if cashback else None,
+                min_recharge=D(o["min_recharge"]) if cashback else None,
+                audience=OfferAudience(o["audience"]),
+                starts_on=today,
+                ends_on=ends,
+            )
         )
-    )
-    db.add(
-        Offer(
-            title=OFFER_TITLES[1],
-            description="Redeem 700 reward points for a 1 GB bonus valid for 3 days.",
-            package_id=reward.id,
-            points_cost=700,
-            audience=OfferAudience.all,
-            starts_on=today,
-            ends_on=ends,
-        )
-    )
-    db.add(
-        Offer(
-            title=OFFER_TITLES[2],
-            description="Get 10% cashback (up to ৳30) on any recharge of ৳200 or more.",
-            cashback_percent=D("10"),
-            cashback_cap=D("30"),
-            min_recharge=D("200"),
-            audience=OfferAudience.prepaid,
-            starts_on=today,
-            ends_on=ends,
-        )
-    )
-    counts["offers"] = 3
+    counts["offers"] = len(OFFERS)
     db.flush()
     return counts
 
