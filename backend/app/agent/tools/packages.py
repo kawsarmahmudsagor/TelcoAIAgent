@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import re
+import unicodedata
 from decimal import Decimal
 
 from livekit.agents import RunContext, function_tool
 from livekit.agents.llm import ToolError
 from sqlalchemy.orm import Session
 
-from app.agent import actions
+from app.agent import actions, cards
 from app.agent.telco_format import format_amount, format_data
 from app.agent.tools._common import (
     LISTED,
@@ -19,7 +22,7 @@ from app.agent.tools._common import (
     run_read,
     run_write,
 )
-from app.agent.topics import PACKAGES, publish
+from app.agent.topics import PACKAGES
 from app.agent.userdata import SessionUserdata
 from app.bss import accounts, packages
 from app.bss.errors import BssError, InsufficientBalance, InvalidRequest
@@ -44,11 +47,59 @@ def _card(p: PackageView) -> dict:
     }
 
 
+# A size the customer names ("একশো মিনিটের", "2 GB", "৫০০ এমবি"), so the
+# cards show only the packages they asked about.
+_NUMBER_WORDS = {
+    "এক": 1, "দুই": 2, "দু": 2, "তিন": 3, "চার": 4, "পাঁচ": 5, "ছয়": 6, "সাত": 7, "আট": 8,
+    "নয়": 9, "দশ": 10, "বারো": 12, "পনেরো": 15, "বিশ": 20, "পঁচিশ": 25, "ত্রিশ": 30,
+    "চল্লিশ": 40, "পঞ্চাশ": 50, "একশো": 100, "একশ": 100, "দেড়শো": 150, "দুইশো": 200,
+    "দুশো": 200, "তিনশো": 300, "চারশো": 400, "পাঁচশো": 500, "ছয়শো": 600, "হাজার": 1000,
+    "এক হাজার": 1000, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15, "twenty": 20, "thirty": 30,
+    "fifty": 50, "hundred": 100, "one hundred": 100, "thousand": 1000, "one thousand": 1000,
+}
+_WORDS = "|".join(sorted(map(re.escape, _NUMBER_WORDS), key=len, reverse=True))
+_SIZE_RE = re.compile(
+    rf"(?<![\wঀ-৿])([\d০-৯]+(?:\.\d+)?|{_WORDS})\s*-?\s*"
+    r"(জিবি|গিগা|এমবি|মিনিট|gb|mb|minutes?|mins?)(?![a-z])",
+    re.IGNORECASE,
+)
+_BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+
+
+def _named_sizes(text: str) -> set[tuple[str, float]]:
+    """("data_mb" | "minutes", amount) for each size in `text`."""
+    sizes = set()
+    for m in _SIZE_RE.finditer(unicodedata.normalize("NFC", text)):
+        word, unit = m.group(1).lower(), m.group(2).lower()
+        number = _NUMBER_WORDS.get(word) or float(word.translate(_BENGALI_DIGITS))
+        if unit in ("জিবি", "গিগা", "gb"):
+            sizes.add(("data_mb", number * 1024))
+        elif unit in ("এমবি", "mb"):
+            sizes.add(("data_mb", number))
+        else:
+            sizes.add(("minutes", number))
+    return sizes
+
+
+def _about_turn(found: list[PackageView], text: str) -> list[PackageView]:
+    """The packages with a size the customer named, when any have one; else all."""
+    sizes = _named_sizes(text)
+    named = [p for p in found if any(getattr(p, field) == n for field, n in sizes)]
+    return named or found
+
+
 async def _publish_cards(userdata: SessionUserdata, title: str, found: list[PackageView]) -> None:
-    if found:
-        await publish(
-            userdata, PACKAGES, {"title": title, "packages": [_card(p) for p in found[:_CARDS]]}
-        )
+    """Cards for what this turn asks about, shown with the reply's first words
+    (app.agent.cards). The set already on screen isn't sent again."""
+    shown = _about_turn(found, userdata.turn_text)[:_CARDS]
+    if not shown:
+        return
+    payload = json.dumps({"title": title, "packages": [_card(p) for p in shown]})
+    if payload == userdata.shown_packages:
+        return
+    userdata.shown_packages = payload
+    await cards.send_card(userdata, PACKAGES, payload)
 
 
 def describe_package(p: PackageView) -> str:

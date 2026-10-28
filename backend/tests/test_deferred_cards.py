@@ -18,14 +18,15 @@ class _Participant:
     def __init__(self):
         self.sent: list[tuple[str, str]] = []
 
-    async def send_text(self, payload, topic):
+    async def send_text(self, payload, topic, destination_identities):
+        assert destination_identities == ["caller"]
         self.sent.append((topic, payload))
 
 
 def _userdata(*, defer: bool) -> SessionUserdata:
     participant = _Participant()
     room = SimpleNamespace(local_participant=participant)
-    userdata = SessionUserdata(channel="web", room=room)
+    userdata = SessionUserdata(channel="web", room=room, linked_identity=lambda: "caller")
     userdata.defer_cards = defer
     return userdata
 
@@ -122,3 +123,34 @@ def test_a_tool_call_step_keeps_the_cards_for_the_next_step():
         assert _sent(userdata) == [] and userdata.pending_card == (_TOPIC, _CARDS)
 
     asyncio.run(go())
+
+
+def _pkg(code, minutes=0, data_mb=0):
+    from decimal import Decimal
+
+    from app.bss.types import PackageView
+    from app.models.telco import PackageKind
+
+    return PackageView(
+        code=code, name=code, kind=PackageKind.voice, data_mb=data_mb, minutes=minutes, sms=0,
+        validity_days=7, price=Decimal("79"), tag=None,
+    )
+
+
+def test_package_cards_show_only_the_size_asked_about_and_never_repeat():
+    import json
+
+    from app.agent.tools import packages
+
+    found = [_pkg("V50", minutes=50), _pkg("V100", minutes=100), _pkg("V300", minutes=300)]
+
+    async def go():
+        userdata = _userdata(defer=False)
+        userdata.turn_text = "মিনিটের প্যাকেজ দেখান"
+        await packages._publish_cards(userdata, "Packages", found)
+        await packages._publish_cards(userdata, "Packages", found)  # same set: not again
+        userdata.turn_text = "একশো মিনিটের প্যাকেজটি সম্পর্কে বলুন"
+        await packages._publish_cards(userdata, "Packages", found)
+        return [[p["code"] for p in json.loads(payload)["packages"]] for _, payload in _sent(userdata)]
+
+    assert asyncio.run(go()) == [["V50", "V100", "V300"], ["V100"]]

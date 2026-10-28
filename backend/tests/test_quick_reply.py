@@ -671,3 +671,14 @@ def test_only_filler_lines_are_cacheable():
     assert not quick_reply.is_filler_line("আপনার ব্যালেন্স ৫০ টাকা।")
     quick_reply.remember_filler("ওকে, আপনার প্যাকটা দেখছি।")
     assert quick_reply.is_filler_line("ওকে, আপনার প্যাকটা দেখছি।")
+
+
+def test_ruled_out_validity_or_size_is_not_echoed():
+    # From a call: "ত্রিশ দিন না" got "মাসিক ডাটা প্যাকেজগুলো".
+    lines = _fillers(
+        "আচ্ছা আমাকে ত্রিশ দিন না, আপনি এক দিনের কিছু package দেখান data।", n=40
+    )
+    assert all("এক দিনের" in line for line in lines)
+    assert not any("মাসিক" in line for line in lines)
+    assert quick_reply._size("২ জিবি না, ৫ জিবির প্যাকেজ") == ("৫ জিবির", "৫ GB")
+    assert quick_reply._validity("not 30 days, a weekly one") == ("সাত দিনের", "weekly")

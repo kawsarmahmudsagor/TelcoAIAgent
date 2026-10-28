@@ -652,9 +652,37 @@ def _one_package(utterance: str) -> bool:
     return bool(_ONE_PACKAGE_RE.search(utterance)) and not _WHICH_RE.search(utterance)
 
 
+def _negated(utterance: str, start: int, end: int) -> bool:
+    """"ত্রিশ দিন না", "not 30 days": the customer named it to rule it out."""
+    return bool(
+        _PLACE_NEGATED_AFTER_RE.search(utterance[end:end + 30])
+        or _PLACE_NEGATED_BEFORE_RE.search(utterance[max(0, start - 12):start])
+    )
+
+
+def _validity(utterance: str) -> tuple[str, str] | None:
+    """(Bangla, English) words for the last validity named and not ruled out:
+    "ত্রিশ দিন না, এক দিনের" is the one-day."""
+    found = [
+        (m.start(), bn, en)
+        for pattern, bn, en in _VALIDITY
+        for m in pattern.finditer(utterance)
+        if not _negated(utterance, m.start(), m.end())
+    ]
+    if not found:
+        return None
+    _, bn, en = max(found)
+    return bn, en
+
+
 def _size(utterance: str) -> tuple[str, str] | None:
-    """(Bangla, English) words for the data or minutes the customer named."""
-    m = _SIZE_RE.search(utterance)
+    """(Bangla, English) words for the last data or minutes the customer named
+    and didn't rule out."""
+    m = next(
+        (m for m in reversed(list(_SIZE_RE.finditer(utterance)))
+         if not _negated(utterance, m.start(), m.end())),
+        None,
+    )
     if m is None:
         return None
     number, unit = m.group(1), m.group(2).lower()
@@ -680,7 +708,7 @@ def _entity_x(topic: str | None, utterance: str) -> tuple[str, str, str] | None:
             return f"{bn} এলাকার নেটওয়ার্কটা", f"the network in {en}", family
         return f"{bn} এলাকার কাছের কেয়ার সেন্টারটা", f"the care centre nearest {en}", family
     if topic in _PACK_KIND_BN:
-        validity = next(((bn, en) for p, bn, en in _VALIDITY if p.search(utterance)), None)
+        validity = _validity(utterance)
         size = _size(utterance)
         v_bn, v_en = (f"{validity[0]} ", f"{validity[1]} ") if validity else ("", "")
         s_bn, s_en = (f"{size[0]} ", f"{size[1]} ") if size else ("", "")

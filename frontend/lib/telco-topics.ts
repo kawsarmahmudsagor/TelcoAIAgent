@@ -84,9 +84,12 @@ export interface TelcoTopics {
   confirm: ConfirmState | null;
 }
 
-// A card is sent the moment the tool runs, before the agent has said a word about it. It is held
-// until the agent next *starts* speaking (the reply presenting it); speech already playing when
-// it arrived doesn't count. The timer is only a safety net (a reply that was never spoken).
+// A case card is sent the moment the tool runs, before the agent has said a word about it. It is
+// held until the agent next *starts* speaking (the reply presenting it); speech already playing
+// when it arrived doesn't count. The timer is only a safety net (a reply that was never spoken).
+// Package cards come with the main reply's first words (backend app.agent.cards), so one that
+// arrives while the agent is speaking shows at once: that speech may be a filler line running
+// straight into the reply, with no new start to wait for.
 const FALLBACK_REVEAL_MS = 60_000;
 
 function readJson<T>(reader: TextStreamReader, topic: string, use: (payload: T) => void) {
@@ -132,6 +135,9 @@ export function useTelcoTopics(room: Room | undefined, agentState: AgentState): 
     ]);
   };
 
+  const agentStateRef = useRef(agentState);
+  agentStateRef.current = agentState;
+
   const hold = (card: HeldCard) => {
     heldRef.current.push(card);
     clearTimer();
@@ -168,7 +174,9 @@ export function useTelcoTopics(room: Room | undefined, agentState: AgentState): 
 
     const onPackages = (reader: TextStreamReader) =>
       readJson<TelcoPackagesPayload>(reader, TELCO_TOPICS.packages, (data) => {
-        if (data.packages?.length) hold({ kind: 'packages', data });
+        if (!data.packages?.length) return;
+        hold({ kind: 'packages', data });
+        if (agentStateRef.current === 'speaking') revealHeld();
       });
 
     const onCase = (reader: TextStreamReader) =>

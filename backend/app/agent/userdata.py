@@ -31,6 +31,10 @@ class SessionUserdata:
     # Set by app.agent.voice_mode.apply once the session runs; None before.
     voice_mode: "VoiceMode | None" = None
     pending_card: tuple[str, str] | None = None
+    # The package card set last sent (JSON), so the same set isn't shown twice
+    # in a row, and the customer's latest turn, which narrows the next set.
+    shown_packages: str = ""
+    turn_text: str = ""
     # The subscriber this session is about (from the dispatch metadata); the
     # transcript recorder links the conversation to it on close.
     subscriber_id: UUID | None = None

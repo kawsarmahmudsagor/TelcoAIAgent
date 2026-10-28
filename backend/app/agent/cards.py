@@ -17,7 +17,19 @@ async def send_card(userdata: SessionUserdata, topic: str, payload: str) -> None
     if userdata.defer_cards:
         userdata.pending_card = (topic, payload)
         return
-    await userdata.room.local_participant.send_text(payload, topic=topic)
+    await _send(userdata, topic, payload)
+
+
+async def _send(userdata: SessionUserdata, topic: str, payload: str) -> None:
+    """To the linked browser alone, as app.agent.topics.publish sends; with no
+    identity to send to, nothing is sent."""
+    identity = userdata.linked_identity() if userdata.linked_identity else None
+    if identity is None:
+        logger.warning("no linked participant; %s card not sent", topic)
+        return
+    await userdata.room.local_participant.send_text(
+        payload, topic=topic, destination_identities=[identity]
+    )
 
 
 async def flush_pending_card(userdata: SessionUserdata) -> bool:
@@ -29,7 +41,7 @@ async def flush_pending_card(userdata: SessionUserdata) -> bool:
     userdata.pending_card = None
     topic, payload = pending
     try:
-        await userdata.room.local_participant.send_text(payload, topic=topic)
+        await _send(userdata, topic, payload)
     except Exception:
         logger.exception("could not send the %s card", topic)
         return False

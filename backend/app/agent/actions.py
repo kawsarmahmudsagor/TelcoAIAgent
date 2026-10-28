@@ -43,6 +43,11 @@ from app.services.phone_numbers import spoken_digits_in_text
 ActionKind = Literal["purchase", "recharge", "redeem"]
 
 _SNAPSHOT_NOTE = "These figures replace the account snapshot in your instructions."
+# A finished write ends the task: the reply closes with an offer of more help.
+_DONE_NEXT = (
+    "Tell them it went through briefly, then end the reply by asking whether they need help "
+    "with anything else, in varied words."
+)
 _CODE_SENT = (
     "A 6-digit code was sent to the customer's screen; they can say or type it, or enter it "
     "on the confirm card. State the price and how they pay, then ask for the code in one short "
@@ -263,7 +268,7 @@ def _execute(db: Session, sid: UUID, a: PendingAction, now: datetime) -> tuple[s
         )
         if r.expires_at is not None:
             text += f" The package is active until {format_day(r.expires_at)}."
-    return r.transaction_ref, f"{text}\n{_SNAPSHOT_NOTE}"
+    return r.transaction_ref, f"{text}\n{_SNAPSHOT_NOTE}\n{_DONE_NEXT}"
 
 
 async def confirm_action(

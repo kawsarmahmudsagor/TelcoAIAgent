@@ -26,8 +26,7 @@ from livekit.agents.llm import ToolError
 
 from app.agent import turn_gate, turn_router
 from app.agent.tools import care_centres, search_knowledge_base
-from app.agent.tools._common import run_db
-from app.agent.tools.packages import search_packages_text
+from app.agent.tools.packages import run_search_packages
 from app.agent.turn_judge import Exchange, Judgement
 from app.agent.turn_router import RouterArgs
 from app.bss.errors import BssError
@@ -206,7 +205,8 @@ class Prefetcher:
         try:
             if name == "search_packages":
                 call_args = dict(args.packages)
-                output = await run_db(lambda db: search_packages_text(db, **call_args))
+                # The tool's own run: it also puts the package cards on screen.
+                output = await run_search_packages(self.session.userdata, **call_args)
             elif name == care_centres.TOOL_NAME:
                 # No place named: the tool falls back to the customer's district.
                 call_args = {"place": args.care_place} if args.care_place else {}

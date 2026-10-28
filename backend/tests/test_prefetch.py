@@ -16,7 +16,6 @@ from app.agent import entrypoint, prefetch
 from app.agent.prefetch import Lookup, Prefetcher
 from app.agent.turn_judge import Judgement
 from app.agent.turn_router import RouterArgs
-from app.bss.errors import BssError
 from app.config import Settings
 from app.services import agent_config_service
 
@@ -52,15 +51,11 @@ def tools(monkeypatch):
     """The knowledge-base and package-search cores, recording their calls."""
     calls: list[tuple[str, dict]] = []
 
-    async def run_db(fn):
-        return fn("fake-db")
-
-    def search_packages_text(db, **args):
+    async def run_search_packages(userdata, **args):
         calls.append(("packages", args))
         return "Found 2 packages: Net 7GB 7 days, 299 taka"
 
-    monkeypatch.setattr(prefetch, "run_db", run_db)
-    monkeypatch.setattr(prefetch, "search_packages_text", search_packages_text)
+    monkeypatch.setattr(prefetch, "run_search_packages", run_search_packages)
 
     def search_text(query, config):
         calls.append(("knowledge_base", {"query": query}))
@@ -142,10 +137,10 @@ def test_a_package_lookup_injects_a_search_packages_call_and_its_output(monkeypa
 
 
 def test_a_package_search_the_catalogue_refuses_leaves_it_to_the_llm(monkeypatch, tools):
-    def refuse(db, **args):
-        raise BssError("bad kind")
+    async def refuse(userdata, **args):
+        raise ToolError("bad kind")
 
-    monkeypatch.setattr(prefetch, "search_packages_text", refuse)
+    monkeypatch.setattr(prefetch, "run_search_packages", refuse)
     p, _ = _prefetcher(monkeypatch, _PKG)
     lookups, _, _ = _run(p, "৩০০ টাকার নেট প্যাক?", Judgement(0.9, "packages", 0.97))
     assert lookups == []
@@ -383,3 +378,17 @@ def test_a_care_centre_lookup_without_a_place_asks_a_guest(monkeypatch, tools):
     session.userdata = SimpleNamespace(subscriber_id=None)
     (lookup,), _, _ = _run(p, "care centre kothay?", Judgement(0.9, "care_centre", 0.97))
     assert lookup.args == {} and "which district" in lookup.output
+
+
+def test_a_prefetched_package_search_runs_the_tool_so_its_cards_are_sent(monkeypatch):
+    # From a call: prefetched searches skipped the tool's card publish.
+    seen = []
+
+    async def run_search_packages(userdata, **args):
+        seen.append(userdata)
+        return "Found 2 packages"
+
+    monkeypatch.setattr(prefetch, "run_search_packages", run_search_packages)
+    p, session = _prefetcher(monkeypatch, _PKG)
+    _run(p, "৩০০ টাকার নেট প্যাক?", Judgement(0.9, "packages", 0.97))
+    assert seen == [session.userdata]

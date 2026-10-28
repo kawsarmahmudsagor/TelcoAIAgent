@@ -94,6 +94,7 @@ def test_purchase_needs_code_then_executes(bss_world):
         assert "120 taka" in out
 
         done = await actions.confirm_action(ud, sms["code"])
+        assert "anything else" in done
         assert _txns(bss_world, sub) == 1
         assert ud.pending_action is None
         (t1, final), (t2, changed) = _sent(ud)[-2:]

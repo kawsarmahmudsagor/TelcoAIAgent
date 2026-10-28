@@ -1,4 +1,5 @@
 import asyncio
+import json
 import itertools
 import random
 from decimal import Decimal
@@ -106,9 +107,9 @@ def _capture(monkeypatch) -> list[tuple[str, dict]]:
     sent: list[tuple[str, dict]] = []
 
     async def fake(userdata, topic, payload):
-        sent.append((topic, payload))
+        sent.append((topic, json.loads(payload)))
 
-    monkeypatch.setattr(packages, "publish", fake)
+    monkeypatch.setattr(packages.cards, "send_card", fake)
     return sent
 
 

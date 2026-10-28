@@ -754,6 +754,9 @@ class TurnGateController:
         text = spoken_digits_in_text(turn_gate.clean_transcript(new_message.text_content or ""))
         if text != new_message.text_content:
             new_message.content = [text]
+        if (userdata := _userdata(self)) is not None:
+            # The package cards show only what this turn asks about.
+            userdata.turn_text = text
         if turn_gate.matches_handled(text, self._answered.text, now - self._answered.at):
             _log("deduped", text)
             raise StopResponse()
