@@ -68,6 +68,8 @@ class SessionUserdata:
     offer_ids: list[UUID] = field(default_factory=list)
     # When each OTP was issued this session (throttle).
     otp_issued_at: list[datetime] = field(default_factory=list)
+    # The example code ask given with the last OTP, so the next one differs.
+    code_ask: str = ""
     # The identity of the browser this session talks to (entrypoint's
     # _linked_identity); telco topics are sent to it alone, so the OTP code
     # never reaches anyone else in the room.

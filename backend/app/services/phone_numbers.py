@@ -76,8 +76,9 @@ _WORD_RE = re.compile(r"\S+")
 # Punctuation around a word in a run ("seven," "eight.") is not part of the number.
 _EDGE_PUNCT = ",.;:!?।\"'()"
 _SENTENCE_END = (".", "!", "?", "।")
-# A run this long is a phone number, not a count ("one or two bedrooms").
-_MIN_SPOKEN_RUN = 7
+# A run this long is a phone number or a 6-digit code, not a count ("one or
+# two bedrooms").
+_MIN_SPOKEN_RUN = 6
 
 
 def _is_spoken_digit(word: str) -> bool:
@@ -89,7 +90,7 @@ def spoken_digits_in_text(text: str) -> str:
     """Writes a number said aloud as digits, the way speech-to-text can't: "my
     number is zero one seven zero one double zero one three nine eight" -> "my
     number is 01701001398". The LLM miscounts "double"/"triple" when it does
-    this itself, so a caller's turn gets it done here first. Only a run of 7 or
+    this itself, so a caller's turn gets it done here first. Only a run of 6 or
     more digits changes; "one or two bedrooms" is left alone."""
     out, last = [], 0
     run: list[re.Match[str]] = []

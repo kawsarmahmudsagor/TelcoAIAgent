@@ -74,6 +74,9 @@ def test_spoken_digits_still_validated(raw):
             "I need two. zero one seven zero one double zero one three nine eight",
             "I need two. 01701001398",
         ),
+        # A 6-digit OTP said aloud (call log: matched only when typed).
+        ("nine one eight two three five", "918235"),
+        ("কোডটা নয় এক আট দুই তিন পাঁচ", "কোডটা 918235"),
     ],
 )
 def test_spoken_digits_in_text_become_digits(heard, expected):

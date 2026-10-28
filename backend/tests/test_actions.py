@@ -337,3 +337,29 @@ def test_throttle_text_differs_from_limit_text():
     assert "Too many codes were requested. Please wait a few minutes and try again." in (
         ERROR_TEXT["too_many_codes"]
     )
+
+
+def test_code_ask_example_never_repeats_back_to_back():
+    ud = SessionUserdata(channel=Channel.inbound_chat, room=None)
+    asks = []
+    for _ in range(30):
+        out = actions._code_sent(ud)
+        assert "enter it on the confirm card" in out and "Never read the code aloud" in out
+        asks.append(ud.code_ask)
+        assert f'"{ud.code_ask}"' in out
+    assert all(a != b for a, b in zip(asks, asks[1:]))
+    assert len(set(asks)) > 2
+
+
+def test_code_said_as_words_confirms(bss_world):
+    sub, pkg = _buyer(bss_world)
+    ud = _ud(sub)
+
+    async def go():
+        await package_tools.run_purchase_package(ud, pkg.code)
+        code = _sent(ud)[0][1]["code"]
+        words = " ".join("zero one two three four five six seven eight nine".split()[int(c)] for c in code)
+        await actions.confirm_action(ud, words)
+        assert _txns(bss_world, sub) == 1
+
+    asyncio.run(go())

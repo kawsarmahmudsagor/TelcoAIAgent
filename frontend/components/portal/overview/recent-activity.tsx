@@ -32,7 +32,7 @@ function title(txn: TransactionView, ownMsisdn: string): string {
       ? `Recharge to ${txn.target_msisdn}`
       : 'Mobile recharge';
   }
-  if (txn.type === 'purchase') return txn.package_name ?? 'Pack purchase';
+  if (txn.type === 'purchase') return txn.package_name ?? 'Package purchase';
   return txn.package_name ? `${txn.package_name} reward` : 'Reward redeemed';
 }
 

@@ -13,6 +13,7 @@ the session's action state must still follow it."""
 from __future__ import annotations
 
 import asyncio
+import random
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import datetime
@@ -37,15 +38,34 @@ from app.bss.errors import (
 )
 from app.bss.types import PurchaseRequest, RechargeRequest
 from app.models.telco import Actor, CasePriority, PlanType, TxnChannel
+from app.services.phone_numbers import spoken_digits_in_text
 
 ActionKind = Literal["purchase", "recharge", "redeem"]
 
 _SNAPSHOT_NOTE = "These figures replace the account snapshot in your instructions."
 _CODE_SENT = (
-    "A 6-digit code was sent to the customer's screen. State the price and how they pay, "
-    "then ask them to say or type the code, or enter it on the confirm card. "
-    "Never read the code aloud."
+    "A 6-digit code was sent to the customer's screen; they can say or type it, or enter it "
+    "on the confirm card. State the price and how they pay, then ask for the code in one short "
+    "sentence, worded differently from any earlier ask in this call; naming one way is enough. "
+    "In Bangla, say it the way people talk, with the English words they use (কোড, এসএমএস, "
+    "কনফার্ম, টাইপ), not a translated or bookish line such as \"কেনার অনুরোধ হয়েছে\". "
+    'For example: "{example}" Never read the code aloud.'
 )
+# Example asks, one per OTP, never the same twice in a row.
+_CODE_ASKS = (
+    "কোডটা বললেই কনফার্ম করে দিচ্ছি।",
+    "এসএমএসে যে কোডটা পেয়েছেন, ওটা বলুন বা টাইপ করুন।",
+    "স্ক্রিনের কোডটা বলুন, চাইলে কার্ডেও দিতে পারেন।",
+    "কোডটা পেয়েছেন? বললেই হয়ে যাবে।",
+    "কনফার্ম করতে এসএমএসের কোডটা বলুন প্লিজ।",
+    "কোডটা কার্ডে দিন, অথবা আমাকে বলুন।",
+)
+
+
+def _code_sent(userdata: SessionUserdata) -> str:
+    example = random.choice([a for a in _CODE_ASKS if a != userdata.code_ask])
+    userdata.code_ask = example
+    return _CODE_SENT.format(example=example)
 
 T = TypeVar("T")
 
@@ -187,7 +207,7 @@ async def _start(userdata: SessionUserdata, kind: ActionKind, request, now: date
             },
         )
         await _publish_card(userdata, userdata.pending_action, "awaiting_code")
-    lines += [text, _CODE_SENT]
+    lines += [text, _code_sent(userdata)]
     return "\n".join(lines)
 
 
@@ -253,7 +273,9 @@ async def confirm_action(
     action_id: UUID | None = None,
     now: datetime | None = None,
 ) -> str:
-    return await _uncancellable(_confirm(userdata, otp.normalise_code(code), action_id, now))
+    # The model may pass the code as said ("nine one eight ..."): words to digits first.
+    code = otp.normalise_code(spoken_digits_in_text(code))
+    return await _uncancellable(_confirm(userdata, code, action_id, now))
 
 
 async def _confirm(

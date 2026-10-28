@@ -17,7 +17,7 @@ import type { PortalActionKind } from '@/lib/types/portal';
 const HEADINGS: Record<PortalActionKind, Record<ConfirmState['state'], string>> = {
   purchase: {
     awaiting_code: 'Confirm purchase',
-    done: 'Pack activated',
+    done: 'Package activated',
     cancelled: 'Purchase cancelled',
     expired: 'Purchase expired',
   },
