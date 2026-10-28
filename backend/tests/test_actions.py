@@ -104,6 +104,14 @@ def test_purchase_needs_code_then_executes(bss_world):
     asyncio.run(go())
 
 
+def test_purchase_takes_a_code_in_any_case(bss_world):
+    # Codes are upper case ("D8-7D"); the model may write them lower case.
+    sub, pkg = _buyer(bss_world)
+    ud = _ud(sub)
+    out = asyncio.run(package_tools.run_purchase_package(ud, f" {pkg.code.lower()} "))
+    assert ud.pending_action is not None and "120 taka" in out
+
+
 def test_execute_refused_without_verified_code(bss_world):
     sub, pkg = _buyer(bss_world)
     ud = _ud(sub)

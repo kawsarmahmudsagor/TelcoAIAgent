@@ -38,7 +38,7 @@ export default function LoginPage() {
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
           <h1 className="text-3xl font-extrabold tracking-[-0.03em]">Sign in to the dashboard</h1>
           <p className="text-muted-foreground mt-2 mb-8 text-sm">
-            For telco. staff. Use the account your administrator set up for you.
+            For telco staff. Use the account your administrator set up for you.
           </p>
           <Suspense>
             <LoginForm />

@@ -1,6 +1,6 @@
 import { cn } from '@/lib/shadcn/utils';
 
-/** The telco. mark: a "T" on the indigo-to-mint gradient tile from the reference UI. */
+/** The telco mark: a "T" on the indigo-to-mint gradient tile from the reference UI. */
 export function TelcoMark({ className }: { className?: string }) {
   return (
     <span
@@ -15,14 +15,14 @@ export function TelcoMark({ className }: { className?: string }) {
   );
 }
 
-/** Mark, wordmark ("telco" with a mint full stop) and the "digital telecom" line. */
+/** Mark, wordmark ("telco") and the "digital telecom" line. */
 export function TelcoBrand({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <TelcoMark />
       <span className="flex flex-col">
         <span className="text-xl leading-tight font-extrabold tracking-[-0.035em]">
-          telco<span className="text-mint">.</span>
+          telco
         </span>
         <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
           digital telecom

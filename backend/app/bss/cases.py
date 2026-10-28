@@ -3,7 +3,7 @@
 import re
 import uuid
 
-from sqlalchemy import case, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -134,6 +134,12 @@ def get_case_status(
         ).limit(limit)
     ).all()
     return [_view(r) for r in rows]
+
+
+def count_cases(db: Session, subscriber_id: uuid.UUID) -> int:
+    """How many cases get_case_status would list with no limit."""
+    q = select(func.count()).select_from(SupportCase)
+    return db.scalar(q.where(SupportCase.subscriber_id == subscriber_id)) or 0
 
 
 def list_recent(db: Session, subscriber_id: uuid.UUID, *, limit: int = 20) -> list[CaseView]:

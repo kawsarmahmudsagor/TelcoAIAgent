@@ -2,7 +2,7 @@
 
 ## English
 
-What we collect: when you register a SIM, we keep your name, NID or passport details, date of birth, address and the biometric verification result, as Bangladesh law requires. When you use our network, we keep records of calls, SMS, data use, recharges and payments for billing. When you use the telco. website, app or assistant, we keep your conversations, the pages you use, your device and browser type, and your IP address.
+What we collect: when you register a SIM, we keep your name, NID or passport details, date of birth, address and the biometric verification result, as Bangladesh law requires. When you use our network, we keep records of calls, SMS, data use, recharges and payments for billing. When you use the telco website, app or assistant, we keep your conversations, the pages you use, your device and browser type, and your IP address.
 
 Why we use it: to provide and bill your service, verify your identity, prevent fraud and SIM misuse, fix network problems, answer your questions, and improve our services. If you agree to it, we also use it to send you offers that fit how you use your phone. You can stop offer messages at any time by asking the hotline or the assistant.
 
@@ -16,15 +16,15 @@ Your rights: you can ask what personal data we hold about you, ask us to correct
 
 Security: we protect your data with access controls and encryption. Every account change is confirmed with a one-time code (OTP). We will never ask for your PIN, password or OTP.
 
-Cookies: the telco. website uses functional cookies (for example to remember your language and keep you logged in) and analytic cookies that count visits without identifying you. We don't use tracking cookies. You can block cookies in your browser settings, but some features may then stop working.
+Cookies: the telco website uses functional cookies (for example to remember your language and keep you logged in) and analytic cookies that count visits without identifying you. We don't use tracking cookies. You can block cookies in your browser settings, but some features may then stop working.
 
-Terms of use: the content of the telco. website and app belongs to telco. and may not be copied without permission. Offers, prices and rates can change; the price shown when you buy is the one that applies. Using telco. services for fraud, spam, harassment or anything illegal can lead to your SIM being blocked. These terms follow the laws of Bangladesh. We may update this policy and these terms; the latest version is always on the telco. website.
+Terms of use: the content of the telco website and app belongs to telco and may not be copied without permission. Offers, prices and rates can change; the price shown when you buy is the one that applies. Using telco services for fraud, spam, harassment or anything illegal can lead to your SIM being blocked. These terms follow the laws of Bangladesh. We may update this policy and these terms; the latest version is always on the telco website.
 
-Questions about privacy: call the hotline (121 from a telco. number, or 01700121121) or email care@telco.demo.
+Questions about privacy: call the hotline (121 from a telco number, or 01700121121) or email care@telco.demo.
 
 ## বাংলা
 
-আমরা কী রাখি: সিম রেজিস্টার করার সময় দেশের আইন অনুযায়ী আপনার নাম, এনআইডি বা পাসপোর্টের তথ্য, জন্মতারিখ, ঠিকানা আর ফিঙ্গারপ্রিন্ট মিলেছে কি না সেই রেজাল্ট রাখি। আমাদের নেটওয়ার্ক ইউজ করার সময় বিলের জন্য কল, এসএমএস, ডাটা ইউসেজ, রিচার্জ আর পেমেন্টের রেকর্ড রাখি। telco. ওয়েবসাইট, অ্যাপ বা অ্যাসিস্ট্যান্ট ইউজ করলে আপনার চ্যাট, কোন পেজ দেখেছেন, ডিভাইস আর ব্রাউজারের ধরন আর আইপি অ্যাড্রেস রাখি।
+আমরা কী রাখি: সিম রেজিস্টার করার সময় দেশের আইন অনুযায়ী আপনার নাম, এনআইডি বা পাসপোর্টের তথ্য, জন্মতারিখ, ঠিকানা আর ফিঙ্গারপ্রিন্ট মিলেছে কি না সেই রেজাল্ট রাখি। আমাদের নেটওয়ার্ক ইউজ করার সময় বিলের জন্য কল, এসএমএস, ডাটা ইউসেজ, রিচার্জ আর পেমেন্টের রেকর্ড রাখি। telco ওয়েবসাইট, অ্যাপ বা অ্যাসিস্ট্যান্ট ইউজ করলে আপনার চ্যাট, কোন পেজ দেখেছেন, ডিভাইস আর ব্রাউজারের ধরন আর আইপি অ্যাড্রেস রাখি।
 
 কেন রাখি: সার্ভিস দেওয়া আর বিল করা, আপনার পরিচয় কনফার্ম করা, ফ্রড আর সিমের অপব্যবহার ঠেকানো, নেটওয়ার্কের সমস্যা ঠিক করা, আপনার প্রশ্নের উত্তর দেওয়া আর সার্ভিস আরও ভালো করার জন্য। আপনি রাজি থাকলে আপনার ইউসেজ দেখে অফারও পাঠাই। হটলাইন বা অ্যাসিস্ট্যান্টকে বলে যেকোনো সময় অফার মেসেজ বন্ধ করতে পারেন।
 
@@ -38,8 +38,8 @@ Questions about privacy: call the hotline (121 from a telco. number, or 01700121
 
 সেফটি: অ্যাক্সেস কন্ট্রোল আর এনক্রিপশন দিয়ে আমরা আপনার তথ্য সুরক্ষিত রাখি। অ্যাকাউন্টে প্রতিটা পরিবর্তন ওটিপি কোড দিয়ে কনফার্ম করতে হয়। আমরা কখনো আপনার পিন, পাসওয়ার্ড বা ওটিপি চাইব না।
 
-কুকিজ: telco. ওয়েবসাইট কাজের জন্য দরকারি কুকিজ ইউজ করে, যেমন আপনার ভাষা আর লগইন মনে রাখা, আর কে ভিজিট করছে না জেনে শুধু ভিজিট গোনার জন্য অ্যানালিটিক কুকিজ। আমরা ট্র্যাকিং কুকিজ ইউজ করি না। ব্রাউজারের সেটিংস থেকে কুকিজ বন্ধ করতে পারেন, তবে তাতে কিছু ফিচার কাজ নাও করতে পারে।
+কুকিজ: telco ওয়েবসাইট কাজের জন্য দরকারি কুকিজ ইউজ করে, যেমন আপনার ভাষা আর লগইন মনে রাখা, আর কে ভিজিট করছে না জেনে শুধু ভিজিট গোনার জন্য অ্যানালিটিক কুকিজ। আমরা ট্র্যাকিং কুকিজ ইউজ করি না। ব্রাউজারের সেটিংস থেকে কুকিজ বন্ধ করতে পারেন, তবে তাতে কিছু ফিচার কাজ নাও করতে পারে।
 
-ইউজের শর্ত: telco. ওয়েবসাইট আর অ্যাপের কনটেন্ট telco.-এর, পারমিশন ছাড়া কপি করা যাবে না। অফার, দাম আর রেট বদলাতে পারে, কেনার সময় যে দাম দেখায় সেটাই ধরা হয়। ফ্রড, স্প্যাম, হয়রানি বা বেআইনি কোনো কাজে telco. সার্ভিস ইউজ করলে সিম বন্ধ করে দেওয়া হতে পারে। এই শর্তগুলো বাংলাদেশের আইন মেনে চলে। আমরা এই পলিসি আর শর্ত আপডেট করতে পারি, লেটেস্ট ভার্সন সবসময় telco. ওয়েবসাইটে থাকে।
+ইউজের শর্ত: telco ওয়েবসাইট আর অ্যাপের কনটেন্ট telco-এর, পারমিশন ছাড়া কপি করা যাবে না। অফার, দাম আর রেট বদলাতে পারে, কেনার সময় যে দাম দেখায় সেটাই ধরা হয়। ফ্রড, স্প্যাম, হয়রানি বা বেআইনি কোনো কাজে telco সার্ভিস ইউজ করলে সিম বন্ধ করে দেওয়া হতে পারে। এই শর্তগুলো বাংলাদেশের আইন মেনে চলে। আমরা এই পলিসি আর শর্ত আপডেট করতে পারি, লেটেস্ট ভার্সন সবসময় telco ওয়েবসাইটে থাকে।
 
-প্রাইভেসি নিয়ে প্রশ্ন: হটলাইনে কল করুন (telco. নম্বর থেকে ১২১, অথবা ০১৭০০১২১১২১), বা care@telco.demo-তে ইমেইল করুন।
+প্রাইভেসি নিয়ে প্রশ্ন: হটলাইনে কল করুন (telco নম্বর থেকে ১২১, অথবা ০১৭০০১২১১২১), বা care@telco.demo-তে ইমেইল করুন।

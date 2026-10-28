@@ -2,7 +2,7 @@
 
 ## English
 
-telco. provides 4G data and voice service across all 64 districts of Bangladesh, with the strongest coverage in city areas such as Dhaka, Chattogram, Gazipur, Rajshahi and Sylhet. Coverage can be weaker in remote char, hill and haor areas, and inside basements, lifts and some large buildings.
+telco provides 4G data and voice service across all 64 districts of Bangladesh, with the strongest coverage in city areas such as Dhaka, Chattogram, Gazipur, Rajshahi and Sylhet. Coverage can be weaker in remote char, hill and haor areas, and inside basements, lifts and some large buildings.
 
 Slow or no signal: first restart your phone, check that airplane mode is off, and make sure the SIM is seated properly. Then check that you still have data in your active pack and that its validity has not ended.
 
@@ -13,7 +13,7 @@ Reporting a problem: if there is no known incident, report it so we can investig
 
 ## বাংলা
 
-telco. বাংলাদেশের ৬৪টা জেলাতেই ৪জি ডাটা আর ভয়েস সার্ভিস দেয়। ঢাকা, চট্টগ্রাম, গাজীপুর, রাজশাহী আর সিলেটের মতো শহরে কভারেজ সবচেয়ে ভালো। দূরের চর, পাহাড় আর হাওর এলাকায়, আর বেসমেন্ট, লিফট বা কিছু বড় বিল্ডিংয়ের ভেতরে সিগন্যাল দুর্বল হতে পারে।
+telco বাংলাদেশের ৬৪টা জেলাতেই ৪জি ডাটা আর ভয়েস সার্ভিস দেয়। ঢাকা, চট্টগ্রাম, গাজীপুর, রাজশাহী আর সিলেটের মতো শহরে কভারেজ সবচেয়ে ভালো। দূরের চর, পাহাড় আর হাওর এলাকায়, আর বেসমেন্ট, লিফট বা কিছু বড় বিল্ডিংয়ের ভেতরে সিগন্যাল দুর্বল হতে পারে।
 
 নেট স্লো বা নেটওয়ার্ক না থাকলে: আগে ফোনটা রিস্টার্ট দিন, এয়ারপ্লেন মোড অফ আছে কি না আর সিমটা ঠিকমতো বসানো আছে কি না দেখুন। তারপর চালু প্যাকে ডাটা বাকি আছে কি না আর মেয়াদ শেষ হয়ে গেছে কি না চেক করুন।
 

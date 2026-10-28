@@ -50,7 +50,7 @@ export function SiteHeader({ me }: { me: SignedIn }) {
   return (
     <header className="bg-background/85 border-line sticky top-0 z-30 border-b backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-6 px-4 sm:px-8">
-        <Link href="/" aria-label="telco. home" className={cn('rounded-md', FOCUS)}>
+        <Link href="/" aria-label="telco home" className={cn('rounded-md', FOCUS)}>
           <TelcoBrand />
         </Link>
         <nav aria-label="Sections" className="phone:hidden ml-2">

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** An operator logs in at `/login` and runs the demo from a telco. admin portal (control center, subscribers, transactions, support queue, network, AI monitor, offers, plus the kept chatbot/knowledge/conversations pages). They can stage a network incident or resolve a case live, and run proactive nudges that appear in the customer portal's notification bell. Clicking a notification opens the assistant, which greets with that nudge.
+**Goal:** An operator logs in at `/login` and runs the demo from a telco admin portal (control center, subscribers, transactions, support queue, network, AI monitor, offers, plus the kept chatbot/knowledge/conversations pages). They can stage a network incident or resolve a case live, and run proactive nudges that appear in the customer portal's notification bell. Clicking a notification opens the assistant, which greets with that nudge.
 
 **Architecture:**
 - Backend:
@@ -10,7 +10,7 @@
   - New admin routes under `/api/admin/*`, all behind `get_current_admin`. New customer routes `/api/me/notifications*`.
   - The scheduler runs the nudge sweep every 15 minutes; `POST /api/admin/nudges/run` runs it on demand.
 - Frontend:
-  - The real-estate dashboard pages are deleted. The dashboard gets a telco. shell (same tokens as the portal) with Operations and Agent nav groups.
+  - The real-estate dashboard pages are deleted. The dashboard gets a telco shell (same tokens as the portal) with Operations and Agent nav groups.
   - The portal topbar gets a notification bell. A click marks the notification read and starts a fresh assistant session carrying `nudge_id`.
   - The token route only lets an admin join an existing room by `room_name`.
 
@@ -68,7 +68,7 @@ Real-microphone voice testing (a demo-prep step, listed in the README checklist)
 | `backend/app/scheduler/jobs.py`, `worker.py` (modify) | `run_nudges` job every 15 min |
 | `backend/alembic/versions/*` (create) | offer audience `specific` + `offer_subscribers`; `audit_events` FK `SET NULL` |
 | `frontend/app/dashboard/{bookings,leads,properties,schedule,incoming}/**`, `components/dashboard/properties/**`, `components/app/scheduled-call-watcher.tsx`, `components/dashboard/knowledge/properties-sync-card.tsx`, `lib/types/{booking,property,schedule}.ts` (delete) | real-estate leftovers |
-| `frontend/components/dashboard/shell/*` (create), `app/dashboard/layout.tsx` (modify) | telco. admin shell |
+| `frontend/components/dashboard/shell/*` (create), `app/dashboard/layout.tsx` (modify) | telco admin shell |
 | `frontend/lib/admin-api.ts`, `lib/types/admin.ts`, `lib/admin-query.ts` (create) | typed `/api/admin` client and query hook |
 | `frontend/app/dashboard/{page,subscribers,transactions,cases,network,ai-monitor}/**`, `components/dashboard/{control,subscribers,transactions,cases,network,monitor}/*` (create/replace) | admin pages |
 | `frontend/components/dashboard/offers/*`, `lib/types/offer.ts` (rewrite) | reshaped offers |

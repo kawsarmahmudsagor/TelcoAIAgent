@@ -43,7 +43,8 @@ def points_for(amount: Decimal) -> int:
 
 
 def _normalise(raw: str) -> str:
-    s = re.sub(r"[\s-]", "", raw)
+    # "০১৭১২৩৪৫৬৭৮": the model writes Bangla replies, digits included.
+    s = re.sub(r"[\s-]", "", raw.translate(otp.BENGALI_DIGITS))
     if s.startswith("+88"):
         s = s[3:]
     elif s.startswith("88") and len(s) == 13:

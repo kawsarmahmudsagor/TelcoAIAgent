@@ -73,6 +73,10 @@ def test_msisdn_normalisation_and_validation(bss_world, db):
     assert recharge.preview_recharge(db, s.id, _req(100, "880 1712342841")).target_msisdn == (
         "01712342841"
     )
+    # The model writes Bangla replies, digits included.
+    assert recharge.preview_recharge(db, s.id, _req(100, "০১৭১২৩৪২৮৪১")).target_msisdn == (
+        "01712342841"
+    )
     with pytest.raises(InvalidMsisdn):
         recharge.preview_recharge(db, s.id, _req(100, "0121234567"))
 

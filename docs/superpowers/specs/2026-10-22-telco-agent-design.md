@@ -7,7 +7,7 @@ Reference UI: `telco_dashboard.html` (static prototype supplied by the user)
 ## 1. Goal and context
 
 Turn this repository (forked from RealEstateAgent) into a **sales-demo Telco AI agent** for a fictional
-Bangladesh mobile operator ("telco."). A prospect sees a customer self-care portal and an operations
+Bangladesh mobile operator ("telco"). A prospect sees a customer self-care portal and an operations
 admin portal, both on live (seeded) data, and an AI assistant that answers account questions and
 performs simulated actions (buy pack, recharge, redeem, open case) by web voice or text chat — with
 the portal updating on screen as the agent acts.

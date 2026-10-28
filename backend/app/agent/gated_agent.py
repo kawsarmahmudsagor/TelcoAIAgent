@@ -180,11 +180,19 @@ def jev_judge(
     url = turn_judge.decisions_url(settings.openrouter_base_url)
     timeout_s = settings.turn_judge_timeout_ms / 1000
 
-    async def _judge(text: str, bot_state: BotState, route: bool = False) -> Judgement:
+    async def _judge(
+        text: str, bot_state: BotState, route: bool = False, speaking: str = ""
+    ) -> Judgement:
         lookup = router and route
+        history = _recent_exchanges(session)
+        # What the agent is saying right now joins the history only once it
+        # stops: without it "দুইটা দেখান" over a list of packages reads as
+        # garble (run_27: 0.12).
+        if speaking.strip() and not (history and history[-1].text == speaking):
+            history.append(Exchange("assistant", f"{speaking.strip()} …"))
         payload = turn_judge.build_request(
             settings.turn_judge_model,
-            _recent_exchanges(session),
+            history,
             text,
             bot_state,
             turn_gate.address_form(text),
@@ -345,6 +353,10 @@ class TurnGateController:
     on_filler: Callable[[str, float | None, float], None] | None = None
     # (user message id, line): stores the filler after its turn (transcript).
     on_filler_store: Callable[[str, str], None] | None = None
+    # (line) for a filler said in front of the reply (with_filler): its
+    # transcription is held back from the reply's, so the browser is sent it
+    # this way, as session.say's fillers reach it on their own.
+    on_filler_shown: Callable[[str], None] | None = None
     # (handed_off) for each turn the small model takes (run_log).
     on_fast: Callable[[bool], None] | None = None
     # What became of speech over the agent: paused, resumed, interrupted,
@@ -1022,6 +1034,8 @@ class TurnGateController:
                     self._filler_spoken(
                         done.message_id, done.text, line, self.clock() - done.started
                     )
+                    if self.on_filler_shown is not None:
+                        self.on_filler_shown(line)
                     yield line
                     yield FlushSentinel()
                 try:
@@ -1136,7 +1150,11 @@ class TurnGateController:
         if task is None:
             if len(self._judged) > 64:
                 self._judged.clear()
-            task = asyncio.ensure_future(self.judge(text, bot_state, route=True))
+            # Over the agent, Jev also hears what it is saying (jev_judge).
+            speaking = self._bot_texts[-1] if bot_state != "listening" else ""
+            task = asyncio.ensure_future(
+                self.judge(text, bot_state, route=True, speaking=speaking)
+            )
             self._judged[key] = task
         return task
 

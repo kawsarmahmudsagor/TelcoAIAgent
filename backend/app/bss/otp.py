@@ -24,12 +24,13 @@ OTP_TTL = timedelta(minutes=3)
 MAX_ATTEMPTS = 3
 MAX_CODES_PER_WINDOW = 5
 CODE_WINDOW = timedelta(minutes=15)
-_BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
+# Bengali digits -> ASCII, for anything the customer or the model writes in them.
+BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 
 
 def normalise_code(raw: str) -> str:
     """Bengali digits -> ASCII; everything but digits dropped ('১২৩ ৪৫৬' -> '123456')."""
-    return "".join(c for c in raw.translate(_BENGALI_DIGITS) if c in "0123456789")
+    return "".join(c for c in raw.translate(BENGALI_DIGITS) if c in "0123456789")
 
 
 def _sha256(text: str) -> str:

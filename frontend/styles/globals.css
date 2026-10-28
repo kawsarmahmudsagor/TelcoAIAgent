@@ -11,7 +11,7 @@
 @custom-variant narrow (@media (max-width: 390px));
 
 /*
- * telco. design tokens (spec 6.6; values from the reference UI, telco_dashboard.html).
+ * telco design tokens (spec 6.6; values from the reference UI, telco_dashboard.html).
  *
  * Indigo (#4f46e5) is the brand and the primary action; brand2 (#756cf6) is its lighter partner
  * and the primary in dark mode. Mint, orange and red are the data/status accents. The shadcn
@@ -111,7 +111,7 @@
   /* Default border colour for every element (`* { border-color }` below). */
   --hairline: var(--border);
 
-  /* `brass` is the admin dashboard's warm highlight; in telco. it is the orange accent. */
+  /* `brass` is the admin dashboard's warm highlight; in telco it is the orange accent. */
   --brass: var(--orange);
   --brass-foreground: #4a3328;
   --success: #0d9b79;

@@ -19,7 +19,7 @@ PREFIX = "telco KB: "
 DOC_COUNT = 13
 
 # The KB was written from a real operator's public pages; the bot must only ever
-# speak as telco., so none of its names, products, numbers or addresses may stay.
+# speak as telco, so none of its names, products, numbers or addresses may stay.
 OTHER_BRANDS = re.compile(
     r"banglalink|mybl|toffee|veon|ryze|tigers?'? den|monobrand|desh ek rate"
     r"|grameenphone|robi|airtel|teletalk|1911304121|01950\s?111|\*121\*",
@@ -72,4 +72,4 @@ def test_docs_speak_only_as_telco():
         text = doc.read_text(encoding="utf-8")
         assert not OTHER_BRANDS.findall(text), (doc.name, OTHER_BRANDS.findall(text))
         assert not real_estate_words(text), (doc.name, real_estate_words(text))
-        assert "telco." in text, doc.name
+        assert "telco" in text, doc.name

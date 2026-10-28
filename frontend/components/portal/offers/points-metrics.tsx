@@ -18,7 +18,7 @@ export function PointsMetrics({ data }: { data: OffersAndPoints }) {
       <MetricTile
         icon={GiftIcon}
         tone="purple"
-        label="telco. reward points"
+        label="telco reward points"
         value={
           <>
             {pts(points)}

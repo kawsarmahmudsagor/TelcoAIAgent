@@ -101,7 +101,7 @@ Spec 5.1: rename `agency_name` → `operator_name`, add `greeting_nudge`, drop `
 - Test: `tests/test_agent_config.py`, `tests/test_build_llm.py`, `tests/test_voice_preview.py`, `tests/test_greeting_guard.py`, `tests/test_prompts.py`, `tests/test_speech_numbers.py:109`
 
 **Interfaces:**
-- Produces: `ResolvedAgentConfig.operator_name / operator_phone / operator_address / greeting_nudge`; no `agency_*`, `greeting_coldcall`, `greeting_followup`. Settings `database_url` default becomes `postgresql+psycopg://telco:telco@localhost:5435/telco` (leftover). Settings `operator_name="telco."`, `operator_phone="01700121121"`, `operator_address="telco. Experience Centre, Gulshan Avenue, Dhaka 1212"` (env `OPERATOR_NAME`, `OPERATOR_PHONE`, `OPERATOR_ADDRESS`). `PLACEHOLDERS`:
+- Produces: `ResolvedAgentConfig.operator_name / operator_phone / operator_address / greeting_nudge`; no `agency_*`, `greeting_coldcall`, `greeting_followup`. Settings `database_url` default becomes `postgresql+psycopg://telco:telco@localhost:5435/telco` (leftover). Settings `operator_name="telco"`, `operator_phone="01700121121"`, `operator_address="telco Experience Centre, Gulshan Avenue, Dhaka 1212"` (env `OPERATOR_NAME`, `OPERATOR_PHONE`, `OPERATOR_ADDRESS`). `PLACEHOLDERS`:
   - `prompt_identity_rules`: `{"agent_name", "operator_name", "current_date", "timezone", "knowledge_scope"}`
   - `greeting_inbound`: `{"agent_name", "operator_name", "customer_name"}`
   - `greeting_nudge`: `{"agent_name", "operator_name", "customer_name", "nudge_text"}`

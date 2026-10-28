@@ -83,7 +83,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         href="/dashboard"
         onClick={onNavigate}
-        aria-label="telco. control center"
+        aria-label="telco control center"
         className={cn('self-start rounded-md px-2.5', FOCUS)}
       >
         <TelcoBrand />

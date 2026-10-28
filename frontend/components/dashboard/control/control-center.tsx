@@ -36,7 +36,7 @@ export function ControlCenter() {
           <h1 className="phone:text-[22px] text-[26px] font-extrabold tracking-[-0.8px]">
             Operations control center
           </h1>
-          <p className="mt-1 text-xs text-white/80">Live overview of the telco. environment.</p>
+          <p className="mt-1 text-xs text-white/80">Live overview of the telco environment.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           {data && (

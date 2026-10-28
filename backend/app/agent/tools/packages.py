@@ -10,7 +10,15 @@ from sqlalchemy.orm import Session
 
 from app.agent import actions
 from app.agent.telco_format import format_amount, format_data
-from app.agent.tools._common import error_text, parse_enum, run_db, run_read, run_write
+from app.agent.tools._common import (
+    LISTED,
+    error_text,
+    listed,
+    parse_enum,
+    run_db,
+    run_read,
+    run_write,
+)
 from app.agent.topics import PACKAGES, publish
 from app.agent.userdata import SessionUserdata
 from app.bss import accounts, packages
@@ -75,9 +83,7 @@ def _search_text(found: list[PackageView]) -> str:
     if not found:
         return "No packages match. Offer to widen the search (higher price or fewer filters)."
     lines = [f"{len(found)} matching packages, cheapest first:"]
-    lines += [f"- {describe_package(p)}." for p in found[:_DETAIL]]
-    if len(found) > _DETAIL:
-        lines.append(f"{len(found) - _DETAIL} more not listed; offer to narrow the search.")
+    lines += listed([f"- {describe_package(p)}." for p in found[:LISTED]], len(found))
     return "\n".join(lines)
 
 
@@ -136,7 +142,8 @@ async def run_purchase_package(
         channel = parse_enum(TxnChannel, pay_from)
         if channel is None:
             raise InvalidRequest("pay_from is required")
-        req = PurchaseRequest(package_code=package_code.strip(), pay_from=channel)
+        # Codes are upper case ("D8-7D"); the model may write "d8-7d".
+        req = PurchaseRequest(package_code=package_code.strip().upper(), pay_from=channel)
         try:
             return await actions.start_action(userdata, "purchase", req)
         except InsufficientBalance as err:
@@ -158,7 +165,7 @@ async def search_packages(
     validity_days: int | None = None,
 ) -> str:
     """Search the active package catalogue (works for anyone, no login needed).
-    Returns the cheapest matches first; only the first three are described.
+    Returns up to ten matches, cheapest first; read them out three at a time.
 
     Args:
         kind: Optional: "data", "voice", "bundle" or "sms".

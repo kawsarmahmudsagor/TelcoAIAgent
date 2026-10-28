@@ -94,7 +94,7 @@ def test_low_data(bss_world):
     sub = bss_world.subscriber(reward_points=0)
     pkg = bss_world.package(kind=PackageKind.data, data_mb=1024)
     bss_world.subscription(sub, pkg, data_left_mb=120, expires_in_days=10)
-    assert _highlights(bss_world, sub) == ["Only 120 MB data left across their packs."]
+    assert _highlights(bss_world, sub) == ["Only 120 MB data left across their packages."]
 
 
 def test_balance_below_last_bought_pack(bss_world):
@@ -171,7 +171,7 @@ def test_snapshot_carries_the_highlights(bss_world):
     pkg = bss_world.package(kind=PackageKind.data, data_mb=1024)
     bss_world.subscription(sub, pkg, data_left_mb=120, expires_in_days=10)
     text = load_snapshot(sub.id)
-    assert text.endswith(highlights.block(["Only 120 MB data left across their packs."]))
+    assert text.endswith(highlights.block(["Only 120 MB data left across their packages."]))
 
 
 def test_points_note_says_whether_points_buy_anything(bss_world):

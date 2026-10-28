@@ -40,7 +40,7 @@ export function SmsCard({
   return (
     <div
       role="status"
-      aria-label={`Text message to ${to}: telco. OTP ${code}`}
+      aria-label={`Text message to ${to}: telco OTP ${code}`}
       className="bg-toast text-toast-foreground w-[min(340px,calc(100vw-32px))] rounded-[18px] p-3.5 shadow-[0_18px_44px_#0b102040] ring-1 ring-white/10"
     >
       <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export function SmsCard({
         </button>
       </div>
       <p className="mt-2 pl-[30px] text-[13px] leading-snug">
-        telco. OTP:{' '}
+        telco OTP:{' '}
         <strong className="text-[15px] font-extrabold tracking-[0.12em] tabular-nums select-all">
           {code}
         </strong>{' '}

@@ -9,13 +9,11 @@ from livekit.agents import RunContext, function_tool
 
 from app.agent.actions import CaseDraft
 from app.agent.telco_format import format_day
-from app.agent.tools._common import parse_enum, run_db, run_read, run_write
+from app.agent.tools._common import LISTED, listed, parse_enum, run_db, run_read, run_write
 from app.agent.topics import ACCOUNT_CHANGED, CASE_CREATED, publish
 from app.agent.userdata import SessionUserdata
 from app.bss import cases
 from app.models.telco import CasePriority, CaseSource
-
-_DETAIL = 3
 
 
 async def _publish_case(userdata: SessionUserdata, case) -> None:
@@ -35,20 +33,21 @@ async def _publish_case(userdata: SessionUserdata, case) -> None:
 
 async def run_get_case_status(userdata: SessionUserdata, ref: str | None = None) -> str:
     def build(db, sid):
-        rows = cases.get_case_status(db, sid, ref=ref)
+        rows = cases.get_case_status(db, sid, ref=ref, limit=LISTED)
         if not rows:
             return "The customer has no support cases."
-        lines = [f"{len(rows)} support case(s):"]
-        for c in rows[:_DETAIL]:
+        total = len(rows) if ref else cases.count_cases(db, sid)
+        lines = [f"{total} support case(s), open ones first:"]
+        found = []
+        for c in rows:
             line = (
                 f"- {c.ref}: {c.category}, {c.status.value.replace('_', ' ')}, "
                 f"opened {format_day(c.created_at)}, last update {format_day(c.updated_at)}"
             )
             if c.resolved_at:
                 line += f", resolved {format_day(c.resolved_at)}"
-            lines.append(line + f". Issue: {c.description}")
-        if len(rows) > _DETAIL:
-            lines.append(f"{len(rows) - _DETAIL} more not listed.")
+            found.append(line + f". Issue: {c.description}")
+        lines += listed(found, total)
         return "\n".join(lines)
 
     return await run_read(userdata, build, verify=True)

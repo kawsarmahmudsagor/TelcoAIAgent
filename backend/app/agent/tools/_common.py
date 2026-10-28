@@ -104,6 +104,27 @@ async def run_db(fn: Callable[[Session], T]) -> T:
 E = TypeVar("E", bound=Enum)
 
 
+# A list tool hands the model up to LISTED items and asks it to read out
+# READ_OUT at a time, so "any others?" has its answer (run_28: "2 more not
+# listed" left the agent unable to say which).
+READ_OUT = 3
+LISTED = 10
+
+
+def listed(lines: list[str], total: int) -> list[str]:
+    """`lines` (one per item, in order) cut to LISTED, with how to read them
+    out; past LISTED, the rest are only counted."""
+    out = lines[:LISTED]
+    if total > READ_OUT:
+        out.append(
+            f"Read out {READ_OUT} at a time; the others above are for when the customer asks "
+            "for more."
+        )
+    if total > LISTED:
+        out.append(f"{total - LISTED} more not listed; offer to narrow it down.")
+    return out
+
+
 def parse_enum(enum_cls: type[E], value: str | None) -> E | None:
     """The enum member named by an LLM-supplied string; unknown -> InvalidRequest."""
     if value is None or value == "":

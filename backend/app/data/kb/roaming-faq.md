@@ -2,7 +2,7 @@
 
 ## English
 
-Q: Do I need to activate roaming? Yes. International roaming is off by default. Prepaid customers need a main balance of at least 500 taka, and postpaid customers need to have no overdue bill. Call the hotline 01700121121 or visit the telco. Experience Centre in Gulshan, Dhaka at least one day before you travel.
+Q: Do I need to activate roaming? Yes. International roaming is off by default. Prepaid customers need a main balance of at least 500 taka, and postpaid customers need to have no overdue bill. Call the hotline 01700121121 or visit the telco Experience Centre in Gulshan, Dhaka at least one day before you travel.
 
 Q: What is charged? Outgoing calls, incoming calls, SMS and mobile data are all charged at roaming rates, which depend on the country. Local packs such as 15 GB Monthly or the Smart 15 GB + 300 min bundle do not work abroad, so your data and minutes are not used up while you roam.
 
@@ -14,7 +14,7 @@ Q: Lost phone abroad? Call the hotline to block your SIM.
 
 ## বাংলা
 
-প্রশ্ন: রোমিং কি চালু করে নিতে হয়? হ্যাঁ। ইন্টারন্যাশনাল রোমিং শুরুতে বন্ধ থাকে। প্রিপেইড হলে মেইন ব্যালেন্সে অন্তত ৫০০ টাকা থাকতে হবে, আর পোস্টপেইড হলে কোনো বকেয়া বিল থাকা যাবে না। যাওয়ার অন্তত একদিন আগে হটলাইন ০১৭০০১২১১২১-এ কল করুন, বা ঢাকার গুলশানে telco. এক্সপেরিয়েন্স সেন্টারে আসুন।
+প্রশ্ন: রোমিং কি চালু করে নিতে হয়? হ্যাঁ। ইন্টারন্যাশনাল রোমিং শুরুতে বন্ধ থাকে। প্রিপেইড হলে মেইন ব্যালেন্সে অন্তত ৫০০ টাকা থাকতে হবে, আর পোস্টপেইড হলে কোনো বকেয়া বিল থাকা যাবে না। যাওয়ার অন্তত একদিন আগে হটলাইন ০১৭০০১২১১২১-এ কল করুন, বা ঢাকার গুলশানে telco এক্সপেরিয়েন্স সেন্টারে আসুন।
 
 প্রশ্ন: কীসে কীসে চার্জ লাগে? কল করা, কল আসা, এসএমএস আর মোবাইল ডাটা, সবকিছুতেই দেশ অনুযায়ী রোমিং রেটে চার্জ লাগে। ১৫ জিবি মান্থলি বা স্মার্ট ১৫ জিবি + ৩০০ মিনিটের মতো লোকাল প্যাক বিদেশে চলে না, তাই রোমিংয়ের সময় প্যাকের ডাটা বা মিনিট খরচ হয় না।
 

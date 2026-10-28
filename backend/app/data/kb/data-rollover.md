@@ -2,7 +2,7 @@
 
 ## English
 
-telco. packs do not have data rollover. Unused data, minutes and SMS from a pack are lost when that pack expires, and they are never added to a later pack.
+telco packs do not have data rollover. Unused data, minutes and SMS from a pack are lost when that pack expires, and they are never added to a later pack.
 
 How validity works: every pack keeps its own validity, counted from the moment it was activated. For example, 8 GB Weekly (D8-7D) lasts 7 days and 15 GB Monthly (D15-30D) lasts 30 days. If you buy the same pack again before it expires, the new purchase is a separate pack with its own fresh validity. Your leftover data stays in the old pack and expires with it. Nothing is merged or carried over.
 
@@ -12,11 +12,11 @@ Check your balance: you can see the remaining data, minutes, SMS and expiry date
 
 Bonus data: the 1 GB bonus from reward points (700 points, valid 3 days) is also a pack with its own expiry and does not roll over.
 
-More help: telco. hotline 01700121121.
+More help: telco hotline 01700121121.
 
 ## বাংলা
 
-telco.-এর প্যাকে ডাটা রোলওভার নেই। প্যাকের মেয়াদ শেষ হলে যে ডাটা, মিনিট আর এসএমএস বাকি থাকে, সেগুলো চলে যায়, পরের প্যাকে যোগ হয় না।
+telco-এর প্যাকে ডাটা রোলওভার নেই। প্যাকের মেয়াদ শেষ হলে যে ডাটা, মিনিট আর এসএমএস বাকি থাকে, সেগুলো চলে যায়, পরের প্যাকে যোগ হয় না।
 
 মেয়াদ যেভাবে চলে: প্রতিটা প্যাকের নিজের মেয়াদ, চালু হওয়ার সময় থেকে গোনা হয়। যেমন ৮ জিবি উইকলি (D8-7D) চলে ৭ দিন, আর ১৫ জিবি মান্থলি (D15-30D) চলে ৩০ দিন। মেয়াদ শেষের আগে একই প্যাক আবার কিনলে নতুনটা আলাদা প্যাক হিসেবে নতুন মেয়াদে চালু হয়। আগের প্যাকের বাকি ডাটা আগের প্যাকেই থাকে, আর ওটার সাথেই শেষ হয়ে যায়। কিছু যোগ হয় না, কিছু জমেও না।
 
@@ -26,4 +26,4 @@ telco.-এর প্যাকে ডাটা রোলওভার নেই।
 
 বোনাস ডাটা: রিওয়ার্ড পয়েন্টের ১ জিবি বোনাস (৭০০ পয়েন্ট, মেয়াদ ৩ দিন) নিজের মেয়াদের আলাদা প্যাক, এটাও রোলওভার হয় না।
 
-আরও কিছু জানতে telco. হটলাইন ০১৭০০১২১১২১।
+আরও কিছু জানতে telco হটলাইন ০১৭০০১২১১২১।

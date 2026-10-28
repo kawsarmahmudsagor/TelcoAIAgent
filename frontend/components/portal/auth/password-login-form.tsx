@@ -67,7 +67,7 @@ export function PasswordLoginForm({ next }: { next: string }) {
 
       <p className="text-muted-foreground flex flex-wrap justify-between gap-2 text-sm">
         <span>
-          New to telco.? <AuthLink href={`/signup${query}`}>Create an account</AuthLink>
+          New to telco? <AuthLink href={`/signup${query}`}>Create an account</AuthLink>
         </span>
         <AuthLink href={`/reset${query}`}>Forgot password?</AuthLink>
       </p>

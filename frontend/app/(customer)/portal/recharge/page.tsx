@@ -35,7 +35,7 @@ export default function PortalRechargePage() {
           <Panel>
             <PanelHeader
               title="Need help with a recharge?"
-              description="If your balance wasn’t updated after a successful payment, telco. AI can check the transaction for you."
+              description="If your balance wasn’t updated after a successful payment, telco AI can check the transaction for you."
               className="mb-0"
             />
             <LinkButton

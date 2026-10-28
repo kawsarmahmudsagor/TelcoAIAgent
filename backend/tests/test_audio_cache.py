@@ -26,20 +26,16 @@ def test_a_saved_line_is_found_again_and_survives_a_restart(tmp_path):
     assert item.pcm_data == _PCM
 
 
-def test_a_near_line_on_the_same_topic_is_reused(tmp_path):
+def test_only_the_same_words_are_reused(tmp_path):
     cache = _cache(tmp_path)
-    cache.save("জি, ডাটা প্যাকগুলো দেখছি।", _PCM, 24000, 1, _VOICE)
-    match = cache.find("ডাটা প্যাকগুলো দেখছি।", _VOICE, 24000)
-    assert match is not None and match[1] < 1.0
-
-
-def test_a_line_on_another_topic_or_with_other_digits_is_never_reused(tmp_path):
-    cache = _cache(tmp_path)
-    cache.save("ডাটা প্যাকগুলো দেখছি।", _PCM, 24000, 1, _VOICE)
-    cache.save("৫০ টাকার মধ্যে, দেখছি।", _PCM, 24000, 1, _VOICE)
-    assert cache.find("মিনিট প্যাকগুলো দেখছি।", _VOICE, 24000) is None
-    assert cache.find("৬০ টাকার মধ্যে, দেখছি।", _VOICE, 24000) is None
-    assert cache_entities("ডাটা প্যাক") != cache_entities("মিনিট প্যাক")
+    cache.save("ঠিক আছে, ডাটা প্যাকেজগুলো চেক করছি।", _PCM, 24000, 1, _VOICE)
+    cache.save("৫০ টাকার মধ্যে, চেক করছি।", _PCM, 24000, 1, _VOICE)
+    # run_26: this line, 0.84 similar, played the line before it again.
+    assert cache.find("ওকে, ডাটা প্যাকেজগুলো বের করছি।", _VOICE, 24000) is None
+    assert cache.find("ডাটা প্যাকেজগুলো চেক করছি।", _VOICE, 24000) is None
+    assert cache.find("মিনিট প্যাকেজগুলো চেক করছি।", _VOICE, 24000) is None
+    assert cache.find("৬০ টাকার মধ্যে, চেক করছি।", _VOICE, 24000) is None
+    assert cache_entities("ডাটা প্যাকেজ") != cache_entities("মিনিট প্যাকেজ")
 
 
 def test_another_voice_or_sample_rate_is_never_reused(tmp_path):

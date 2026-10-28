@@ -227,7 +227,7 @@ def test_a_text_start_prompt_answers_cold():
 
 def test_greeting_defaults_fit_the_operator():
     assert "{nudge_text}" in DEFAULT_GREETING_NUDGE
-    assert len(SPOKEN_GREETINGS_INBOUND) == 3
+    assert len(SPOKEN_GREETINGS_INBOUND) == 2
     assert all("{customer_name}" in line for line in SPOKEN_GREETINGS_INBOUND)
     assert len(SPOKEN_GREETINGS_GUEST) == 2
     assert not any("{customer_name}" in line for line in SPOKEN_GREETINGS_GUEST)

@@ -6,13 +6,13 @@ audio is kept on disk (storage/audio_cache/quick_responses/: one WAV each, plus
 index.json) and in memory, and a repeat plays at once with no TTS request.
 
 Only filler lines are cached (AudioCachingTTS's `cacheable`): a reply sentence
-carries the customer's balance, data left or a price, and a near match there
-would say the wrong number. A near match between fillers is fine ("জি, একটু চেক
-করছি।" for "জি, চেক করছি।"), but never across topics or digits: a data pack line
-never stands in for a minute pack line (cache_entities).
+carries the customer's balance, data left or a price. A line plays only its own
+audio, never a similar line's: the fillers vary their opener and verb on
+purpose, and "ওকে, ডাটা প্যাকেজগুলো বের করছি।" played from "ঠিক আছে, ডাটা
+প্যাকেজগুলো চেক করছি।" says the last turn's line again (run_26). Every
+template line is cached after it is first said.
 """
 
-import difflib
 import hashlib
 import json
 import logging
@@ -29,8 +29,6 @@ from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, tts, 
 
 logger = logging.getLogger("agent.audio_cache")
 
-# A near match must be at least this similar (difflib ratio, 0-1).
-MIN_SIMILARITY = 0.82
 # Lines longer than this are never fillers (quick_reply.FILLER_MAX_WORDS is 12).
 MAX_WORDS = 14
 # Enough for every template line in a few voices; new lines stop being saved after it.
@@ -39,7 +37,7 @@ MAX_ENTRIES = 400
 _PUNCT_RE = re.compile(r"[।,.?!\-\"':;()\[\]–—]")
 _DIGITS_RE = re.compile(r"\d+")  # Bangla digits too
 
-# What a line is about: two lines that differ here are never swapped.
+# What a line is about, kept with each entry in index.json for reading it.
 _TOPIC_PATTERNS = [
     ("data", re.compile(r"ডাটা|ডেটা|ইন্টারনেট|নেট|\bdata\b|\binternet\b", re.I)),
     ("voice", re.compile(r"মিনিট|টকটাইম|\bminutes?\b|\bvoice\b|\btalk", re.I)),
@@ -63,7 +61,7 @@ def normalize_text(text: str) -> str:
 
 
 def cache_entities(text: str) -> list[str]:
-    """The line's topics and digits: a near match must have the same ones."""
+    """The line's topics and digits."""
     found = [name for name, pattern in _TOPIC_PATTERNS if pattern.search(text)]
     found += [f"n{d}" for d in _DIGITS_RE.findall(text)]
     return sorted(found)
@@ -137,31 +135,22 @@ class AudioCache:
             logger.warning("could not save the audio cache index: %s", exc)
 
     def find(
-        self, text: str, voice_key: str, sample_rate: int, min_similarity: float = MIN_SIMILARITY
+        self, text: str, voice_key: str, sample_rate: int
     ) -> tuple[CachedAudio, float] | None:
-        """The cached line for `text`: the same words, else the most similar one
-        above min_similarity with the same topics and digits. Same voice and
-        sample rate only."""
+        """The cached line with the same words as `text` (punctuation and case
+        aside), in the same voice and sample rate, and its similarity (1.0)."""
         norm = normalize_text(text)
         if not norm:
             return None
-        entities = cache_entities(text)
         with self._lock:
-            candidates = [
-                item
-                for item in self._entries
-                if item.voice_key == voice_key
-                and item.sample_rate == sample_rate
-                and item.entities == entities
-            ]
-        best: tuple[CachedAudio, float] | None = None
-        for item in candidates:
-            if item.normalized_text == norm:
-                return item, 1.0
-            ratio = difflib.SequenceMatcher(None, norm, item.normalized_text).ratio()
-            if ratio >= min_similarity and (best is None or ratio > best[1]):
-                best = (item, ratio)
-        return best
+            for item in self._entries:
+                if (
+                    item.normalized_text == norm
+                    and item.voice_key == voice_key
+                    and item.sample_rate == sample_rate
+                ):
+                    return item, 1.0
+        return None
 
     def has_line(self, text: str) -> bool:
         """Whether these exact words are cached, in any voice."""

@@ -5,12 +5,10 @@ from __future__ import annotations
 from livekit.agents import RunContext, function_tool
 
 from app.agent.telco_format import format_amount, format_day
-from app.agent.tools._common import parse_enum, run_read
+from app.agent.tools._common import LISTED, listed, parse_enum, run_read
 from app.agent.userdata import SessionUserdata
 from app.bss import transactions
 from app.models.telco import TxnStatus, TxnType
-
-_DETAIL = 3
 
 
 async def run_lookup_transactions(
@@ -21,18 +19,16 @@ async def run_lookup_transactions(
     days: int = 30,
 ) -> str:
     def build(db, sid):
-        rows = transactions.lookup(
-            db,
-            sid,
-            type=parse_enum(TxnType, type),
-            status=parse_enum(TxnStatus, status),
-            ref=ref,
-            days=days,
+        filters = dict(
+            type=parse_enum(TxnType, type), status=parse_enum(TxnStatus, status), ref=ref, days=days
         )
+        rows = transactions.lookup(db, sid, limit=LISTED, **filters)
         if not rows:
             return "No matching transactions found."
-        lines = [f"{len(rows)} transactions, newest first:"]
-        for t in rows[:_DETAIL]:
+        total = transactions.count(db, sid, **filters)
+        lines = [f"{total} transactions, newest first:"]
+        found = []
+        for t in rows:
             # The type word appears once: "purchase <package>, ৳ 120" or
             # "recharge of ৳ 200".
             if t.package_name:
@@ -49,9 +45,8 @@ async def run_lookup_transactions(
                 line += f", to {t.target_msisdn[:3]}••••{t.target_msisdn[-4:]}"
             if t.failure_reason:
                 line += f", failure reason: {t.failure_reason}"
-            lines.append(line + ".")
-        if len(rows) > _DETAIL:
-            lines.append(f"{len(rows) - _DETAIL} more not listed.")
+            found.append(line + ".")
+        lines += listed(found, total)
         return "\n".join(lines)
 
     return await run_read(userdata, build, verify=True)
@@ -71,7 +66,8 @@ async def lookup_transactions(
     Args:
         type: Optional: "recharge", "purchase" or "redeem".
         status: Optional: "success", "pending" or "failed".
-        ref: Optional transaction reference such as "TXN-840221"; ignores days.
+        ref: Optional transaction reference such as "TXN-840221" (or just its
+            digits); ignores days.
         days: How many days back to look (default 30).
     """
     return await run_lookup_transactions(ctx.userdata, type, status, ref, days)

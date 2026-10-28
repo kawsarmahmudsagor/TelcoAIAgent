@@ -78,10 +78,23 @@ def strip_sound_tags(text: str) -> str:
     return _SOUND_TAG.sub(" ", text)
 
 
+# After a number the STT hears জিবি (GB) as জীবি or জীবিত ("alive"): "দুই
+# জীবিতটা দেখান" for "দুই জিবিরটা দেখান" (run_27), which Jev took for garble.
+_MISHEARD_GB_RE = re.compile(
+    r"((?:[০-৯0-9]+|এক|দুই|দু|তিন|চার|পাঁচ|সাত|আট|দশ|বারো|পনেরো|বিশ|পঁচিশ|ত্রিশ|চল্লিশ|পঞ্চাশ)"
+    r"\s*)জীবি(ত|র)?"
+)
+
+
+def _fix_misheard_gb(m: re.Match[str]) -> str:
+    return m.group(1) + ("জিবির" if m.group(2) else "জিবি")
+
+
 def clean_transcript(text: str) -> str:
     """The words only, as the agent and the transcript should see them:
-    "হ্যাঁ, আমি কালকে আসছি। [গলা ঝারার শব্দ]" -> "হ্যাঁ, আমি কালকে আসছি।"."""
-    return " ".join(strip_sound_tags(text).split())
+    "হ্যাঁ, আমি কালকে আসছি। [গলা ঝারার শব্দ]" -> "হ্যাঁ, আমি কালকে আসছি।", and
+    "দুই জীবিতটা" -> "দুই জিবিরটা"."""
+    return _MISHEARD_GB_RE.sub(_fix_misheard_gb, " ".join(strip_sound_tags(text).split()))
 
 
 def is_sound_only(text: str) -> bool:

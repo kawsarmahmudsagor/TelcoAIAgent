@@ -44,7 +44,7 @@ def test_every_district_of_bangladesh_is_mapped():
         ("মিরপুর", "Mirpur care centre"),
         ("Tongi", "Uttara care centre"),
         ("Savar", "Mirpur care centre"),
-        ("Gulshan", "telco. Experience Centre"),
+        ("Gulshan", "telco Experience Centre"),
         ("Narayangonj", "Motijheel care centre"),
         ("Mymensing", "Ganginarpar care centre"),  # misspelt
     ],

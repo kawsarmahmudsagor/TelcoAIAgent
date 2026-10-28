@@ -33,9 +33,9 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'telco.',
-  pageTitle: 'telco. assistant',
-  pageDescription: 'telco. self-care portal and AI assistant (demo)',
+  companyName: 'telco',
+  pageTitle: 'telco assistant',
+  pageDescription: 'telco self-care portal and AI assistant (demo)',
 
   supportsChatInput: true,
   supportsVideoInput: false,

@@ -336,3 +336,11 @@ def test_phone_numbers_not_dropped_as_filler():
     v = decide(pre, 0.46, stt_writes_bengali=True, state=GateState(), now=0.0)
     assert v is Verdict.ACCEPT
 
+
+
+def test_gb_misheard_after_a_number_is_mended():
+    # run_27: the STT wrote জিবি (GB) as জীবিত ("alive").
+    assert turn_gate.clean_transcript("দুই জীবিতটা দেখান") == "দুই জিবিরটা দেখান"
+    assert turn_gate.clean_transcript("৫ জীবি প্যাক আছে?") == "৫ জিবি প্যাক আছে?"
+    # Not after a number, it is the word itself.
+    assert turn_gate.clean_transcript("সবাই জীবিত আছে") == "সবাই জীবিত আছে"

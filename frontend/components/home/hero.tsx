@@ -17,7 +17,7 @@ const CHAT: Line[] = [
   { from: 'ai', text: 'I’ve sent a code to your phone. Enter it to renew the pack for ৳ 299.' },
 ];
 
-/** The indigo hero: what My telco. does, the account action, and a sample assistant chat. */
+/** The indigo hero: what My telco does, the account action, and a sample assistant chat. */
 export function Hero({ me }: { me: SignedIn }) {
   return (
     <section
@@ -49,7 +49,7 @@ export function Hero({ me }: { me: SignedIn }) {
             ) : (
               <LinkButton href="/signin" variant="white" className="min-h-11 px-5 text-sm">
                 <LogInIcon aria-hidden="true" />
-                Log in to My telco.
+                Log in to My telco
               </LinkButton>
             )}
             <LinkButton href="#packs" variant="glass" className="min-h-11 px-5 text-sm">

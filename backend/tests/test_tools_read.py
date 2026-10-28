@@ -83,9 +83,23 @@ def test_search_packages_filters_and_caps_detail(bss_world):
     out = asyncio.run(
         packages.run_search_packages(_ud(), kind="data", max_price=60, validity_days=17)
     )
-    assert out.count("- PYTEST Data") == 3
-    assert "2 more" in out
+    # All five reach the model, so "any others?" has an answer (run_28); it
+    # reads out three at a time.
+    assert out.count("- PYTEST Data") == 5
+    assert "Read out 3 at a time" in out
+    assert "more not listed" not in out
     assert "PYTEST Dead" not in out and "PYTEST Voice" not in out
+
+
+def test_search_packages_lists_ten_and_counts_the_rest(bss_world):
+    for i in range(12):
+        bss_world.package(
+            name=f"PYTEST Bulk {i}", kind=PackageKind.data, data_mb=1024, price=Decimal(50 + i),
+            validity_days=19,
+        )
+    out = asyncio.run(packages.run_search_packages(_ud(), kind="data", validity_days=19))
+    assert out.count("- PYTEST Bulk") == 10
+    assert "2 more not listed" in out
 
 
 def _capture(monkeypatch) -> list[tuple[str, dict]]:
@@ -185,8 +199,19 @@ def test_no_cases_text(bss_world):
 def test_bad_period_maps_invalid_request(bss_world):
     sub = bss_world.subscriber()
     with pytest.raises(ToolError) as e:
-        asyncio.run(account.run_get_usage_breakdown(_ud(sub), period_days=14))
+        asyncio.run(account.run_get_usage_breakdown(_ud(sub), period_days=91))
     assert str(e.value) == ERROR_TEXT["invalid_request"]
+
+
+def test_usage_today_and_any_period(bss_world):
+    from app.models.telco import UsageKind
+
+    sub = bss_world.subscriber()
+    bss_world.usage(sub, UsageKind.data, 1024)
+    out = asyncio.run(account.run_get_usage_breakdown(_ud(sub), 1, "data"))
+    assert out.startswith("Usage today:") and "Heaviest data day" not in out
+    out = asyncio.run(account.run_get_usage_breakdown(_ud(sub), 3, "data"))
+    assert out.startswith("Usage in the last 3 days:")
 
 
 def test_bad_enum_maps_invalid_request(bss_world):
@@ -240,12 +265,75 @@ def test_reads_scoped_to_session_subscriber(bss_world):
     assert tb.ref not in out
 
 
-def test_transactions_cap_detail(bss_world):
+def test_transactions_list_ten_with_the_real_count(bss_world):
+    # "আগের রিচার্জগুলো?" needs them all, and 12 is not "10 transactions".
     sub = bss_world.subscriber()
-    for _ in range(5):
+    for _ in range(12):
         _txn(bss_world, sub)
     out = asyncio.run(transactions.run_lookup_transactions(_ud(sub)))
-    assert out.count("- TXN-") == 3 and "2 more" in out
+    assert out.startswith("12 transactions")
+    assert out.count("- TXN-") == 10
+    assert "Read out 3 at a time" in out and "2 more not listed" in out
+
+
+@pytest.mark.parametrize("said", ["txn {n}", "TXN{n}", " TXN-{n} ", "{n}"])
+def test_transaction_ref_however_said(bss_world, said):
+    sub = bss_world.subscriber()
+    row = _txn(bss_world, sub)
+    digits = row.ref.removeprefix("TXN-")
+    out = asyncio.run(transactions.run_lookup_transactions(_ud(sub), ref=said.format(n=digits)))
+    assert out.startswith("1 transactions") and row.ref in out
+
+
+def test_deductions_list_them_all(bss_world):
+    from app.models.telco import UsageKind
+
+    sub = bss_world.subscriber()
+    for i in range(5):
+        bss_world.usage(sub, UsageKind.voice, 1, charge=10 + i)
+    out = asyncio.run(account.run_explain_deductions(_ud(sub), 7))
+    assert out.startswith("5 deductions") and out.count("\n- ") == 5
+    assert "more not listed" not in out
+
+
+def test_case_status_lists_them_all_with_the_real_count(bss_world, db):
+    from app.bss import cases
+    from app.models.telco import CaseSource
+
+    sub = bss_world.subscriber()
+    for i in range(7):
+        cases.create_case(
+            db, sub.id, category=f"case_{i}", description="PYTEST", source=CaseSource.agent,
+            action_id=uuid4(),
+        )
+    out = asyncio.run(support.run_get_case_status(_ud(sub)))
+    assert out.startswith("7 support case(s)") and out.count("- TC-") == 7
+
+
+@pytest.mark.parametrize(
+    ("place", "district"),
+    [("সিলেট", "PYTEST Zindabazar"), ("Sylhet", "PYTEST Zindabazar"), ("Tongi", "PYTEST Tongi")],
+)
+def test_network_by_area_or_in_bangla(bss_world, place, district):
+    # run_28 audit: "সিলেট" and "Tongi" read as all clear.
+    bss_world.incident(district="Sylhet", area="PYTEST Zindabazar")
+    bss_world.incident(district="Gazipur", area="PYTEST Gazipur Sadar")
+    bss_world.incident(district="Gazipur", area="PYTEST Tongi")
+    out = asyncio.run(network.run_check_network_status(_ud(), place))
+    assert district in out
+
+
+def test_network_area_comes_first_and_says_its_district(bss_world):
+    bss_world.incident(district="Gazipur", area="PYTEST Gazipur Sadar")
+    bss_world.incident(district="Gazipur", area="PYTEST Tongi")
+    out = asyncio.run(network.run_check_network_status(_ud(), "Tongi"))
+    assert "(Tongi is in Gazipur)" in out
+    assert out.index("PYTEST Tongi") < out.index("PYTEST Gazipur Sadar")
+
+
+def test_network_unknown_place_asks_instead_of_all_clear():
+    out = asyncio.run(network.run_check_network_status(_ud(), "Atlantis"))
+    assert "Ask which district" in out and "No network problems" not in out
 
 
 def test_transaction_text_no_repeated_type(bss_world):

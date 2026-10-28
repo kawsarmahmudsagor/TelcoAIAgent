@@ -169,3 +169,35 @@ def test_lookup_falls_back_to_confidence_and_tolerates_a_bad_answer():
 
 def test_failure_is_a_judgement_without_a_score():
     assert _judgement(lambda request: httpx.Response(500)) == Judgement(None)
+
+
+def test_over_the_agent_jev_hears_what_it_is_saying():
+    # run_27: "দুই জিবিরটা দেখান" over a list of packages, with the list not yet
+    # in the history, scored 0.12 and was dropped.
+    from types import SimpleNamespace
+
+    from app.agent import gated_agent
+
+    sent: list[dict] = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(500)
+
+    session = SimpleNamespace(history=SimpleNamespace(items=[]))
+    settings = SimpleNamespace(
+        openrouter_base_url="https://openrouter.ai/api/v1",
+        turn_judge_model="typesafe/jev-1.13",
+        turn_judge_timeout_ms=1000,
+    )
+    listing = "আমাদের কাছে ১ জিবি ২৯ টাকা, ২ জিবি ৪৯ টাকা"
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            judge_fn = gated_agent.jev_judge(session, settings, "or-key", client)
+            await judge_fn("দুই জিবিরটা দেখান", "speaking", speaking=listing)
+            await judge_fn("দুই জিবিরটা দেখান", "listening")
+
+    asyncio.run(go())
+    assert f"Assistant: {listing} …" in sent[0]["state"]
+    assert "Assistant:" not in sent[1]["state"]

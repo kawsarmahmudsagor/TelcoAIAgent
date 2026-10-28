@@ -16,7 +16,7 @@ export default async function SignUpPage({
 
   return (
     <AuthShell
-      title="Create your telco. account"
+      title="Create your telco account"
       intro={
         <>
           New accounts start with <strong className="text-foreground">৳200</strong> balance and{' '}

@@ -51,7 +51,7 @@ in `.env` and editable on the dashboard. The prompts and greetings use them.
 `backend/app/data/kb/` (policies, contact and helpline, stores, new SIM and eSIM, MNP, SIM
 ownership, privacy) for `search_knowledge_base`. It only adds docs that have no source yet; the
 scheduler embeds them, which needs an OpenRouter key (`OPENROUTER_API_KEY`). The docs speak only
-as `telco.`; `tests/test_seed_kb.py` fails on another operator's name or contact details.
+as `telco`; `tests/test_seed_kb.py` fails on another operator's name or contact details.
 Editing a seeded doc needs no delete: the dashboard's Knowledge base page (and its sidebar badge)
 flags it as changed, and **Re-embed** loads the new text and embeds it in place. In Docker the
 docs are baked into the image, so rebuild `api` after editing one.

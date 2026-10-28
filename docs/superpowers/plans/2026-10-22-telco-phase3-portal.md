@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A prospect picks one of 5 seeded personas and lands in a telco. self-care portal (overview, balance & usage, recharge, packages, offers, support, assistant). The portal runs on live `bss` data, its Recharge/Buy/Redeem buttons use the simulated OTP flow, and the AI assistant (bubble + full page, voice + chat) pushes cards and keeps the screen in sync.
+**Goal:** A prospect picks one of 5 seeded personas and lands in a telco self-care portal (overview, balance & usage, recharge, packages, offers, support, assistant). The portal runs on live `bss` data, its Recharge/Buy/Redeem buttons use the simulated OTP flow, and the AI assistant (bubble + full page, voice + chat) pushes cards and keeps the screen in sync.
 
 **Architecture:**
 - Backend:
@@ -273,9 +273,9 @@ Carry-over (phase 1): "subscriber_id in LiveKit metadata server-side" (frontend 
 - Modify:
   - `frontend/package.json` (add `"typecheck": "tsc --noEmit"`)
   - `frontend/next.config.ts` (drop the `/` → `/home` redirect and the unsplash image pattern)
-  - `frontend/app/layout.tsx` (Inter via `next/font/google`, metadata title `telco.`, description "telco. self-care portal and AI assistant (demo)")
+  - `frontend/app/layout.tsx` (Inter via `next/font/google`, metadata title `telco`, description "telco self-care portal and AI assistant (demo)")
   - `frontend/styles/globals.css`
-  - `frontend/app-config.ts` (telco. name, accent `#4f46e5`, dark accent `#756cf6`, `agentName: 'telco_agent'`)
+  - `frontend/app-config.ts` (telco name, accent `#4f46e5`, dark accent `#756cf6`, `agentName: 'telco_agent'`)
   - `frontend/middleware.ts`
   - `frontend/app/api/token/route.ts`
 
@@ -416,7 +416,7 @@ Spec 6.4.
 - Consumes: `portalApi.startAction/confirmAction/packages/offers/transactions`, `invalidatePortal`.
 - Produces:
   - `usePortalAction(): { start(a: PortalAction): Promise<void>; dialog: ReactNode }`. `dialog` is rendered once per page. Shared by Task 10 (not reused by the agent cards — they use RPC).
-  - `showSmsToast({code, to, expiresAt})`. A sonner custom toast styled as a phone SMS: "telco. OTP: <code> — valid 3 min. Never share it." It stays until dismissed or expiry. Exported for Task 10.
+  - `showSmsToast({code, to, expiresAt})`. A sonner custom toast styled as a phone SMS: "telco OTP: <code> — valid 3 min. Never share it." It stays until dismissed or expiry. Exported for Task 10.
 
 Flow:
 1. The button calls `start`.

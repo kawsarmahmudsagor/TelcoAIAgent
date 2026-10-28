@@ -2,7 +2,7 @@
 
 ## English
 
-All telco. packs are bought from your main balance (or paid through bKash, Nagad or card) and start immediately. Validity counts from activation. Each pack keeps its own validity. Unused data, minutes and SMS are lost at expiry; there is no rollover.
+All telco packs are bought from your main balance (or paid through bKash, Nagad or card) and start immediately. Validity counts from activation. Each pack keeps its own validity. Unused data, minutes and SMS are lost at expiry; there is no rollover.
 
 Data packs: D1-1D (1 GB Daily, 1 day, 29 taka), D2-3D (2 GB 3 Days, 3 days, 49 taka), D3-3D (3 GB Weekend, 3 days, 69 taka), D5-7D (5 GB Weekly, 7 days, 109 taka), D8-7D (8 GB Weekly, 7 days, 149 taka), D10-15D (10 GB 15 Days, 15 days, 229 taka), D15-30D (15 GB Monthly, 30 days, 349 taka), D30-30D (30 GB Monthly, 30 days, 549 taka), D50-30D (50 GB Monthly, 30 days, 749 taka), D100-30D (100 GB Monthly, 30 days, 999 taka).
 
@@ -16,7 +16,7 @@ You can hold several packs at once, and the pack that expires first is used firs
 
 ## বাংলা
 
-telco.-এর সব প্যাক মেইন ব্যালেন্স থেকে, অথবা বিকাশ, নগদ বা কার্ডে পেমেন্ট করে কেনা যায়, আর কেনার সাথে সাথেই চালু হয়ে যায়। মেয়াদ গোনা হয় চালু হওয়ার সময় থেকে, প্রতিটা প্যাকের নিজের মেয়াদ। মেয়াদ শেষে বাকি ডাটা, মিনিট আর এসএমএস চলে যায়, রোলওভার নেই।
+telco-এর সব প্যাক মেইন ব্যালেন্স থেকে, অথবা বিকাশ, নগদ বা কার্ডে পেমেন্ট করে কেনা যায়, আর কেনার সাথে সাথেই চালু হয়ে যায়। মেয়াদ গোনা হয় চালু হওয়ার সময় থেকে, প্রতিটা প্যাকের নিজের মেয়াদ। মেয়াদ শেষে বাকি ডাটা, মিনিট আর এসএমএস চলে যায়, রোলওভার নেই।
 
 ডাটা প্যাক: ১ জিবি ডেইলি (D1-1D) ১ দিন ২৯ টাকা, ২ জিবি (D2-3D) ৩ দিন ৪৯ টাকা, ৩ জিবি উইকেন্ড (D3-3D) ৩ দিন ৬৯ টাকা, ৫ জিবি উইকলি (D5-7D) ৭ দিন ১০৯ টাকা, ৮ জিবি উইকলি (D8-7D) ৭ দিন ১৪৯ টাকা, ১০ জিবি (D10-15D) ১৫ দিন ২২৯ টাকা, ১৫ জিবি (D15-30D) ৩০ দিন ৩৪৯ টাকা, ৩০ জিবি (D30-30D) ৩০ দিন ৫৪৯ টাকা, ৫০ জিবি (D50-30D) ৩০ দিন ৭৪৯ টাকা, ১০০ জিবি (D100-30D) ৩০ দিন ৯৯৯ টাকা।
 

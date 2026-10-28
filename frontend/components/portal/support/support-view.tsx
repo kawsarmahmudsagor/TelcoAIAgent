@@ -120,12 +120,12 @@ export function SupportView() {
           <Panel>
             <PanelHeader
               title="Need help now?"
-              description="telco. AI can check your account and answer straight away."
+              description="telco AI can check your account and answer straight away."
               className="mb-0"
             />
             <LinkButton href="/portal/assistant" variant="soft" className="mt-[13px]">
               <SparklesIcon aria-hidden="true" />
-              Ask telco. AI
+              Ask telco AI
             </LinkButton>
           </Panel>
         </div>

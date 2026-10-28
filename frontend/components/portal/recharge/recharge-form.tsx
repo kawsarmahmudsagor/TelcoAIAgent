@@ -119,7 +119,7 @@ export function RechargeForm() {
                 ? `Your bill is ${formatTaka(due)}. Pay up to ${formatTaka(MAX)} at a time.`
                 : 'Your bill is fully paid. You can still pay ahead.'
               : 'Loading your bill…'
-            : 'Recharge your telco. number or someone else’s.'}
+            : 'Recharge your telco number or someone else’s.'}
         </p>
 
         <label htmlFor={`${ids}-msisdn`} className="mt-4 mb-[7px] block text-[11px] font-bold">

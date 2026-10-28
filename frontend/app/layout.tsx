@@ -5,7 +5,7 @@ import { ThemeProvider } from '@/components/app/theme-provider';
 import { cn } from '@/lib/shadcn/utils';
 import '@/styles/globals.css';
 
-// The telco. face for everything: body, page titles and figures (spec 6.6).
+// The telco face for everything: body, page titles and figures (spec 6.6).
 const inter = Inter({
   variable: '--font-inter',
   subsets: ['latin'],
@@ -39,8 +39,8 @@ const commitMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'telco.', template: '%s · telco.' },
-  description: 'telco. self-care portal and AI assistant (demo)',
+  title: { default: 'telco', template: '%s · telco' },
+  description: 'telco self-care portal and AI assistant (demo)',
 };
 
 interface RootLayoutProps {

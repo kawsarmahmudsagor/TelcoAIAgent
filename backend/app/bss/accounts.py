@@ -111,8 +111,8 @@ def get_usage_breakdown(
     kind: UsageKind | None = None,
     now: datetime | None = None,
 ) -> UsageBreakdown:
-    if period_days not in (7, 30):
-        raise InvalidRequest("period_days must be 7 or 30")
+    if not 1 <= period_days <= 90:
+        raise InvalidRequest("period_days must be between 1 and 90")
     now = now or utc_now()
     if db.get(Subscriber, subscriber_id) is None:
         raise SubscriberNotFound()

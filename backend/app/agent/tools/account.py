@@ -9,15 +9,12 @@ from livekit.agents import RunContext, function_tool
 
 from app.agent import highlights
 from app.agent.telco_format import format_amount, format_data, format_day
-from app.agent.tools._common import parse_enum, run_read
+from app.agent.tools._common import LISTED, listed, parse_enum, run_read
 from app.agent.userdata import SessionUserdata
 from app.bss import accounts
 from app.bss.clock import local_tz, utc_now
 from app.bss.errors import InvalidRequest
 from app.models.telco import PlanType, UsageKind
-
-_DETAIL = 3
-
 
 def _day_name(d: date) -> str:
     return f"{d:%A} {d.day} {d:%B}"
@@ -44,17 +41,17 @@ async def run_get_account_summary(userdata: SessionUserdata) -> str:
                 f"Active packs: {len(s.subscriptions)}. Total left: {format_data(t.data_left_mb)} "
                 f"data, {t.minutes_left} minutes, {t.sms_left} SMS."
             )
-            for v in s.subscriptions[:_DETAIL]:
+            packs = []
+            for v in s.subscriptions[:LISTED]:
                 renew = ", auto-renew on" if v.auto_renew else ""
                 expires = format_day(v.expires_at)
                 if when := highlights.relative_day(v.expires_at, today):
                     expires = f"{when} ({expires})"
-                lines.append(
+                packs.append(
                     f"- {v.package_name}: {format_data(v.data_left_mb)}, {v.minutes_left} minutes, "
                     f"{v.sms_left} SMS left, expires {expires}{renew}."
                 )
-            if len(s.subscriptions) > _DETAIL:
-                lines.append(f"{len(s.subscriptions) - _DETAIL} more active packs not listed.")
+            lines += listed(packs, len(s.subscriptions))
         else:
             lines.append("No active packs.")
         lines.append(f"Open support cases: {s.open_cases}.")
@@ -74,14 +71,15 @@ async def run_get_usage_breakdown(
     def build(db, sid):
         usage_kind = parse_enum(UsageKind, kind)
         b = accounts.get_usage_breakdown(db, sid, period_days=period_days, kind=usage_kind)
+        when = "today" if b.period_days == 1 else f"in the last {b.period_days} days"
         if not b.totals:
-            return f"No usage in the last {b.period_days} days."
-        lines = [f"Usage in the last {b.period_days} days:"]
+            return f"No usage {when}."
+        lines = [f"Usage {when}:"]
         for t in b.totals:
             amount = format_data(int(t.amount)) if t.kind == UsageKind.data else f"{int(t.amount)} {t.unit}"
             lines.append(f"- {t.kind.value}: {amount}, charged {format_amount(t.charge)}.")
         peak = max(b.daily, key=lambda d: d[1], default=None)
-        if peak and peak[1] > 0:
+        if peak and peak[1] > 0 and b.period_days > 1:
             lines.append(f"Heaviest data day: {_day_name(peak[0])}, {format_data(int(peak[1]))}.")
         extra = []
         if usage_kind in (None, UsageKind.data):
@@ -100,13 +98,14 @@ async def run_explain_deductions(userdata: SessionUserdata, days: int = 7) -> st
             return f"No balance deductions in the last {days} days."
         total = sum((i.amount for i in items), Decimal("0"))
         lines = [f"{len(items)} deductions in the last {days} days, {format_amount(total)} in total:"]
-        for i in items[:_DETAIL]:
-            lines.append(
+        lines += listed(
+            [
                 f"- {format_day(i.occurred_at, with_time=True)}: {i.description}, "
                 f"{format_amount(i.amount)} ({i.source})."
-            )
-        if len(items) > _DETAIL:
-            lines.append(f"{len(items) - _DETAIL} more not listed.")
+                for i in items[:LISTED]
+            ],
+            len(items),
+        )
         return "\n".join(lines)
 
     return await run_read(userdata, build)
@@ -130,7 +129,8 @@ async def get_usage_breakdown(
     """Get how much data, voice and SMS the customer used and what it cost.
 
     Args:
-        period_days: 7 or 30 (days back from today). Only these two are accepted.
+        period_days: Days back, today included: 1 to 90 (1 = today, 7 = this
+            week, 30 = this month). Default 30.
         kind: Optional filter: "data", "voice", "sms" or "vas". Leave out for all.
     """
     return await run_get_usage_breakdown(ctx.userdata, period_days, kind)

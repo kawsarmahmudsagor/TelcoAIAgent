@@ -54,8 +54,7 @@ export function BotAvatar({ size = 'md', className }: { size?: 'sm' | 'md'; clas
 
 /**
  * The chat panel's header: the assistant's name, its live status, the chat history toggle, and
- * the session controls (speaker, end) while connected. `actions` go on the right (e.g. the
- * bubble's buttons).
+ * the speaker toggle while connected. `actions` go on the right (e.g. the bubble's buttons).
  */
 export function AssistantChatHeader({
   titleAs: Title = 'h2',
@@ -66,7 +65,7 @@ export function AssistantChatHeader({
   actions?: ReactNode;
   className?: string;
 }) {
-  const { isConnected, connecting, micEnabled, agentState, end, historyOpen, setHistoryOpen } =
+  const { isConnected, connecting, micEnabled, agentState, historyOpen, setHistoryOpen } =
     useAssistant();
   const { muted, toggleMuted } = useCallAudio();
 
@@ -98,18 +97,13 @@ export function AssistantChatHeader({
         <HistoryIcon aria-hidden="true" />
       </HeaderButton>
       {isConnected && (
-        <>
-          <HeaderButton
-            label={muted ? 'Turn the assistant’s voice on' : 'Mute the assistant’s voice'}
-            onClick={toggleMuted}
-            pressed={muted}
-          >
-            {muted ? <VolumeXIcon aria-hidden="true" /> : <Volume2Icon aria-hidden="true" />}
-          </HeaderButton>
-          <HeaderButton label="End the chat" onClick={end} tone="danger">
-            <PhoneOffIcon aria-hidden="true" />
-          </HeaderButton>
-        </>
+        <HeaderButton
+          label={muted ? 'Turn the assistant’s voice on' : 'Mute the assistant’s voice'}
+          onClick={toggleMuted}
+          pressed={muted}
+        >
+          {muted ? <VolumeXIcon aria-hidden="true" /> : <Volume2Icon aria-hidden="true" />}
+        </HeaderButton>
       )}
       {actions}
     </div>
@@ -121,13 +115,11 @@ export function HeaderButton({
   label,
   onClick,
   pressed,
-  tone = 'default',
   children,
 }: {
   label: string;
   onClick(): void;
   pressed?: boolean;
-  tone?: 'default' | 'danger';
   children: ReactNode;
 }) {
   return (
@@ -137,10 +129,7 @@ export function HeaderButton({
       aria-label={label}
       title={label}
       aria-pressed={pressed}
-      className={cn(
-        'text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] motion-safe:transition-colors [&_svg]:size-4',
-        tone === 'danger' && 'hover:text-red'
-      )}
+      className="text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] motion-safe:transition-colors [&_svg]:size-4"
     >
       {children}
     </button>
@@ -247,12 +236,12 @@ function EmptyState({ compact }: { compact: boolean }) {
           <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
             {me ? (
               <p lang="bn">
-                আসসালামু আলাইকুম, {me.first_name}! আমি telco.-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
+                আসসালামু আলাইকুম, {me.first_name}! আমি telco-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
                 ইউসেজের হিসাব, প্যাকেজ খোঁজা বা রিচার্জ, সবকিছুতেই হেল্প করতে পারি।
               </p>
             ) : (
               <p lang="bn">
-                আসসালামু আলাইকুম! আমি telco.-এর অ্যাসিস্ট্যান্ট। প্যাকেজ খোঁজা, আপনার এলাকার
+                আসসালামু আলাইকুম! আমি telco-এর অ্যাসিস্ট্যান্ট। প্যাকেজ খোঁজা, আপনার এলাকার
                 নেটওয়ার্ক চেক, বা সিম, স্টোর আর আমাদের পলিসি নিয়ে যেকোনো প্রশ্নে হেল্প করতে পারি।
                 নিজের ব্যালেন্স দেখতে বা প্যাকেজ কিনতে লগইন করুন।
               </p>
@@ -285,7 +274,8 @@ function EmptyState({ compact }: { compact: boolean }) {
 }
 
 function Composer({ initialText, inputId }: { initialText?: string; inputId: string }) {
-  const { sendText, toggleMic, micEnabled, isConnected, connecting, voiceMode } = useAssistant();
+  const { sendText, toggleMic, micEnabled, isConnected, connecting, voiceMode, end } =
+    useAssistant();
   const [text, setText] = useState(initialText ?? '');
 
   const micLabel = !isConnected
@@ -331,6 +321,17 @@ function Composer({ initialText, inputId }: { initialText?: string; inputId: str
           ) : (
             <MicOffIcon aria-hidden="true" />
           )}
+        </button>
+      )}
+      {isConnected && (
+        <button
+          type="button"
+          onClick={end}
+          aria-label="End the chat"
+          title="End the chat"
+          className="bg-red border-red focus-visible:ring-ring/60 grid w-[43px] shrink-0 place-items-center rounded-[10px] border text-white outline-none hover:opacity-90 focus-visible:ring-[3px] motion-safe:transition-opacity [&_svg]:size-[18px]"
+        >
+          <PhoneOffIcon aria-hidden="true" />
         </button>
       )}
       <label htmlFor={inputId} className="sr-only">

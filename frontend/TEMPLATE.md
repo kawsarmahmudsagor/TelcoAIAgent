@@ -1,6 +1,6 @@
 ## Overview
 
-The Next.js frontend for the telco. voice and chat agent, built on LiveKit's [JavaScript SDK](https://github.com/livekit/client-sdk-js) and [React Components](https://github.com/livekit/components-js). It started from the `agent-starter-react` template and now has two surfaces:
+The Next.js frontend for the telco voice and chat agent, built on LiveKit's [JavaScript SDK](https://github.com/livekit/client-sdk-js) and [React Components](https://github.com/livekit/components-js). It started from the `agent-starter-react` template and now has two surfaces:
 
 - `/` persona picker, then the customer portal at `/portal` (overview, packages, recharge, offers, support, and the assistant page with its chat bubble and notification bell).
 - `/login` then `/dashboard`: the admin portal (control center, subscribers, transactions, support cases, network incidents, AI monitor, offers, chatbot, knowledge, conversations, listen).

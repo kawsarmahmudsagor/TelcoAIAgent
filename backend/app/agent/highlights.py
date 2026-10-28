@@ -68,20 +68,20 @@ def account_highlights(db: Session, s: AccountSummary, now: datetime) -> list[st
             out.append(f"Their {v.package_name} expires {when} and doesn't auto-renew.")
     data_left = s.totals.data_left_mb
     if 0 < data_left < LOW_DATA_MB:
-        out.append(f"Only {format_data(data_left)} data left across their packs.")
+        out.append(f"Only {format_data(data_left)} data left across their packages.")
     elif data_left == 0:
         # Out of data only matters to someone who uses it.
         week = _data_between(db, s.subscriber_id, local_day_start(today - timedelta(days=6)), now)
         if week > 0:
             out.append(
-                f"They have no data left in any pack, though they used {format_data(int(week))} "
+                f"They have no data left in any package, though they used {format_data(int(week))} "
                 "this week."
             )
     if s.plan_type == PlanType.prepaid:
         usual = _usual_pack(db, s.subscriber_id)
         if usual is not None and s.main_balance < usual.price:
             out.append(
-                f"Their balance is below the price of the pack they last bought, {usual.name} "
+                f"Their balance is below the price of the package they last bought, {usual.name} "
                 f"({format_amount(usual.price)}): renewing it needs a recharge first."
             )
     redeemable = _redeemable(db, s.subscriber_id, s.reward_points, now)

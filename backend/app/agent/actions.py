@@ -242,7 +242,7 @@ def _execute(db: Session, sid: UUID, a: PendingAction, now: datetime) -> tuple[s
             f"Reward points left: {r.reward_points}."
         )
         if r.expires_at is not None:
-            text += f" The pack is active until {format_day(r.expires_at)}."
+            text += f" The package is active until {format_day(r.expires_at)}."
     return r.transaction_ref, f"{text}\n{_SNAPSHOT_NOTE}"
 
 

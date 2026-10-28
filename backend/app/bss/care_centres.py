@@ -33,10 +33,10 @@ class CareCentre:
 
 CENTRES: dict[str, CareCentre] = {
     "gulshan": CareCentre(
-        "telco. Experience Centre",
+        "telco Experience Centre",
         "Gulshan Avenue, Dhaka 1212",
         "Dhaka",
-        "telco. এক্সপেরিয়েন্স সেন্টার, গুলশান এভিনিউ, ঢাকা ১২১২",
+        "telco এক্সপেরিয়েন্স সেন্টার, গুলশান এভিনিউ, ঢাকা ১২১২",
         EXPERIENCE_CENTRE_HOURS,
     ),
     "dhanmondi": CareCentre(

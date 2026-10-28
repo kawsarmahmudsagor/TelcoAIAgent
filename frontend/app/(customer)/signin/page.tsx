@@ -21,7 +21,7 @@ export default async function SignInPage({
   return (
     <AuthShell
       wide
-      title="Log in to My telco."
+      title="Log in to My telco"
       intro="Log in with your number and password, or try one of the demo customers below."
     >
       <div className="w-full max-w-md">

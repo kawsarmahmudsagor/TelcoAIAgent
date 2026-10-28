@@ -27,7 +27,7 @@ export function AuthShell({
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 pt-6 sm:px-8">
         <Link
           href="/"
-          aria-label="telco. home"
+          aria-label="telco home"
           className="focus-visible:ring-ring/60 rounded-md outline-none focus-visible:ring-[3px]"
         >
           <TelcoBrand />

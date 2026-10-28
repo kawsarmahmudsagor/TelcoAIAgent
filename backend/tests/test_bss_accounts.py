@@ -49,10 +49,13 @@ def test_usage_breakdown_7_days_daily_series(bss_world, db):
     assert out.totals[0].amount == Decimal("300")
 
 
-def test_usage_breakdown_rejects_other_periods(bss_world, db):
+def test_usage_breakdown_takes_1_to_90_days(bss_world, db):
     s = bss_world.subscriber()
-    with pytest.raises(InvalidRequest):
-        accounts.get_usage_breakdown(db, s.id, period_days=14)
+    for days in (1, 3, 14, 90):
+        assert accounts.get_usage_breakdown(db, s.id, period_days=days).period_days == days
+    for days in (0, 91):
+        with pytest.raises(InvalidRequest):
+            accounts.get_usage_breakdown(db, s.id, period_days=days)
 
 
 def test_explain_deductions_only_charged_items(bss_world, db):

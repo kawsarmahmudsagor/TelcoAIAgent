@@ -23,7 +23,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <Link
         href="/portal"
         onClick={onNavigate}
-        aria-label="telco. overview"
+        aria-label="telco overview"
         className={cn('self-start rounded-md px-2.5', FOCUS)}
       >
         <TelcoBrand />
@@ -78,7 +78,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           )}
         >
           <ArrowLeftIcon className="size-3.5" aria-hidden="true" />
-          telco. home page
+          telco home page
         </Link>
         <div className="from-promo-from to-promo-to relative overflow-hidden rounded-[15px] bg-linear-145 p-[15px] text-white">
           <SparklesIcon

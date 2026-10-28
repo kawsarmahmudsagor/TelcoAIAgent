@@ -101,7 +101,7 @@ def _gate(
     quick.compose = compose
     judged: list[tuple[str, str]] = []
 
-    async def judge(text, bot_state, route=False):
+    async def judge(text, bot_state, route=False, speaking=""):
         judged.append((text, bot_state))
         return judgement
 

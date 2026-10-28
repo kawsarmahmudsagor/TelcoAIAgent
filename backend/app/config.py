@@ -169,12 +169,12 @@ class Settings(BaseSettings):
     settings_encryption_key: str = ""
 
     # Operator identity
-    operator_name: str = "telco."
+    operator_name: str = "telco"
     # Mock contact details: the agent points customers here for anything it
     # can't answer. Dashboard-editable (agent_config). One unbroken digit run:
     # speech_numbers only reads a number as a phone number in that form.
     operator_phone: str = "01700121121"
-    operator_address: str = "telco. Experience Centre, Gulshan Avenue, Dhaka 1212"
+    operator_address: str = "telco Experience Centre, Gulshan Avenue, Dhaka 1212"
     agent_display_name: str = "Anika"
     ceo_email: str = "ceo@example.com"
     # IANA zone the agent resolves spoken times in -- "tomorrow at 3pm" means

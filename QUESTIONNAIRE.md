@@ -1,4 +1,4 @@
-# Bot test questionnaire: telco. assistant
+# Bot test questionnaire: telco assistant
 
 A manual test script for the customer assistant (chat and voice) and the admin features around it.
 Every case has a stable ID, so it can later become an automated eval without being renumbered.
@@ -182,7 +182,7 @@ Needs the KB embedded: on the admin Knowledge base page, sources show **Ready**.
 
 | ID | Persona | Say | Expected | Result | Notes |
 |---|---|---|---|---|---|
-| J1 ★ | Any | "What's your hotline number?" | 121 from a telco. number, 01700121121 from other phones. Open 24/7 | | |
+| J1 ★ | Any | "What's your hotline number?" | 121 from a telco number, 01700121121 from other phones. Open 24/7 | | |
 | J2 ★ | Any | "Chattogram e apnader store kothay?" | GEC Circle care centre, CDA Avenue. Saturday to Thursday, 10 am to 7 pm | | |
 | J3 | Any | "Is the Gulshan centre open on Friday?" | Yes, the Experience Centre is open every day from 9 am to 9 pm | | |
 | J4 ★ | Any | "How do I get a new SIM?" | NID or passport, biometric in person, at a care centre or retail point, or order online. Mentions the starter offers (250 or 450 taka) | | |

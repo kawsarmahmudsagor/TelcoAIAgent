@@ -88,7 +88,7 @@ def _controller(
     session, room = FakeSession(), FakeRoom()
     judged: list[tuple[str, str]] = []
 
-    async def judge(text, bot_state, route=False):
+    async def judge(text, bot_state, route=False, speaking=""):
         judged.append((text, bot_state))
         if isinstance(scores, dict):
             return Judgement(scores.get(text))

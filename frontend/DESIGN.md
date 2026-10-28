@@ -1,4 +1,4 @@
-# telco. design system
+# telco design system
 
 The source of truth for the customer portal (`/portal/**`, public home page at `/`, log in at `/signin`), the admin portal
 (`/dashboard/**`) and `/login`. Tokens live in `styles/globals.css`; this file explains them and
@@ -6,7 +6,7 @@ the patterns built on them.
 
 ## Direction
 
-telco. is a Bangladeshi mobile operator whose AI agent answers customers by chat and voice. Customers check balance, buy
+telco is a Bangladeshi mobile operator whose AI agent answers customers by chat and voice. Customers check balance, buy
 packs and raise cases in the portal; staff run the network, support queue, offers and nudges
 from the admin portal. Both share one look: calm panels, one indigo brand colour, and the
 status accents carrying meaning.

@@ -4,9 +4,9 @@
 
 If your SIM is lost, stolen or damaged, you can get a replacement and keep the same number, your balance, your active packs and your reward points.
 
-Step 1, block the old SIM: call the telco. hotline 01700121121 as soon as possible so nobody can misuse it. Our team verifies your identity before blocking.
+Step 1, block the old SIM: call the telco hotline 01700121121 as soon as possible so nobody can misuse it. Our team verifies your identity before blocking.
 
-Step 2, visit us: go to the telco. Experience Centre, Gulshan Avenue, Dhaka 1212, or any authorised telco. retail point, and bring your original national ID card (NID) or passport. The registered owner must be present. A biometric verification is done at the counter.
+Step 2, visit us: go to the telco Experience Centre, Gulshan Avenue, Dhaka 1212, or any authorised telco retail point, and bring your original national ID card (NID) or passport. The registered owner must be present. A biometric verification is done at the counter.
 
 Step 3, pay the fee: the replacement fee is 200 taka, paid at the counter.
 
@@ -18,9 +18,9 @@ Notes: a damaged but working SIM can be replaced the same way and the number sta
 
 সিম হারিয়ে গেলে, চুরি হলে বা নষ্ট হয়ে গেলে একই নম্বরে নতুন সিম নিতে পারবেন। আপনার ব্যালেন্স, চালু প্যাক আর রিওয়ার্ড পয়েন্ট সব আগের মতোই থাকবে।
 
-ধাপ ১, পুরনো সিমটা ব্লক করুন: যত তাড়াতাড়ি পারেন telco. হটলাইন ০১৭০০১২১১২১-এ কল করুন, যেন কেউ সিমটা ইউজ করতে না পারে। ব্লক করার আগে আমাদের টিম আপনার পরিচয়টা কনফার্ম করে নেবে।
+ধাপ ১, পুরনো সিমটা ব্লক করুন: যত তাড়াতাড়ি পারেন telco হটলাইন ০১৭০০১২১১২১-এ কল করুন, যেন কেউ সিমটা ইউজ করতে না পারে। ব্লক করার আগে আমাদের টিম আপনার পরিচয়টা কনফার্ম করে নেবে।
 
-ধাপ ২, আমাদের কাছে আসুন: গুলশান এভিনিউ, ঢাকা ১২১২-এর telco. এক্সপেরিয়েন্স সেন্টারে, বা আমাদের যেকোনো রিটেইলারের কাছে আসুন। সাথে অরিজিনাল এনআইডি কার্ড বা পাসপোর্ট আনবেন। যার নামে সিমটা রেজিস্টার করা, তাকেই আসতে হবে, কারণ কাউন্টারে ফিঙ্গারপ্রিন্ট দিতে হয়।
+ধাপ ২, আমাদের কাছে আসুন: গুলশান এভিনিউ, ঢাকা ১২১২-এর telco এক্সপেরিয়েন্স সেন্টারে, বা আমাদের যেকোনো রিটেইলারের কাছে আসুন। সাথে অরিজিনাল এনআইডি কার্ড বা পাসপোর্ট আনবেন। যার নামে সিমটা রেজিস্টার করা, তাকেই আসতে হবে, কারণ কাউন্টারে ফিঙ্গারপ্রিন্ট দিতে হয়।
 
 ধাপ ৩, ফি দিন: সিম রিপ্লেসমেন্টের ফি ২০০ টাকা, কাউন্টারেই দিতে হয়।
 

@@ -6,34 +6,63 @@ from livekit.agents import RunContext, function_tool
 from livekit.agents.llm import ToolError
 
 from app.agent.telco_format import format_day
-from app.agent.tools._common import NOT_LOGGED_IN, error_text, run_db, subscriber_id_or_none
+from app.agent.tools._common import (
+    LISTED,
+    NOT_LOGGED_IN,
+    error_text,
+    listed,
+    run_db,
+    subscriber_id_or_none,
+)
 from app.agent.userdata import SessionUserdata
-from app.bss import accounts, network
+from app.bss import accounts, care_centres, network
 from app.bss.errors import BssError, SubscriberNotFound
 
 ASK_DISTRICT = "Ask the customer which district they are in, then call this again with it."
-_DETAIL = 3
+
+
+def _unknown(place: str) -> str:
+    return (
+        f'"{place}" isn\'t a district or area of Bangladesh I can match. '
+        "Ask which district it is in, then call this again with the district."
+    )
 
 
 async def run_check_network_status(userdata: SessionUserdata, district: str | None = None) -> str:
     sid = subscriber_id_or_none(userdata)
-    if not district and sid is None:
+    place = (district or "").strip()
+    if not place and sid is None:
         return ASK_DISTRICT
 
     def build(db):
-        where = district or accounts.get_account_summary(db, sid).district
+        # Incidents are filed by English district: "সিলেট" or an area such as
+        # "Tongi" (Gazipur) found none and read as all clear.
+        area = None
+        if not place:
+            where = accounts.get_account_summary(db, sid).district
+        elif (match := care_centres.resolve(place)) is not None:
+            where = match.district
+            area = match.place if match.place != match.district else None
+        else:
+            where = place
         incidents = network.check_network_status(db, where)
+        in_area = f" ({area} is in {where})" if area else ""
         if not incidents:
-            return f"No network problems or planned work reported in {where}."
-        lines = [f"{len(incidents)} network incident(s) in {where}:"]
-        for i in incidents[:_DETAIL]:
+            if place and where == place:
+                return _unknown(place)
+            return f"No network problems or planned work reported in {where}{in_area}."
+        if area:
+            # The named area's own incidents first.
+            incidents.sort(key=lambda i: area.lower() not in i.area.lower())
+        lines = [f"{len(incidents)} network incident(s) in {where}{in_area}:"]
+        found = []
+        for i in incidents[:LISTED]:
             ends = f", expected until {format_day(i.ends_at, with_time=True)}" if i.ends_at else ""
-            lines.append(
+            found.append(
                 f"- {i.area}: {i.kind.value}, {i.status.value}, since "
                 f"{format_day(i.starts_at, with_time=True)}{ends}. {i.message}"
             )
-        if len(incidents) > _DETAIL:
-            lines.append(f"{len(incidents) - _DETAIL} more not listed.")
+        lines += listed(found, len(incidents))
         return "\n".join(lines)
 
     try:
@@ -50,6 +79,7 @@ async def check_network_status(ctx: RunContext[SessionUserdata], district: str |
     logged-in customer's district; a guest must name one.
 
     Args:
-        district: Optional district name such as "Dhaka" or "Chattogram".
+        district: Optional district or area the customer names, English or
+            Bangla, such as "Dhaka", "Mirpur", "Tongi" or "সিলেট".
     """
     return await run_check_network_status(ctx.userdata, district)

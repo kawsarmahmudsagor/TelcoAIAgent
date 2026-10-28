@@ -26,8 +26,30 @@ def test_a_dash_or_semicolon_becomes_a_comma():
 
 
 def test_codes_and_ranges_keep_their_hyphen():
-    assert clean_reply_text("The D8-7D pack, case TC-2048.") == "The D8-7D pack, case TC-2048."
+    assert clean_reply_text("The D8-7D package, case TC-2048.") == "The D8-7D package, case TC-2048."
     assert clean_reply_text("২–৩ কাজের দিনে") == "২-৩ কাজের দিনে"
+
+
+def test_pack_is_always_package():
+    assert clean_reply_text("আপনার ডাটা প্যাকটা আজ শেষ, নতুন প্যাক নেবেন?") == (
+        "আপনার ডাটা প্যাকেজটা আজ শেষ, নতুন প্যাকেজ নেবেন?"
+    )
+    assert clean_reply_text("প্যাকে ১ জিবি আছে, ডাটাপ্যাকগুলো") == "প্যাকেজে ১ জিবি আছে, ডাটাপ্যাকেজগুলো"
+    assert clean_reply_text("Two packs: the Pack 7D and a PACK.") == (
+        "Two packages: the Package 7D and a PACKAGE."
+    )
+    # Already a package, or another word.
+    for text in ("প্যাকেজটা", "একটা প্যাকেট", "প্যাকিং", "a package, packed and packaging"):
+        assert clean_reply_text(text) == text
+
+
+def test_a_pack_split_across_chunks_is_still_a_package():
+    assert "".join(_clean(["আপনার ডাটা প্যা", "কটা শেষ"])) == "আপনার ডাটা প্যাকেজটা শেষ"
+    assert "".join(_clean(["আপনার প্যাকে", "জটা শেষ"])) == "আপনার প্যাকেজটা শেষ"
+    assert "".join(_clean(["Your data pa", "ck ends; buy a pa", "ckage?"])) == (
+        "Your data package ends, buy a package?"
+    )
+    assert "".join(_clean(["a new pack"])) == "a new package"
 
 
 def test_a_dash_split_across_chunks_is_still_one_comma():

@@ -42,14 +42,14 @@ _CHECK_IN_SYSTEM = """You write the short line a mobile operator's phone assista
 the customer has gone quiet.
 Write one short, polite, natural spoken question (under 12 words) that checks in and helps the \
 conversation move on, based on the RECENT conversation:
-- A recharge, pack purchase or offer is waiting for the code sent to their phone: ask for the code.
+- A recharge, package purchase or offer is waiting for the code sent to their phone: ask for the code.
 - A complaint is being written up: ask whether to go ahead with it.
 - The assistant's last message already offered more help: ask whether they're still there.
 - The assistant just asked a question or offered a choice: follow up on exactly that.
-- A balance, usage or pack answer was just given: ask whether they need anything else about it.
+- A balance, usage or package answer was just given: ask whether they need anything else about it.
 - Little was said yet: ask how you can help with their mobile service.
 Language: the language of the conversation. Bangla in Bengali script, in the respectful আপনি form, \
-the way people actually speak, with the English words Bangla speakers use (চেক, প্যাক, ব্যালেন্স, \
+the way people actually speak, with the English words Bangla speakers use (চেক, প্যাকেজ, ব্যালেন্স, \
 কোড); you may open with "আপনি কি আছেন?". English: everyday spoken English.
 Never repeat the assistant's last message. Never state a balance, price, amount, code or any other \
 number, and never promise anything.

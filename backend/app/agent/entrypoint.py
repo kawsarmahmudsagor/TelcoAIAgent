@@ -19,8 +19,16 @@ from livekit.agents import NOT_GIVEN, Agent, AgentSession, JobContext
 from livekit.agents import llm as llm_utils
 from livekit.agents import stt as stt_utils
 from livekit.agents import tts as tts_utils
+from livekit.agents import utils as lk_utils
 from livekit.agents import vad as vad_utils
 from livekit.agents.beta.tools.end_call import EndCallTool
+from livekit.agents.types import (
+    ATTRIBUTE_TRANSCRIPTION_FINAL,
+    ATTRIBUTE_TRANSCRIPTION_SEGMENT_ID,
+    ATTRIBUTE_TRANSCRIPTION_TRACK_ID,
+    TOPIC_TRANSCRIPTION,
+)
+from livekit.agents.voice.transcription import find_micro_track_id
 from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 
 from app.agent import (
@@ -141,6 +149,29 @@ async def _announce_user_turns(room: rtc.Room) -> None:
         await room.local_participant.set_attributes({gated_agent.GATE_ATTRIBUTE: "1"})
     except Exception:
         logger.exception("could not publish the turn_gate attribute")
+
+
+async def _show_agent_line(room: rtc.Room, line: str) -> None:
+    """Sends `line` to the browser as one finished agent transcription segment,
+    the way livekit-agents sends what the agent says (room_io._output): a
+    filler said in front of the reply never reaches the reply's transcription."""
+    identity = room.local_participant.identity
+    attributes = {
+        ATTRIBUTE_TRANSCRIPTION_FINAL: "true",
+        ATTRIBUTE_TRANSCRIPTION_SEGMENT_ID: lk_utils.shortuuid("SG_"),
+    }
+    try:
+        attributes[ATTRIBUTE_TRANSCRIPTION_TRACK_ID] = find_micro_track_id(room, identity)
+    except ValueError:
+        pass  # optional, as for the agent's own segments
+    try:
+        writer = await room.local_participant.stream_text(
+            topic=TOPIC_TRANSCRIPTION, sender_identity=identity, attributes=attributes
+        )
+        await writer.write(line)
+        await writer.aclose()
+    except Exception as exc:
+        logger.warning("could not show the filler line: %s", exc)
 
 
 async def _announce_conversation(room: rtc.Room, conversation_id: uuid.UUID) -> None:
@@ -885,6 +916,10 @@ async def entrypoint(ctx: JobContext) -> None:
     if recorder is not None and isinstance(agent, gated_agent.GatedAgent):
         # A filler is said outside the chat context, so the recorder never sees it.
         agent.gate.on_filler_store = recorder.record_assistant_after
+    if isinstance(agent, gated_agent.GatedAgent):
+        agent.gate.on_filler_shown = lambda line: asyncio.ensure_future(
+            _show_agent_line(ctx.room, line)
+        )
     # A guest's refresher idles until a login links the session to an account.
     refresher = snapshot_refresh.SnapshotRefresher(
         session=session,

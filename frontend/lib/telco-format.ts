@@ -1,4 +1,4 @@
-/** Display formats for the telco. portal (Global Constraints: money, data, dates). */
+/** Display formats for the telco portal (Global Constraints: money, data, dates). */
 
 const takaWhole = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 const takaFractional = new Intl.NumberFormat('en-IN', {
