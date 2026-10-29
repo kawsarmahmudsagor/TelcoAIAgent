@@ -159,8 +159,18 @@ def has_contact(text: str) -> bool:
     return bool(_PHONE_OR_CONTACT_RE.search(text))
 
 
+# A 4 to 8 digit code read out ("910242", "৯১০২৪২"). The spoken digits are
+# written as numbers before the gate sees them, so "nine one zero two four two"
+# arrived as "910242", had no letters and was dropped as empty (run_53).
+_CODE_RE = re.compile(r"(?<![0-9০-৯])[0-9০-৯]{4,8}(?![0-9০-৯])")
+
+
+def has_code(text: str) -> bool:
+    return bool(_CODE_RE.search(text))
+
+
 def is_filler_or_empty(text: str) -> bool:
-    if has_contact(text):
+    if has_contact(text) or has_code(text):
         return False
     ws = words(text)
     return not ws or all(w in _FILLERS for w in ws)
@@ -292,10 +302,11 @@ class Precheck:
     confidence: float | None
     closing: bool = False
     presence: bool = False
+    code: bool = False
 
 
 def precheck(text: str, confidence: float | None) -> Precheck:
-    contact = has_contact(text)
+    contact = has_contact(text) or has_code(text)
     script = classify_script(strip_sound_tags(text))
     if script == "none" and contact:
         script = "bn"
@@ -307,6 +318,7 @@ def precheck(text: str, confidence: float | None) -> Precheck:
         confidence=confidence if confidence_known(confidence) else None,
         closing=is_closing(text),
         presence=is_presence_check(text),
+        code=has_code(text),
     )
 
 
@@ -341,6 +353,10 @@ def decide(
     if pre.closing:
         return Verdict.ACCEPT
     if pre.presence:
+        return Verdict.ACCEPT
+    # A code is only ever read out to the agent; Jev scored "Nine one zero two
+    # four two" 0.73, but a lower score must not drop it either.
+    if pre.code:
         return Verdict.ACCEPT
 
     # Another script is only trusted as another language when the STT can write

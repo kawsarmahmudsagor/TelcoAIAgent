@@ -338,6 +338,21 @@ def test_phone_numbers_not_dropped_as_filler():
 
 
 
+@pytest.mark.parametrize("text", ["910242", "৯১০২৪২", "কোডটি হলো 910242", "code is 4821"])
+def test_a_code_read_out_is_always_accepted(text):
+    # run_53: "Nine one zero two four two" arrived as "910242" and was dropped.
+    pre = precheck(text, None)
+    assert pre.code and not pre.filler and pre.script != "none"
+    assert turn_gate.needs_judge(pre, stt_writes_bengali=True)
+    for p in (None, 0.1, 0.73):
+        assert decide(pre, p, stt_writes_bengali=True, state=GateState(), now=0.0) is Verdict.ACCEPT
+
+
+@pytest.mark.parametrize("text", ["আমার 3 জিবি লাগবে", "১০০ টাকা", "123"])
+def test_short_numbers_are_no_code(text):
+    assert not turn_gate.has_code(text)
+
+
 def test_gb_misheard_after_a_number_is_mended():
     # run_27: the STT wrote জিবি (GB) as জীবিত ("alive").
     assert turn_gate.clean_transcript("দুই জীবিতটা দেখান") == "দুই জিবিরটা দেখান"
