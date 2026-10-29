@@ -107,15 +107,34 @@ def request_human_agent(
     source: CaseSource,
     action_id: uuid.UUID,
 ) -> CaseView:
-    return create_case(
-        db,
-        subscriber_id,
-        category="human_handoff",
-        description=reason,
-        priority=CasePriority.high,
-        source=source,
-        action_id=action_id,
-    )
+    """One handoff case per action id (a session's): a repeat request with a new
+    reason adds it to that case's description instead of opening another."""
+    row = db.scalar(select(SupportCase).where(SupportCase.action_id == action_id))
+    if row is None:
+        return create_case(
+            db,
+            subscriber_id,
+            category="human_handoff",
+            description=reason,
+            priority=CasePriority.high,
+            source=source,
+            action_id=action_id,
+        )
+    if row.subscriber_id != subscriber_id:
+        raise CaseNotFound()
+    reason = reason.strip()
+    if reason and reason not in row.description.split("\n"):
+        row.description = f"{row.description}\n{reason}"
+        audit.record(
+            db,
+            actor=_ACTOR[source],
+            action="case_reason_added",
+            subscriber_id=subscriber_id,
+            action_id=action_id,
+            detail={"ref": row.ref, "reason": reason},
+        )
+        db.commit()
+    return _view(row)
 
 
 def get_case_status(

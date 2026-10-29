@@ -154,3 +154,29 @@ def test_package_cards_show_only_the_size_asked_about_and_never_repeat():
         return [[p["code"] for p in json.loads(payload)["packages"]] for _, payload in _sent(userdata)]
 
     assert asyncio.run(go()) == [["V50", "V100", "V300"], ["V100"]]
+
+
+def test_package_cards_narrow_by_every_detail_named():
+    from decimal import Decimal
+
+    from app.agent.tools import packages
+    from app.bss.types import PackageView
+    from app.models.telco import PackageKind
+
+    def pkg(name, data_gb, price, days, tag=None):
+        return PackageView(
+            code=name, name=name, kind=PackageKind.data, data_mb=data_gb * 1024, minutes=0, sms=0,
+            validity_days=days, price=Decimal(price), tag=tag,
+        )
+
+    found = [
+        pkg("2 GB 3 Days", 2, "49", 3), pkg("3 GB Weekend", 3, "69", 3, "WEEKEND"),
+        pkg("5 GB Weekly", 5, "109", 7), pkg("15 GB Monthly", 15, "349", 30),
+    ]
+    heard = "আমি দেখতে পাচ্ছি থ্রি জিবি উইকএন্ড উনসত্তর টাকা, এই প্যাকেজটা সম্পর্কে বলুন"
+    assert [p.name for p in packages._about_turn(found, heard)] == ["3 GB Weekend"]
+    assert [p.name for p in packages._about_turn(found, "মান্থলি প্যাকেজ")] == ["15 GB Monthly"]
+    assert [p.name for p in packages._about_turn(found, "তিন দিনের প্যাকেজ")] == [
+        "2 GB 3 Days", "3 GB Weekend",
+    ]
+    assert len(packages._about_turn(found, "ডাটা প্যাকেজ দেখান")) == 4

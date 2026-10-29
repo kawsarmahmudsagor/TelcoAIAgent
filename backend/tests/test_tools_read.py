@@ -87,7 +87,7 @@ def test_search_packages_filters_and_caps_detail(bss_world):
     # All five reach the model, so "any others?" has an answer (run_28); it
     # reads out three at a time.
     assert out.count("- PYTEST Data") == 5
-    assert "Read out 3 at a time" in out
+    assert "Name 3 at a time" in out
     assert "more not listed" not in out
     assert "PYTEST Dead" not in out and "PYTEST Voice" not in out
 
@@ -274,7 +274,7 @@ def test_transactions_list_ten_with_the_real_count(bss_world):
     out = asyncio.run(transactions.run_lookup_transactions(_ud(sub)))
     assert out.startswith("12 transactions")
     assert out.count("- TXN-") == 10
-    assert "Read out 3 at a time" in out and "2 more not listed" in out
+    assert "Name 3 at a time" in out and "2 more not listed" in out
 
 
 @pytest.mark.parametrize("said", ["txn {n}", "TXN{n}", " TXN-{n} ", "{n}"])

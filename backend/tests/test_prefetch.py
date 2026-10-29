@@ -392,3 +392,10 @@ def test_a_prefetched_package_search_runs_the_tool_so_its_cards_are_sent(monkeyp
     p, session = _prefetcher(monkeypatch, _PKG)
     _run(p, "৩০০ টাকার নেট প্যাক?", Judgement(0.9, "packages", 0.97))
     assert seen == [session.userdata]
+
+
+def test_a_package_search_with_no_criteria_is_left_to_the_llm(monkeypatch, tools):
+    # "কী কী প্যাকেজ আছে?": the LLM asks what kind first instead of listing a mix.
+    p, _ = _prefetcher(monkeypatch, RouterArgs(packages={}))
+    lookups, _, _ = _run(p, "কী কী প্যাকেজ আছে?", Judgement(0.9, "packages", 0.97))
+    assert lookups == [] and tools == []

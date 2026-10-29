@@ -35,6 +35,9 @@ class SessionUserdata:
     # in a row, and the customer's latest turn, which narrows the next set.
     shown_packages: str = ""
     turn_text: str = ""
+    # The customer is closing the topic with this turn (the turn judge, or
+    # app.agent.closing_offer.acknowledges): the reply offers more help.
+    wrap_up: bool = False
     # The subscriber this session is about (from the dispatch metadata); the
     # transcript recorder links the conversation to it on close.
     subscriber_id: UUID | None = None

@@ -205,6 +205,9 @@ class Prefetcher:
         try:
             if name == "search_packages":
                 call_args = dict(args.packages)
+                if not call_args:
+                    # "কী কী প্যাকেজ আছে?": the LLM asks what kind before searching.
+                    return None
                 # The tool's own run: it also puts the package cards on screen.
                 output = await run_search_packages(self.session.userdata, **call_args)
             elif name == care_centres.TOOL_NAME:

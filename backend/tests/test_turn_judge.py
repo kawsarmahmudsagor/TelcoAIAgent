@@ -47,8 +47,8 @@ def test_request_is_one_noul_question_with_the_conversation_as_state():
     ]
     body = build_request("typesafe/jev-1.13", history, "তিনশো টাকা", "speaking", "formal")
     assert body["model"] == "typesafe/jev-1.13"
-    (key,) = body["questions"]
-    assert key == turn_judge.QUESTION_KEY
+    assert set(body["questions"]) == {turn_judge.QUESTION_KEY, turn_judge.WRAP_UP_KEY}
+    key = turn_judge.QUESTION_KEY
     question = body["questions"][key]
     assert question["type"] == "noul"
     assert set(question["criteria"]) == {"true", "false"}
@@ -113,7 +113,7 @@ def test_timeout_returns_none():
 
 def test_lookup_question_is_added_only_when_asked():
     plain = build_request("m", [], "hi", "listening")
-    assert set(plain["questions"]) == {turn_judge.QUESTION_KEY}
+    assert set(plain["questions"]) == {turn_judge.QUESTION_KEY, turn_judge.WRAP_UP_KEY}
 
     routed = build_request("m", [], "৩০০ টাকার প্যাক আছে?", "listening", lookup=True)
     question = routed["questions"][turn_judge.LOOKUP_KEY]
@@ -201,3 +201,26 @@ def test_over_the_agent_jev_hears_what_it_is_saying():
     asyncio.run(go())
     assert f"Assistant: {listing} …" in sent[0]["state"]
     assert "Assistant:" not in sent[1]["state"]
+
+
+
+def test_the_wrap_up_answer_is_read():
+    import asyncio
+
+    import httpx
+
+    def handler(request):
+        return httpx.Response(200, json={"answers": {
+            turn_judge.QUESTION_KEY: {"noul": 0.97},
+            turn_judge.WRAP_UP_KEY: {"noul": 0.88},
+        }})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await turn_judge.judge(client, "http://x", "k", {}, 1.0, utterance="আচ্ছা, বুঝেছি")
+
+    judgement = asyncio.run(go())
+    assert judgement.p == 0.97 and judgement.wrap_up_p == 0.88
+    question = build_request("m", [], "ok", "listening")["questions"][turn_judge.WRAP_UP_KEY]
+    assert question["type"] == "noul" and set(question["criteria"]) == {"true", "false"}
+    assert turn_judge.WRAP_UP_KEY not in build_request("m", [], "ok", "listening", wrap_up=False)["questions"]

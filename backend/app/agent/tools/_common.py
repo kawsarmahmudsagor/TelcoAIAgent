@@ -117,8 +117,8 @@ def listed(lines: list[str], total: int) -> list[str]:
     out = lines[:LISTED]
     if total > READ_OUT:
         out.append(
-            f"Read out {READ_OUT} at a time; the others above are for when the customer asks "
-            "for more."
+            f"Name {READ_OUT} at a time; keep the others above for when the customer wants "
+            "the rest."
         )
     if total > LISTED:
         out.append(f"{total - LISTED} more not listed; offer to narrow it down.")

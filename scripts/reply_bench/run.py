@@ -29,7 +29,7 @@ sys.path.insert(0, str(_HERE.parents[1] / "backend"))
 from livekit.agents import Agent, AgentSession  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-from app.agent import highlights, prompt_defaults  # noqa: E402
+from app.agent import closing_offer, highlights, prompt_defaults  # noqa: E402
 from app.agent.entrypoint import (  # noqa: E402
     _build_llm,
     _load_agent_config,
@@ -74,7 +74,36 @@ SIM_TURNS = [
     "হ্যাঁ, একটু বলেন কোথায় যেতে হবে। আমি গাজীপুরে থাকি।",
     "ফি কত?",
     "customer care kothay? ami mirpur e thaki",
+    "NID কার্ডের ফটোকপি আনলে হবে? না আমাকে অরিজিনাল NID কার্ডটাই আনতে হবে?",
+    "এছাড়া কি আর কিছু করা লাগবে?",
 ]
+
+
+# Package questions in Bangla: does the reply sound spoken, or translated?
+PACKAGE_TURNS = [
+    "কী কী প্যাকেজ আছে?",
+    "ডাটা প্যাকেজ",
+    "হ্যাঁ, আরও বলুন",
+    "হ্যাঁ",
+    "মিনিটের প্যাকেজ কী আছে?",
+    "বিকাশ দিয়ে প্যাকেজ কিনলে কি পয়েন্ট পাবো?",
+    "সাত দিনের মধ্যে কোনো কম্বো প্যাকেজ আছে?",
+]
+
+# Word-for-word translations the prompt warns about (LANGUAGE).
+CALQUES = {
+    "শুনবেন/শুনতে চান (hear more)": re.compile(r"শুনবেন|শুনতে চান"),
+    "two offers in one question": re.compile(r"নাকি[^?]*দেব"),
+    "কথা বলা নেই / উল্লেখ নেই": re.compile(r"কথা বলা নেই|উল্লেখ নেই"),
+}
+
+
+class _BenchAgent(Agent):
+    """The live agents' per-turn additions that don't need a room."""
+
+    def llm_node(self, chat_ctx, tools, model_settings):
+        chat_ctx = closing_offer.with_reminder(chat_ctx, self.session.userdata)
+        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
 
 
 class _NoRoom:
@@ -113,6 +142,7 @@ async def main() -> None:
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--guest", action="store_true", help="not logged in")
     parser.add_argument("--sim", action="store_true", help="the stolen-SIM conversation")
+    parser.add_argument("--packages", action="store_true", help="package questions in Bangla")
     args = parser.parse_args()
     if args.baseline:
         _apply_baseline()
@@ -130,13 +160,19 @@ async def main() -> None:
     tools = registry.telco_tools()
     if _rag_enabled(config):
         tools.append(build_search_knowledge_base(config))
-    agent = Agent(
+    agent = _BenchAgent(
         instructions=build_system_prompt(userdata, config, rag_tool_available=_rag_enabled(config)),
         tools=tools,
     )
     async with AgentSession(llm=_build_llm(get_settings(), config), userdata=userdata) as session:
         await session.start(agent)
-        turns = SIM_TURNS if args.sim else GUEST_TURNS if args.guest else TURNS
+        turns = (
+            PACKAGE_TURNS if args.packages
+            else SIM_TURNS if args.sim
+            else GUEST_TURNS if args.guest
+            else TURNS
+        )
+        said: list[str] = []
         for turn in turns:
             started = time.perf_counter()
             result = await session.run(user_input=turn)
@@ -154,7 +190,14 @@ async def main() -> None:
                 print(f"  [{', '.join(tools)}]")
             for reply in replies:
                 print(f"  {reply}")
+            said += replies
             print()
+        endings = [re.split(r"(?<=[।.!])\s+", r.strip())[-1] for r in said if r.strip().endswith("?")]
+        repeats = sum(a == b for a, b in zip(endings, endings[1:]))
+        print(f"Same closing question twice in a row: {repeats}")
+        print("Calques:")
+        for name, pattern in CALQUES.items():
+            print(f"  {name}: {sum(len(pattern.findall(r)) for r in said)}")
 
 
 if __name__ == "__main__":

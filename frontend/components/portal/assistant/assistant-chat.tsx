@@ -8,6 +8,7 @@ import {
   Loader2Icon,
   MicIcon,
   MicOffIcon,
+  PhoneIcon,
   PhoneOffIcon,
   Volume2Icon,
   VolumeXIcon,
@@ -54,7 +55,9 @@ export function BotAvatar({ size = 'md', className }: { size?: 'sm' | 'md'; clas
 
 /**
  * The chat panel's header: the assistant's name, its live status, the chat history toggle, and
- * the speaker toggle while connected. `actions` go on the right (e.g. the bubble's buttons).
+ * the speaker toggle while connected, and a call button that starts a voice conversation (as
+ * "Talk instead of typing" does) while the mic is off. `actions` go on the right (e.g. the
+ * bubble's buttons).
  */
 export function AssistantChatHeader({
   titleAs: Title = 'h2',
@@ -65,8 +68,16 @@ export function AssistantChatHeader({
   actions?: ReactNode;
   className?: string;
 }) {
-  const { isConnected, connecting, micEnabled, agentState, historyOpen, setHistoryOpen } =
-    useAssistant();
+  const {
+    isConnected,
+    connecting,
+    micEnabled,
+    agentState,
+    historyOpen,
+    setHistoryOpen,
+    toggleMic,
+    voiceMode,
+  } = useAssistant();
   const { muted, toggleMuted } = useCallAudio();
 
   let status = 'Usually replies instantly';
@@ -89,6 +100,11 @@ export function AssistantChatHeader({
         </p>
       </div>
       <StartAudioButton label="Allow audio" size="sm" />
+      {voiceMode !== 'off' && !micEnabled && !connecting && (
+        <HeaderButton label="Talk to the assistant" onClick={toggleMic}>
+          <PhoneIcon aria-hidden="true" />
+        </HeaderButton>
+      )}
       <HeaderButton
         label={historyOpen ? 'Back to the chat' : 'Chat history'}
         onClick={() => setHistoryOpen(!historyOpen)}

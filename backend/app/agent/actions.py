@@ -92,6 +92,26 @@ class CaseDraft:
     category: str
     description: str
     priority: CasePriority
+    # Agent replies finished since the draft was made (age_case_draft).
+    replies: int = 0
+
+
+# A draft lives through the reply that read it back and the caller's answer to
+# it; a draft still unconfirmed when the next reply ends was dropped.
+CASE_DRAFT_REPLIES = 2
+
+
+def age_case_draft(userdata: SessionUserdata) -> None:
+    """Called when the agent finishes a reply. A draft the model moved on from
+    (handed to a human instead, or never read back) is cleared, else it would
+    keep every later turn from the quick replies, the closing offer and the
+    idle check-in. A re-drafted case starts again at 0."""
+    draft = userdata.pending_case
+    if draft is None:
+        return
+    draft.replies += 1
+    if draft.replies >= CASE_DRAFT_REPLIES:
+        userdata.pending_case = None
 
 
 async def _uncancellable(coro: Awaitable[T]) -> T:

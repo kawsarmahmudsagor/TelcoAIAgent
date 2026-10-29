@@ -46,7 +46,15 @@ from livekit.agents.types import FlushSentinel
 from livekit.agents import room_io
 from livekit.agents.voice.events import UserInputTranscribedEvent
 
-from app.agent import cards, quick_reply, reply_punctuation, turn_gate, turn_judge, voice_level
+from app.agent import (
+    cards,
+    closing_offer,
+    quick_reply,
+    reply_punctuation,
+    turn_gate,
+    turn_judge,
+    voice_level,
+)
 from app.agent.prefetch import Prefetcher
 from app.agent.quick_reply import QuickReplyRuntime
 from app.agent.turn_gate import GateState, Thresholds, Verdict
@@ -908,6 +916,10 @@ class TurnGateController:
         self._hook = hook
         seen_barge_ins = self._barge_ins
         self.pending_filler = None
+        if (userdata := getattr(self.session, "userdata", None)) is not None:
+            userdata.wrap_up = closing_offer.wraps_up(
+                judgement.wrap_up_p if judgement is not None else None, text
+            )
         try:
             path = None
             if self.quick is not None:
@@ -1126,10 +1138,16 @@ class TurnGateController:
             return False
         pre = turn_gate.precheck(text, None)
         # Typed text isn't STT output: any script is what the customer wrote.
+        userdata = getattr(self.session, "userdata", None)
         if not turn_gate.needs_judge(pre, stt_writes_bengali=False):
+            if userdata is not None:
+                userdata.wrap_up = closing_offer.acknowledges(text)
             return True
-        p = (await self.judge(text, "listening")).p
+        judgement = await self.judge(text, "listening")
+        p = judgement.p
         if p is None or p >= self.config.thresholds.drop_p:
+            if userdata is not None:
+                userdata.wrap_up = closing_offer.wraps_up(judgement.wrap_up_p, text)
             _log("typed_accept", text, p=p)
             return True
         _log("typed_drop", text, p=p)
@@ -1314,7 +1332,9 @@ class GatedAgent(Agent):
                     gate.on_fast(False)
                 return
         async for chunk in self._cards_with_speech(
-            Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+            Agent.default.llm_node(
+                self, closing_offer.with_reminder(chat_ctx, _userdata(self)), tools, model_settings
+            )
         ):
             yield chunk
 
@@ -1447,7 +1467,9 @@ class TurnPublishingAgent(Agent):
         self, chat_ctx: llm.ChatContext, tools: list[llm.Tool], model_settings
     ) -> AsyncIterable[llm.ChatChunk | str]:
         return reply_punctuation.clean_reply_stream(
-            Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+            Agent.default.llm_node(
+                self, closing_offer.with_reminder(chat_ctx, _userdata(self)), tools, model_settings
+            )
         )
 
     async def on_user_turn_completed(

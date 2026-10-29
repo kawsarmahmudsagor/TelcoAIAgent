@@ -96,6 +96,8 @@ def test_unknown_details_point_to_the_operator_hotline():
             assert "hotline" in flat, (name, rag)
             assert "{operator_" not in prompt, (name, rag)
             assert "say you don't have that detail" not in flat, (name, rag)
+            # "... কথা বলা নেই" is the same shrug: answer from the facts, then a next step.
+            assert "কথা বলা নেই" in flat and "lightest exit" in flat, (name, rag)
 
 
 def test_knowledge_base_tool_points_to_the_team_not_a_shrug():
@@ -235,3 +237,12 @@ def test_greeting_defaults_fit_the_operator():
     assert not any("অফার" in line for line in SPOKEN_GREETINGS_GUEST)
     can_do = " ".join(GUEST_SNAPSHOT.split()).split("You can still talk about")[1].split(".")[0]
     assert "offer" not in can_do and "district" in can_do
+
+
+def test_bangla_is_said_not_translated_and_a_broad_package_ask_is_narrowed_first():
+    from app.agent.prompt_defaults import DEFAULTS
+
+    flat = _flat(DEFAULTS["prompt_identity_rules"])
+    assert "never translate" in flat and "not lines to reuse" in flat
+    assert "they'd like to hear more" not in flat
+    assert "what kind they're after" in flat and "recommend_packages" in flat

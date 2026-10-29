@@ -9,6 +9,7 @@ import pytest
 from livekit.agents.llm import ToolError
 from sqlalchemy import func, select
 
+from app.agent import actions
 from app.agent.quick_reply import route
 from app.agent.tools import packages, recharge, rewards, support, verify
 from app.agent.turn_judge import Judgement
@@ -183,7 +184,68 @@ def test_handoff_is_idempotent_per_session(bss_world):
     first, again = asyncio.run(go())
     rows = _cases(bss_world, sub)
     assert len(rows) == 1 and rows[0].ref in first and rows[0].ref in again
+    assert "Added this" in again and "Customer asked again." in rows[0].description
     assert ud.handoff_action_id is not None
+    # Only the first request announces a new case.
+    assert len([t for t, _ in _sent(ud) if t == CASE_CREATED]) == 1
+
+
+def test_handoff_drops_unconfirmed_case_draft(bss_world):
+    # run_49: a drafted case left unconfirmed by a handoff kept every later
+    # turn from the quick replies.
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    settings = Settings(_env_file=None)
+    config = resolve(None, settings)
+    config.quick_reply_enabled = True
+    judgement = Judgement(0.9, "none", 0.99)
+
+    async def go():
+        await support.run_create_support_case(ud, "poor_network", "Bad network.")
+        await support.run_request_human_agent(ud, "Unhappy with the network.")
+
+    asyncio.run(go())
+    assert ud.pending_case is None
+    assert route(judgement, ud, config, settings) is not None
+
+
+def test_unconfirmed_case_draft_expires_after_next_reply(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+    asyncio.run(support.run_create_support_case(ud, "slow_data", "Data is slow."))
+    actions.age_case_draft(ud)  # the reply that read it back
+    assert ud.pending_case is not None  # the caller's answer still goes to the main model
+    actions.age_case_draft(ud)  # the next reply moved on
+    assert ud.pending_case is None
+
+
+def test_redrafted_case_starts_aging_again(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+
+    async def go():
+        await support.run_create_support_case(ud, "slow_data", "Data is slow.")
+        actions.age_case_draft(ud)
+        await support.run_create_support_case(ud, "slow_data", "Data is slow in Mirpur.")
+        actions.age_case_draft(ud)
+
+    asyncio.run(go())
+    assert ud.pending_case is not None and ud.pending_case.description.endswith("Mirpur.")
+
+
+def test_repeat_handoff_adds_its_reason_once(bss_world):
+    sub = bss_world.subscriber()
+    ud = _ud(sub)
+
+    async def go():
+        await support.run_request_human_agent(ud, "Wants to switch operator.")
+        await support.run_request_human_agent(ud, "Poor network in Dhanmondi.")
+        await support.run_request_human_agent(ud, "Poor network in Dhanmondi.")
+
+    asyncio.run(go())
+    (row,) = _cases(bss_world, sub)
+    assert row.description == "Wants to switch operator.\nPoor network in Dhanmondi."
+    assert len([t for t, _ in _sent(ud) if t == CASE_CREATED]) == 1
 
 
 def test_pending_case_cleared_after_create(bss_world):

@@ -34,6 +34,7 @@ from livekit.plugins import deepgram, elevenlabs, google, openai, silero
 from app.agent import (
     account_link,
     action_rpc,
+    actions,
     audio_cache,
     browser_end_call,
     elevenlabs_keys,
@@ -929,6 +930,10 @@ async def entrypoint(ctx: JobContext) -> None:
     )
     refresher.attach()
     refresher.start()
+    session.on(
+        "agent_state_changed",
+        lambda ev: ev.new_state == "listening" and actions.age_case_draft(userdata),
+    )
     account_link.AccountLink(
         session=session, agent=agent, userdata=userdata, room=ctx.room, config=config
     ).attach()

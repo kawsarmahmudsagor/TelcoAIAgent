@@ -55,6 +55,31 @@ def test_human_handoff_is_high_priority(bss_world, db):
     assert c.description == "wants a person"
 
 
+def test_repeat_handoff_adds_its_reason_once(bss_world, db):
+    s = bss_world.subscriber()
+    aid = uuid4()
+
+    def ask(reason):
+        return cases.request_human_agent(
+            db, s.id, reason=reason, source=CaseSource.agent, action_id=aid
+        )
+
+    first = ask("wants to switch operator")
+    again = ask("poor network in Dhanmondi")
+    ask("poor network in Dhanmondi")
+    assert again.ref == first.ref
+    assert again.description == "wants to switch operator\npoor network in Dhanmondi"
+    assert len(cases.get_case_status(db, s.id)) == 1
+
+
+def test_repeat_handoff_from_other_subscriber_rejected(bss_world, db):
+    s1, s2 = bss_world.subscriber(), bss_world.subscriber()
+    aid = uuid4()
+    cases.request_human_agent(db, s1.id, reason="a", source=CaseSource.agent, action_id=aid)
+    with pytest.raises(CaseNotFound):
+        cases.request_human_agent(db, s2.id, reason="b", source=CaseSource.agent, action_id=aid)
+
+
 def test_case_status_scoped_to_subscriber(bss_world, db):
     s1, s2 = bss_world.subscriber(), bss_world.subscriber()
     c = _mk(db, s1)

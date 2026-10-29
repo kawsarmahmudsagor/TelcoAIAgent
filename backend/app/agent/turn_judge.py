@@ -27,6 +27,9 @@ QUESTION_KEY = "addressed"
 # The turn router's question (app.agent.turn_router), asked in the same request:
 # which lookup the reply will need, so it can run before the LLM.
 LOOKUP_KEY = "lookup"
+# Whether the customer is closing the topic, so the reply offers more help
+# (app.agent.closing_offer), asked in the same request.
+WRAP_UP_KEY = "wrap_up"
 
 _INSTRUCTIONS = (
     "A mobile operator's voice assistant is in a live call with a customer in Bangladesh. "
@@ -87,15 +90,37 @@ _LOOKUP_CRITERIA = {
 }
 
 
+_WRAP_UP_INSTRUCTIONS = (
+    "Is the customer closing the current topic with this utterance, rather than asking about "
+    "it or continuing it? A person on a helpline would then ask whether they need anything "
+    "else."
+)
+
+_WRAP_UP_CRITERIA = {
+    "true": (
+        "The customer accepts or acknowledges the answer (ok, ঠিক আছে, আচ্ছা, বুঝেছি, বুঝলাম, got "
+        "it), thanks the assistant, says what they'll do now (তাহলে ওটাই করব, I'll go there), "
+        "or declines what was offered without asking anything new (না, লাগবে না)."
+    ),
+    "false": (
+        "The customer asks a question, a follow-up or for more detail, makes a request, gives "
+        "information the assistant asked for (a number, a code, a choice, yes to an offer), "
+        "corrects the assistant, or says goodbye outright."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class Judgement:
     """Jev's answers for one utterance. p = P(addressed), None when the call failed
-    or timed out. lookup / lookup_p only when the lookup question was asked."""
+    or timed out. lookup / lookup_p only when the lookup question was asked.
+    wrap_up_p: P(the customer is closing the topic), None when not answered."""
 
     p: float | None
     lookup: str | None = None
     lookup_p: float | None = None
     text: str | None = None
+    wrap_up_p: float | None = None
 
 
 @dataclass(frozen=True)
@@ -149,9 +174,10 @@ def build_request(
     *,
     lookup: bool = False,
     knowledge_base: bool = False,
+    wrap_up: bool = True,
 ) -> dict:
     """lookup adds the router's choice question (knowledge_base: whether that's
-    an option)."""
+    an option); wrap_up the closing-the-topic question."""
     questions: dict = {
         QUESTION_KEY: {
             "type": "noul",
@@ -161,6 +187,12 @@ def build_request(
     }
     if lookup:
         questions[LOOKUP_KEY] = lookup_question(knowledge_base)
+    if wrap_up:
+        questions[WRAP_UP_KEY] = {
+            "type": "noul",
+            "instructions": _WRAP_UP_INSTRUCTIONS,
+            "criteria": _WRAP_UP_CRITERIA,
+        }
     return {
         "model": model,
         "state": build_state(history, utterance, bot_state, address_form),
@@ -191,6 +223,7 @@ async def judge(
         answers = body["answers"]
         p = min(1.0, max(0.0, float(answers[QUESTION_KEY]["noul"])))
         lookup, lookup_p = _lookup_answer(answers.get(LOOKUP_KEY))
+        wrap_up_p = _noul(answers.get(WRAP_UP_KEY))
         usage = body.get("usage") or {}
         cost = usage.get("cost")
         usage_logger.info(
@@ -202,12 +235,19 @@ async def judge(
             p,
             f", lookup={lookup}" if lookup is not None else "",
         )
-        return Judgement(p, lookup, lookup_p, text=utterance)
+        return Judgement(p, lookup, lookup_p, text=utterance, wrap_up_p=wrap_up_p)
     except (TimeoutError, asyncio.TimeoutError):
         logger.warning("turn judge timed out after %.2fs", timeout_s)
     except Exception as exc:
         logger.warning("turn judge failed: %s", exc)
     return Judgement(None, text=utterance)
+
+
+def _noul(answer: object) -> float | None:
+    """A yes/no answer's probability, None if missing."""
+    if not isinstance(answer, dict) or not isinstance(answer.get("noul"), (int, float)):
+        return None
+    return min(1.0, max(0.0, float(answer["noul"])))
 
 
 def _lookup_answer(answer: object) -> tuple[str | None, float | None]:

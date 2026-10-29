@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import unicodedata
 from decimal import Decimal
 
@@ -12,6 +11,7 @@ from livekit.agents.llm import ToolError
 from sqlalchemy.orm import Session
 
 from app.agent import actions, cards
+from app.agent.spoken_numbers import named_amounts
 from app.agent.telco_format import format_amount, format_data
 from app.agent.tools._common import (
     LISTED,
@@ -47,46 +47,50 @@ def _card(p: PackageView) -> dict:
     }
 
 
-# A size the customer names ("একশো মিনিটের", "2 GB", "৫০০ এমবি"), so the
-# cards show only the packages they asked about.
-_NUMBER_WORDS = {
-    "এক": 1, "দুই": 2, "দু": 2, "তিন": 3, "চার": 4, "পাঁচ": 5, "ছয়": 6, "সাত": 7, "আট": 8,
-    "নয়": 9, "দশ": 10, "বারো": 12, "পনেরো": 15, "বিশ": 20, "পঁচিশ": 25, "ত্রিশ": 30,
-    "চল্লিশ": 40, "পঞ্চাশ": 50, "একশো": 100, "একশ": 100, "দেড়শো": 150, "দুইশো": 200,
-    "দুশো": 200, "তিনশো": 300, "চারশো": 400, "পাঁচশো": 500, "ছয়শো": 600, "হাজার": 1000,
-    "এক হাজার": 1000, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15, "twenty": 20, "thirty": 30,
-    "fifty": 50, "hundred": 100, "one hundred": 100, "thousand": 1000, "one thousand": 1000,
+# Words of a package's name or tag as customers say them, so "থ্রি জিবি
+# উইকএন্ড" finds "3 GB Weekend". Amounts are app.agent.spoken_numbers' job.
+_NAME_WORDS = {
+    "daily": ("daily", "ডেইলি", "দৈনিক"),
+    "weekend": ("weekend", "উইকএন্ড", "উইকেন্ড"),
+    "weekly": ("weekly", "উইকলি", "সাপ্তাহিক"),
+    "monthly": ("monthly", "মান্থলি", "মাসিক"),
+    "smart": ("smart", "স্মার্ট"),
+    "starter": ("starter", "স্টার্টার"),
+    "popular": ("popular", "পপুলার"),
+    "premium": ("premium", "প্রিমিয়াম"),
+    "exclusive": ("exclusive", "এক্সক্লুসিভ"),
 }
-_WORDS = "|".join(sorted(map(re.escape, _NUMBER_WORDS), key=len, reverse=True))
-_SIZE_RE = re.compile(
-    rf"(?<![\wঀ-৿])([\d০-৯]+(?:\.\d+)?|{_WORDS})\s*-?\s*"
-    r"(জিবি|গিগা|এমবি|মিনিট|gb|mb|minutes?|mins?)(?![a-z])",
-    re.IGNORECASE,
-)
-_BENGALI_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 
 
-def _named_sizes(text: str) -> set[tuple[str, float]]:
-    """("data_mb" | "minutes", amount) for each size in `text`."""
-    sizes = set()
-    for m in _SIZE_RE.finditer(unicodedata.normalize("NFC", text)):
-        word, unit = m.group(1).lower(), m.group(2).lower()
-        number = _NUMBER_WORDS.get(word) or float(word.translate(_BENGALI_DIGITS))
-        if unit in ("জিবি", "গিগা", "gb"):
-            sizes.add(("data_mb", number * 1024))
-        elif unit in ("এমবি", "mb"):
-            sizes.add(("data_mb", number))
-        else:
-            sizes.add(("minutes", number))
-    return sizes
+def _named_words(text: str) -> set[str]:
+    text = unicodedata.normalize("NFC", text).lower()
+    return {
+        word
+        for word, said in _NAME_WORDS.items()
+        if any(unicodedata.normalize("NFC", s) in text for s in said)
+    }
+
+
+def _matches(p: PackageView, amounts: set[tuple[str, float]], words: set[str]) -> int:
+    """How many of the things the customer named this package has."""
+    own = {
+        "data_mb": p.data_mb, "minutes": p.minutes, "sms": p.sms, "price": float(p.price),
+        "validity_days": p.validity_days,
+    }
+    label = f"{p.name} {p.tag or ''}".lower()
+    return sum(own[field] == amount for field, amount in amounts) + sum(w in label for w in words)
 
 
 def _about_turn(found: list[PackageView], text: str) -> list[PackageView]:
-    """The packages with a size the customer named, when any have one; else all."""
-    sizes = _named_sizes(text)
-    named = [p for p in found if any(getattr(p, field) == n for field, n in sizes)]
-    return named or found
+    """The packages that best fit what the customer named in this turn (size,
+    price, name: "থ্রি জিবি উইকএন্ড উনসত্তর টাকা" is one package); all of
+    them when they named nothing any package has."""
+    amounts, words = named_amounts(text), _named_words(text)
+    scores = [_matches(p, amounts, words) for p in found]
+    best = max(scores, default=0)
+    if best == 0:
+        return found
+    return [p for p, score in zip(found, scores) if score == best]
 
 
 async def _publish_cards(userdata: SessionUserdata, title: str, found: list[PackageView]) -> None:
@@ -216,7 +220,7 @@ async def search_packages(
     validity_days: int | None = None,
 ) -> str:
     """Search the active package catalogue (works for anyone, no login needed).
-    Returns up to ten matches, cheapest first; read them out three at a time.
+    Returns up to ten matches, cheapest first; name them three at a time.
 
     Args:
         kind: Optional: "data", "voice", "bundle" or "sms".

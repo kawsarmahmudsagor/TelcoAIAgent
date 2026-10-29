@@ -2,7 +2,7 @@
 
 ## English
 
-Earning points: every successful telco recharge or bill payment earns reward points, 1 point for every full 10 taka. Only full 10 taka count: a 45 taka recharge earns 4 points, a 99 taka recharge earns 9 points, and a 200 taka recharge earns 20 points. The leftover taka below 10 earns nothing and is not saved for your next recharge. A failed or pending recharge earns nothing until it succeeds.
+Earning points: every successful telco recharge or bill payment earns reward points, 1 point for every full 10 taka. Only full 10 taka count: a 45 taka recharge earns 4 points, a 99 taka recharge earns 9 points, and a 200 taka recharge earns 20 points. The leftover taka below 10 earns nothing and is not saved for your next recharge. A failed or pending recharge earns nothing until it succeeds. Buying a package earns no points, however you pay for it (main balance, bKash, Nagad or card), and neither does redeeming points. To earn points on a package, recharge first (by bKash, Nagad or card) and then buy the package from your main balance: the recharge earns the points.
 
 Who gets the points: the person who pays. If you recharge a friend's or family member's number, the points go to your account, not theirs.
 
@@ -12,7 +12,7 @@ Check your points: see your points and the rewards you can redeem on the Offers 
 
 ## বাংলা
 
-পয়েন্ট পাওয়া: telco-এ প্রতিটা সফল রিচার্জ বা বিল পেমেন্টে রিওয়ার্ড পয়েন্ট পাবেন, প্রতি পুরো ১০ টাকায় ১ পয়েন্ট। শুধু পুরো ১০ টাকা গোনা হয়: ৪৫ টাকা রিচার্জে ৪ পয়েন্ট, ৯৯ টাকায় ৯ পয়েন্ট, আর ২০০ টাকায় ২০ পয়েন্ট। ১০ টাকার কম যেটুকু বাকি থাকে, সেটায় পয়েন্ট আসে না, আর পরের রিচার্জেও যোগ হয় না। রিচার্জ ফেইল বা পেন্ডিং থাকলে সফল না হওয়া পর্যন্ত পয়েন্ট আসে না।
+পয়েন্ট পাওয়া: telco-এ প্রতিটা সফল রিচার্জ বা বিল পেমেন্টে রিওয়ার্ড পয়েন্ট পাবেন, প্রতি পুরো ১০ টাকায় ১ পয়েন্ট। শুধু পুরো ১০ টাকা গোনা হয়: ৪৫ টাকা রিচার্জে ৪ পয়েন্ট, ৯৯ টাকায় ৯ পয়েন্ট, আর ২০০ টাকায় ২০ পয়েন্ট। ১০ টাকার কম যেটুকু বাকি থাকে, সেটায় পয়েন্ট আসে না, আর পরের রিচার্জেও যোগ হয় না। রিচার্জ ফেইল বা পেন্ডিং থাকলে সফল না হওয়া পর্যন্ত পয়েন্ট আসে না। প্যাকেজ কিনলে পয়েন্ট আসে না, মেইন ব্যালেন্স, বিকাশ, নগদ বা কার্ড যেভাবেই পেমেন্ট করুন, আর পয়েন্ট রিডিম করলেও আসে না। প্যাকেজের সাথে পয়েন্ট পেতে চাইলে আগে বিকাশ, নগদ বা কার্ডে রিচার্জ করে তারপর মেইন ব্যালেন্স থেকে প্যাকেজ কিনুন, রিচার্জের পয়েন্টটা পাবেন।
 
 পয়েন্ট কে পাবে: যিনি পেমেন্ট করছেন। বন্ধু বা ফ্যামিলির নম্বরে রিচার্জ করলে পয়েন্ট আপনার অ্যাকাউন্টে যোগ হবে, তাদের না।
 

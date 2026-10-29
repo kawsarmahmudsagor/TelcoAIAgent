@@ -338,7 +338,7 @@ def test_fast_rules_hand_off_telco_facts_and_codes():
 
 
 def test_filler_examples_are_telco():
-    for line in ("ব্যালেন্সটা চেক করছি।", "প্যাকেজগুলো দেখছি।", "Checking your account."):
+    for line in ("ব্যালেন্সটা চেক করে জানাচ্ছি।", "প্যাকেজগুলো দেখে বলছি।", "Checking your account."):
         assert line in quick_reply._FILLER_SYSTEM
 
 
@@ -495,12 +495,10 @@ def test_a_purchase_or_recharge_asked_for(utterance):
     assert set(_fillers(utterance, "none", n=50)) <= set(quick_reply._ACTION_BN)
 
 
-def test_wanting_a_package_and_asking_what_exists_is_a_search():
-    line = quick_reply.fast_filler(
-        "আমি নতুন একটা প্যাকেজ নিতে চাচ্ছি, কী কী options আছে?", "packages",
-        rng=random.Random(1),
-    )
-    assert line not in quick_reply._ACTION_BN and "প্যাকেজ" in line
+def test_wanting_a_package_and_asking_what_exists_gets_a_neutral_line():
+    # The reply asks what kind first, so the filler doesn't promise a search.
+    for line in set(_fillers("আমি নতুন একটা প্যাকেজ নিতে চাচ্ছি, কী কী options আছে?", "packages", n=50)):
+        assert line not in quick_reply._ACTION_BN and line in quick_reply._GENERIC_BN, line
 
 
 def test_a_complaint_ending_in_na_is_not_a_correction():
@@ -595,7 +593,7 @@ def test_fillers_in_a_row_never_share_an_opener_or_a_verb(utterance):
 def test_a_line_already_cached_is_picked_more_often(tmp_path):
     from app.agent.audio_cache import AudioCache
 
-    cached = "আচ্ছা, আপনার ব্যালেন্সটা দেখে নিচ্ছি।"
+    cached = "আচ্ছা, আপনার ব্যালেন্সটা দেখে জানাচ্ছি।"
     cache = AudioCache(tmp_path)
     cache.save(cached, b"\x00\x00" * 100, 24000, 1, "voice:model")
     picks = Counter(_fillers("আমার ব্যালেন্স কত আছে?", n=2000, cache=cache))
@@ -667,7 +665,7 @@ def test_every_echo_of_the_longest_entities_fits(utterance):
 
 
 def test_only_filler_lines_are_cacheable():
-    assert quick_reply.is_filler_line("জি, আপনার ব্যালেন্সটা চেক করছি")  # punctuation aside
+    assert quick_reply.is_filler_line("জি, আপনার ব্যালেন্সটা চেক করে জানাচ্ছি")  # punctuation aside
     assert not quick_reply.is_filler_line("আপনার ব্যালেন্স ৫০ টাকা।")
     quick_reply.remember_filler("ওকে, আপনার প্যাকটা দেখছি।")
     assert quick_reply.is_filler_line("ওকে, আপনার প্যাকটা দেখছি।")
@@ -682,3 +680,75 @@ def test_ruled_out_validity_or_size_is_not_echoed():
     assert not any("মাসিক" in line for line in lines)
     assert quick_reply._size("২ জিবি না, ৫ জিবির প্যাকেজ") == ("৫ জিবির", "৫ GB")
     assert quick_reply._validity("not 30 days, a weekly one") == ("সাত দিনের", "weekly")
+
+
+@pytest.mark.parametrize(
+    ("utterance", "lines"),
+    [
+        ("আমি সর্বনিম্ন কত রিচার্জ করতে পারব?", quick_reply._RECHARGE_LIMIT_BN),
+        ("সর্বোচ্চ কত টাকা রিচার্জ করা যায়?", quick_reply._RECHARGE_LIMIT_BN),
+        ("বিকাশ দিয়ে কিভাবে রিচার্জ করব?", quick_reply._RECHARGE_HOW_BN),
+        # Perks before how-to: it's about the cashback, not paying by bKash.
+        ("বিকাশে রিচার্জ করলে ক্যাশব্যাক কত?", quick_reply._RECHARGE_PERKS_BN),
+        ("১০০ টাকা রিচার্জ দিলাম, আসেনি", quick_reply._RECHARGE_STATUS_BN),
+        ("What is the minimum recharge?", quick_reply._RECHARGE_LIMIT_EN),
+    ],
+)
+def test_a_recharge_question_gets_the_lines_of_its_kind(utterance, lines):
+    for line in set(_fillers(utterance, n=40)):
+        assert line in lines, line
+
+
+def test_a_recharge_request_still_gets_an_action_line():
+    for line in set(_fillers("১০০ টাকা রিচার্জ করুন", n=40)):
+        assert line in quick_reply._ACTION_BN, line
+
+
+def test_a_new_kind_of_recharge_question_is_not_a_follow_up():
+    last = quick_reply._RECHARGE_STATUS_BN[0]
+    for line in set(_fillers("আচ্ছা, সর্বনিম্ন কত রিচার্জ করা যায়?", n=40, avoid=[last])):
+        assert line in quick_reply._RECHARGE_LIMIT_BN, line
+
+
+def test_recharge_kind_lines_are_safe_and_cacheable():
+    sets = [
+        quick_reply._RECHARGE_STATUS_BN, quick_reply._RECHARGE_LIMIT_BN,
+        quick_reply._RECHARGE_HOW_BN, quick_reply._RECHARGE_PERKS_BN,
+        quick_reply._RECHARGE_STATUS_EN, quick_reply._RECHARGE_LIMIT_EN,
+        quick_reply._RECHARGE_HOW_EN, quick_reply._RECHARGE_PERKS_EN,
+    ]
+    for line in (line for lines in sets for line in lines):
+        assert safe_filler(line, "রিচার্জ") == line, line
+        assert quick_reply.is_filler_line(line), line
+
+
+def test_how_much_taka_names_no_amount_but_an_amount_still_fails():
+    assert safe_filler("বুঝেছি, কত টাকা রিচার্জ করা যায় দেখে জানাচ্ছি।", "সর্বনিম্ন কত রিচার্জ?")
+    assert safe_filler("জি, পাঁচশো টাকার প্যাকেজ দেখে জানাচ্ছি।", "প্যাকেজ দেখান") is None
+
+
+def test_a_recharge_question_about_the_process_is_how_to_not_status():
+    # From a call: "process" got "রিচার্জটা ঠিকমতো হয়েছে কি না দেখে জানাচ্ছি".
+    for line in set(_fillers("আমি actually recharge এর process টা সম্পর্কে জানতে চাচ্ছিলাম", n=40)):
+        assert line in quick_reply._RECHARGE_HOW_BN, line
+
+
+def test_a_recharge_question_of_no_known_kind_gets_a_generic_line():
+    for line in set(_fillers("রিচার্জ নিয়ে একটা প্রশ্ন ছিল", n=40)):
+        assert line in quick_reply._GENERIC_BN, line
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # From a call: "একটু সময় দিন, আমি জেনে বলছি।" before a question back.
+        ("আ-আপনাদের কাছে কি কি প্যাকেজ আছে?", None),
+        ("What packages do you have?", None),
+        ("ডাটা প্যাকেজ কী আছে?", "filler"),
+        ("৩ জিবির প্যাকেজ আছে?", "filler"),
+        ("আরও প্যাকেজ দেখান", "filler"),
+    ],
+)
+def test_a_broad_package_ask_gets_no_filler(text, expected):
+    judgement = Judgement(0.9, "packages", 0.95)
+    assert route(judgement, _Userdata(), _config(), _settings(), text=text) == expected

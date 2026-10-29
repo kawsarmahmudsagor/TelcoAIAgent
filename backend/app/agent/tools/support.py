@@ -99,7 +99,8 @@ async def run_create_support_case(
 async def run_request_human_agent(userdata: SessionUserdata, reason: str) -> str:
     async def call() -> str:
         sid = userdata.subscriber_id
-        if userdata.handoff_action_id is None:
+        first = userdata.handoff_action_id is None
+        if first:
             userdata.handoff_action_id = uuid4()
         action_id = userdata.handoff_action_id
         case = await run_db(
@@ -107,11 +108,19 @@ async def run_request_human_agent(userdata: SessionUserdata, reason: str) -> str
                 db, sid, reason=reason, source=CaseSource.agent, action_id=action_id
             )
         )
-        await _publish_case(userdata, case)
-        return (
-            f"Opened high-priority case {case.ref}. "
-            "A human agent will follow up on this case; there is no live transfer."
-        )
+        # The handoff opens its own case: a support case drafted but not
+        # confirmed is dropped, so it no longer waits for a yes.
+        userdata.pending_case = None
+        if first:
+            await _publish_case(userdata, case)
+            opened = f"Opened high-priority case {case.ref}."
+        else:
+            await publish(userdata, ACCOUNT_CHANGED, {"kind": "case", "ref": case.ref})
+            opened = (
+                f"Added this to high-priority case {case.ref}, the human-agent case "
+                "already open in this call."
+            )
+        return f"{opened} A human agent will follow up on this case; there is no live transfer."
 
     return await run_write(userdata, call)
 
