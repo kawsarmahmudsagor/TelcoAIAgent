@@ -29,8 +29,8 @@ from livekit.agents import DEFAULT_API_CONNECT_OPTIONS, APIConnectOptions, tts, 
 
 logger = logging.getLogger("agent.audio_cache")
 
-# Lines longer than this are never fillers (quick_reply.FILLER_MAX_WORDS is 12).
-MAX_WORDS = 14
+# Lines longer than this are never fillers (quick_reply.CARE_FILLER_MAX_WORDS is 15).
+MAX_WORDS = 17
 # Enough for every template line in a few voices; new lines stop being saved after it.
 MAX_ENTRIES = 400
 

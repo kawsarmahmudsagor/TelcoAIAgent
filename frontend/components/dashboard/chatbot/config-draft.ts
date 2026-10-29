@@ -41,6 +41,7 @@ export interface ConfigDraft {
   quick_reply_enabled: boolean;
   quick_fast_answer: boolean;
   quick_filler: boolean;
+  quick_filler_llm: boolean;
   /** '' = the server default. */
   quick_reply_model: string;
 
@@ -79,6 +80,7 @@ export const FIELD_TAB: Record<DraftKey, ChatbotTab> = {
   quick_reply_enabled: 'model',
   quick_fast_answer: 'model',
   quick_filler: 'model',
+  quick_filler_llm: 'model',
   quick_reply_model: 'model',
   rag_enabled: 'knowledge',
   rag_top_k: 'knowledge',
@@ -116,6 +118,7 @@ export function draftFrom(config: AgentConfig): ConfigDraft {
     quick_reply_enabled: config.quick_reply_enabled,
     quick_fast_answer: config.quick_fast_answer,
     quick_filler: config.quick_filler,
+    quick_filler_llm: config.quick_filler_llm,
     quick_reply_model: config.quick_reply_model ?? '',
     rag_enabled: config.rag_enabled,
     rag_top_k: config.rag_top_k,

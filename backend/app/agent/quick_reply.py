@@ -12,13 +12,15 @@ That one answer picks the path (route):
 - "filler": a lookup or an account tool is needed, so one short line ("let me
   check that") is spoken until the main model's reply starts: while the lookup
   runs, and after it in front of the reply if the line is ready before the
-  reply's first words, else dropped. The line comes from fast_filler's
-  templates in under a millisecond (and its audio from app.agent.audio_cache
-  once said before), picked by what the turn is about: Jev's topic answer
-  when it is sure (judged_topic), else the customer's words; only a turn they
-  don't fit asks the small model (compose_filler). The line states no facts:
-  safe_filler drops one with numbers, money or contact details the customer
-  didn't say.
+  reply's first words, else dropped. With quick_filler_llm on (the default)
+  the small model writes the line for the turn, as a care agent would say it
+  (compose_filler with _CARE_FILLER_SYSTEM); a line it doesn't write in time
+  is no line. Off, the line comes from fast_filler's templates in under a
+  millisecond (and its audio from app.agent.audio_cache once said before),
+  picked by what the turn is about: Jev's topic answer when it is sure
+  (judged_topic), else the customer's words; only a turn they don't fit asks
+  the small model. Either way the line states no facts: safe_filler drops one
+  with numbers, money or contact details the customer didn't say.
 
 Anything less sure stays on the main model, as without quick replies.
 """
@@ -55,6 +57,8 @@ Route = Literal["fast", "filler"]
 HANDOFF = "[[MAIN]]"
 
 FILLER_MAX_WORDS = 12
+# A line the small model writes for every turn may say a little more.
+CARE_FILLER_MAX_WORDS = 15
 # How many earlier lines the filler is told not to repeat.
 _AVOID = 5
 
@@ -126,6 +130,46 @@ Safety:
 
 Return JSON only: {"text": "..."}"""
 
+# For quick_filler_llm: the small model writes every filler line. Rules only, no
+# example lines, so the lines don't drift toward a few fixed ones.
+_CARE_FILLER_SYSTEM = f"""You are a mobile operator's customer care agent on a phone call.
+The customer just said something that needs a lookup or an account action. Another assistant
+will give the real answer in a moment. You say the one short line a good care agent says
+first, so the customer isn't left in silence. The line is spoken aloud.
+
+How a good care agent sounds:
+- They react to what this customer just said, not with a stock phrase.
+- They show they understood the request: name what they will check, in the customer's own
+  terms (their area, the package size or validity, the amount they said, their balance).
+- A complaint or a problem gets a little empathy first, then what they will look into.
+- A pick from a list, a correction or a follow-up gets a calm acknowledgement of it.
+- A recharge, purchase or other action gets a calm "I'll take care of it" kind of line,
+  never a claim that it is done.
+- Warm and natural, never robotic, never over-apologetic, never pushy.
+- One sentence, or two very short ones, at most {CARE_FILLER_MAX_WORDS} words.
+- Vary how lines open and end; never repeat or echo the shape of a line already said.
+
+Language:
+- Use the language of the customer's newest message.
+- For Bangla or Banglish, write modern spoken Bangla in Bengali script, polite with আপনি.
+- Use the English words people say in Bangla: চেক, প্যাকেজ, ব্যালেন্স, রিচার্জ, অফার,
+  নেটওয়ার্ক, কমপ্লেইন, সরি, প্লিজ, ওকে.
+- Say "প্যাকেজ", never "প্যাক"; say "দাম", not "প্রাইস"; say "বুঝতে পেরেছি", not "বুঝতে পারছি".
+- No literary or bookish words (মিলিয়ে, ঘেঁটে, খুলছি, অনুগ্রহপূর্বক) and no casual slang.
+- Never a vague "বিষয়টা" or "ব্যাপারটা": name what you check, or leave it out.
+- The operator's name is written "telco", never "telco.".
+
+Safety:
+- Never state a price, number, balance, validity, availability, policy or result.
+- Only echo numbers or amounts the customer said.
+- Never say a recharge, payment, purchase, activation, complaint or message is done,
+  started or successful.
+- Never answer the question itself; the other assistant does that.
+- Never promise an outcome or say a person is joining.
+- No greeting, no question, no emoji.
+
+Return JSON only: {{"text": "..."}}"""
+
 
 @dataclass
 class QuickReplyRuntime:
@@ -174,7 +218,12 @@ class QuickReplyRuntime:
     ) -> str | None:
         """topic: Jev's, when it is sure (judged_topic)."""
         avoid = self.avoid(utterance)
-        line = fast_filler(utterance, lookup, history, avoid, cache=self.audio_cache, topic=topic)
+        care = self.config.quick_filler_llm
+        line = (
+            None
+            if care
+            else fast_filler(utterance, lookup, history, avoid, cache=self.audio_cache, topic=topic)
+        )
         if line is not None:
             # One echoing the customer's words is new: its audio may be cached too.
             remember_filler(line)
@@ -194,6 +243,7 @@ class QuickReplyRuntime:
             timeout_s=self.settings.filler_timeout_ms / 1000,
             on_event=self.on_event,
             topic=topic,
+            care=care,
         )
         if line is not None:
             remember_filler(line)
@@ -1437,12 +1487,12 @@ def _split_marker_tail(text: str) -> tuple[str, str]:
     return text, ""
 
 
-def safe_filler(text: str, utterance: str) -> str | None:
+def safe_filler(text: str, utterance: str, max_words: int = FILLER_MAX_WORDS) -> str | None:
     """The line, if it is one: short, and stating no number, price or contact of
     its own (which could only be a guess -- nothing has been looked up yet).
     Numbers the customer said may be echoed."""
     text = " ".join(text.split())
-    if not text or len(text.split()) > FILLER_MAX_WORDS:
+    if not text or len(text.split()) > max_words:
         return None
     if _CONTACT_RE.search(text):
         return None
@@ -1463,7 +1513,10 @@ def build_filler_request(
     history: list[Exchange],
     avoid: list[str],
     topic: str | None = None,
+    care: bool = False,
 ) -> dict:
+    """care: the model writes every line (_CARE_FILLER_SYSTEM), sampled so
+    turns alike don't get the same line; else it fills in for the templates."""
     lines = ["Conversation so far:"]
     lines += [f"{'Customer' if e.role == 'user' else 'Assistant'}: {e.text}" for e in history]
     if not history:
@@ -1478,11 +1531,11 @@ def build_filler_request(
     return {
         "model": model,
         "messages": [
-            {"role": "system", "content": _FILLER_SYSTEM},
+            {"role": "system", "content": _CARE_FILLER_SYSTEM if care else _FILLER_SYSTEM},
             {"role": "user", "content": "\n".join(lines)},
         ],
         "response_format": {"type": "json_object"},
-        "temperature": 0,
+        "temperature": 0.8 if care else 0,
         "max_tokens": 120,
         "reasoning": reasoning_for(model),
         # Customer speech: keep it out of provider training data.
@@ -1503,9 +1556,10 @@ async def compose_filler(
     timeout_s: float,
     on_event: Callable[[str], None] | None = None,
     topic: str | None = None,
+    care: bool = False,
 ) -> str | None:
     """A filler line for the turn, or None on any error, timeout or unsafe line."""
-    payload = build_filler_request(model, utterance, lookup, history, avoid, topic)
+    payload = build_filler_request(model, utterance, lookup, history, avoid, topic, care)
     started = time.perf_counter()
 
     def note(text: str) -> None:
@@ -1545,7 +1599,8 @@ async def compose_filler(
         note(f"{model} failed ({exc}), no line")
         return None
     took = time.perf_counter() - started
-    line = safe_filler(text, utterance) if isinstance(text, str) else None
+    max_words = CARE_FILLER_MAX_WORDS if care else FILLER_MAX_WORDS
+    line = safe_filler(text, utterance, max_words) if isinstance(text, str) else None
     if line is None:
         logger.info("filler dropped: %r", text)
         note(f'{model} wrote "{text}" in {took:.2f} s, dropped (unsafe or too long)')

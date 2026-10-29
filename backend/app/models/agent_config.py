@@ -93,6 +93,8 @@ class AgentConfig(TimestampedBase):
     )
     quick_fast_answer: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     quick_filler: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # The filler line: written by the small model for the turn; off, from templates.
+    quick_filler_llm: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # One of app.agent.quick_models.QUICK_REPLY_MODELS; NULL = QUICK_REPLY_MODEL.
     quick_reply_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

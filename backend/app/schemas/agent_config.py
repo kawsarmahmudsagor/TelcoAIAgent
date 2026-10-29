@@ -52,6 +52,8 @@ class AgentConfigOut(BaseModel):
     quick_reply_enabled: bool
     quick_fast_answer: bool
     quick_filler: bool
+    # Filler lines written by the small model; false = templates.
+    quick_filler_llm: bool
     # The saved model; null = the server default (quick_reply_model_default).
     quick_reply_model: str | None
     quick_reply_model_default: str
@@ -107,6 +109,7 @@ class AgentConfigUpdate(BaseModel):
     quick_reply_enabled: bool | None = None
     quick_fast_answer: bool | None = None
     quick_filler: bool | None = None
+    quick_filler_llm: bool | None = None
     # One of the quick_reply_models options; null = the server default.
     quick_reply_model: str | None = Field(default=None, max_length=255)
 

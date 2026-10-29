@@ -39,6 +39,7 @@ _NOT_NULLABLE = {
     "quick_reply_enabled",
     "quick_fast_answer",
     "quick_filler",
+    "quick_filler_llm",
 }
 
 # Suggestions only -- the dashboard also accepts any model id typed in.
@@ -172,6 +173,7 @@ def _to_out(row: AgentConfig) -> AgentConfigOut:
         quick_reply_enabled=resolved.quick_reply_enabled,
         quick_fast_answer=resolved.quick_fast_answer,
         quick_filler=resolved.quick_filler,
+        quick_filler_llm=resolved.quick_filler_llm,
         quick_reply_model=(
             row.quick_reply_model if row.quick_reply_model in QUICK_REPLY_MODELS else None
         ),

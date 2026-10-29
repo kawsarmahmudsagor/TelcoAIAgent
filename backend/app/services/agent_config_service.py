@@ -110,6 +110,8 @@ class ResolvedAgentConfig:
     quick_reply_enabled: bool = False
     quick_fast_answer: bool = True
     quick_filler: bool = True
+    # The small model writes each filler line; off, the templates do.
+    quick_filler_llm: bool = True
     quick_reply_model: str = ""
 
 
@@ -197,6 +199,7 @@ def resolve(row: AgentConfig | None, settings: Settings | None = None) -> Resolv
         quick_reply_enabled=bool(row.quick_reply_enabled),
         quick_fast_answer=row.quick_fast_answer is not False,
         quick_filler=row.quick_filler is not False,
+        quick_filler_llm=row.quick_filler_llm is not False,
         # A saved model dropped from the list since falls back to the default.
         quick_reply_model=(
             row.quick_reply_model

@@ -55,6 +55,14 @@ export function QuickReplySection({
             checked={draft.quick_filler}
             onCheckedChange={(value) => set('quick_filler', value)}
           />
+          {draft.quick_filler && (
+            <SwitchRow
+              label="Write filler lines with the model"
+              description="The small model writes each line for what the customer just said, as a care agent would. Off, a line is picked from fixed templates (instant, and its audio is often cached)."
+              checked={draft.quick_filler_llm}
+              onCheckedChange={(value) => set('quick_filler_llm', value)}
+            />
+          )}
           <div className="grid gap-4 pt-3 sm:grid-cols-2">
             <FormField
               id="quick_reply_model"

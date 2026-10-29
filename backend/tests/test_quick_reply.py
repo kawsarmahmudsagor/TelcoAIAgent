@@ -906,3 +906,64 @@ def test_the_same_thing_said_again_is_still_being_checked(utterance, lookup, las
 def test_no_pick_line_names_a_position():
     for line in quick_reply._CHOICE_EN:
         assert not any(word in line for word in ("other", "next", "previous")), line
+
+
+# --- care fillers (quick_filler_llm) ----------------------------------------------------
+
+
+def test_care_filler_request_uses_the_care_prompt_and_samples():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return _completion(json.dumps({"text": "সরি, মিরপুরে নেটওয়ার্কের সমস্যাটা হচ্ছে বুঝতে পেরেছি, এখনই চেক করছি।"}))
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await compose_filler(
+                client, _BASE, "or-key", "m", "মিরপুরে নেট একদম পাচ্ছি না", "network", [], [],
+                timeout_s=1.0, care=True,
+            )  # fmt: skip
+
+    # 13 words: over the template limit, within the care one.
+    assert asyncio.run(go()) == "সরি, মিরপুরে নেটওয়ার্কের সমস্যাটা হচ্ছে বুঝতে পেরেছি, এখনই চেক করছি।"
+    body = seen["body"]
+    assert body["messages"][0]["content"] == quick_reply._CARE_FILLER_SYSTEM
+    assert body["temperature"] == 0.8
+
+
+def test_care_filler_keeps_the_safety_checks():
+    assert safe_filler("x " * 15, "x", quick_reply.CARE_FILLER_MAX_WORDS) is not None
+    assert safe_filler("x " * 16, "x", quick_reply.CARE_FILLER_MAX_WORDS) is None
+    assert safe_filler("আপনার ব্যালেন্স ৫০ টাকা, এক সেকেন্ড।", "ব্যালেন্স কত", 15) is None
+
+
+def test_care_prompt_is_rules_only_and_telco():
+    prompt = quick_reply._CARE_FILLER_SYSTEM
+    assert not real_estate_words(prompt)
+    assert str(quick_reply.CARE_FILLER_MAX_WORDS) in prompt
+    # No template lines to copy.
+    for line in (*quick_reply._GENERIC_BN, *quick_reply._GENERIC_EN):
+        assert line not in prompt
+
+
+@pytest.mark.parametrize("llm_on", [True, False])
+def test_runtime_compose_follows_the_switch(llm_on):
+    asked = []
+
+    def handler(request):
+        asked.append(json.loads(request.content))
+        return _completion(json.dumps({"text": "জি, আপনার ব্যালেন্সটা চেক করছি।"}))
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            runtime = QuickReplyRuntime(_config(quick_filler_llm=llm_on), _settings(), "k", client)
+            return await runtime.compose("আমার ব্যালেন্স কত?", "balance", [])
+
+    line = asyncio.run(go())
+    assert line
+    if llm_on:
+        assert line == "জি, আপনার ব্যালেন্সটা চেক করছি।"
+        assert asked[0]["messages"][0]["content"] == quick_reply._CARE_FILLER_SYSTEM
+    else:
+        assert asked == []  # a template line, no model call

@@ -23,7 +23,7 @@ _COLUMNS = [
     "elevenlabs_tts_model", "elevenlabs_stt_model", "elevenlabs_stt_language", "rag_enabled", "rag_top_k", "rag_similarity_threshold", "embedding_model", "chunk_size",
     "chunk_overlap", "embedding_migration_status", "embedding_migration_target",
     "embedding_migration_error", "quick_reply_enabled", "quick_fast_answer", "quick_filler",
-    "quick_reply_model", "voice_replies_enabled",
+    "quick_filler_llm", "quick_reply_model", "voice_replies_enabled",
 ]  # fmt: skip
 
 

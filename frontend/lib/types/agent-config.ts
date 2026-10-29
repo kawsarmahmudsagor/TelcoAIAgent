@@ -52,10 +52,12 @@ export interface AgentConfig {
   /** Customers and guests hear the agent's replies; off, they read them (and can still speak). */
   voice_replies_enabled: boolean;
   /** Quick replies on gated voice calls: a small model answers turns that need no lookup
-   * (quick_fast_answer) and speaks a short line while a lookup runs (quick_filler). */
+   * (quick_fast_answer) and speaks a short line while a lookup runs (quick_filler), written
+   * by the small model for the turn (quick_filler_llm) or picked from templates. */
   quick_reply_enabled: boolean;
   quick_fast_answer: boolean;
   quick_filler: boolean;
+  quick_filler_llm: boolean;
   /** The saved model; null = the server default below. */
   quick_reply_model: string | null;
   quick_reply_model_default: string;
@@ -112,10 +114,11 @@ export interface AgentConfigUpdate {
 
   /** Null is ignored. */
   voice_replies_enabled?: boolean | null;
-  /** Null is ignored for the three switches. */
+  /** Null is ignored for the four switches. */
   quick_reply_enabled?: boolean | null;
   quick_fast_answer?: boolean | null;
   quick_filler?: boolean | null;
+  quick_filler_llm?: boolean | null;
   /** One of the `quick_reply_models` options; null = the server default. */
   quick_reply_model?: string | null;
 
