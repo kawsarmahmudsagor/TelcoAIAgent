@@ -338,7 +338,7 @@ def test_fast_rules_hand_off_telco_facts_and_codes():
 
 
 def test_filler_examples_are_telco():
-    for line in ("আপনার অসুবিধাটা বুঝতে পারছি।", "Say \"প্যাকেজ\", not \"প্যাক\"."):
+    for line in ("আপনার অসুবিধাটা বুঝতে পেরেছি।", "Say \"প্যাকেজ\", not \"প্যাক\"."):
         assert line in quick_reply._FILLER_SYSTEM
     assert not real_estate_words(quick_reply._FILLER_SYSTEM)
 
@@ -594,7 +594,7 @@ def test_fillers_in_a_row_never_share_an_opener_or_a_verb(utterance):
 def test_a_line_already_cached_is_picked_more_often(tmp_path):
     from app.agent.audio_cache import AudioCache
 
-    cached = "আচ্ছা, আপনার ব্যালেন্সটা একটু দেখে বলছি।"
+    cached = "আচ্ছা, আপনার ব্যালেন্সটা একটু দেখছি।"
     cache = AudioCache(tmp_path)
     cache.save(cached, b"\x00\x00" * 100, 24000, 1, "voice:model")
     picks = Counter(_fillers("আমার ব্যালেন্স কত আছে?", n=2000, cache=cache))
@@ -641,7 +641,8 @@ def test_dekhchi_is_not_the_usual_verb():
     bangla = [line for line in _template_lines() if turn_gate.classify_script(line) == "bn"]
     assert sum("দেখছি" in line for line in bangla) * 4 <= len(bangla)
     for family in quick_reply._ECHO_BN.values():
-        assert sum("দেখছি" in shape for shape in family) <= 1
+        # Two at most: the user wants bare দেখছি lines (2026-10-29).
+        assert sum("দেখছি" in shape for shape in family) <= 2
         assert "দেখছি" not in family[0]
         assert len({quick_reply._opener(shape) for shape in family}) == len(family)
 
@@ -660,7 +661,8 @@ def test_every_echo_of_the_longest_entities_fits(utterance):
     utterance = unicodedata.normalize("NFC", utterance)
     bangla = quick_reply._speaks_bangla(utterance, None)
     own_words = quick_reply._tiers(utterance, "packages", bangla)[0]
-    assert len(own_words) == len((quick_reply._ECHO_BN if bangla else quick_reply._ECHO_EN)["search"])
+    family = quick_reply._entity_x(quick_reply._filler_topic(utterance, "packages"), utterance)[2]
+    assert len(own_words) == len((quick_reply._ECHO_BN if bangla else quick_reply._ECHO_EN)[family])
     for line in own_words:
         assert safe_filler(line, utterance) == line, line
 
@@ -826,6 +828,43 @@ def test_a_pick_by_position_gets_the_pick_lines(utterance):
     assert lines <= picks, lines - picks
 
 
+@pytest.mark.parametrize(
+    "utterance",
+    ["আমার কি অরিজিনালি কার্ডই লাগবে নাকি ফটোকপি আনলেও হবে?", "ডাটা চাই নাকি মিনিট, ভাবছি"],
+)
+def test_naki_asks_a_question_it_corrects_nothing(utterance):
+    assert not quick_reply._CORRECTION_RE.search(unicodedata.normalize("NFC", utterance))
+
+
+@pytest.mark.parametrize("utterance", ["ডাটা প্যাক লাগবে না", "এটা চাই না, অন্যটা", "আমি এটা বলিনি"])
+def test_a_whole_word_na_still_corrects(utterance):
+    assert quick_reply._CORRECTION_RE.search(unicodedata.normalize("NFC", utterance))
+
+
+@pytest.mark.parametrize(
+    ("utterance", "kind"),
+    [
+        ("আ আমি জানতে চাচ্ছিলাম reward point কিভাবে accumulate করা যায়?", "earn"),
+        ("How do I earn points?", "earn"),
+        ("পয়েন্ট দিয়ে কী নিতে পারি?", "redeem"),
+        ("কিভাবে পয়েন্ট রিডিম করব?", "redeem"),
+        ("How can I use my points?", "redeem"),
+    ],
+)
+def test_how_to_earn_or_use_points_is_not_how_many(utterance, kind):
+    lines = {
+        "earn": {*quick_reply._POINTS_EARN_BN, *quick_reply._POINTS_EARN_EN},
+        "redeem": {*quick_reply._POINTS_REDEEM_BN, *quick_reply._POINTS_REDEEM_EN},
+    }[kind]
+    said = set(_fillers(utterance, n=60, topic="points"))
+    assert said <= lines, said - lines
+
+
+def test_how_many_points_keeps_the_points_lines():
+    said = set(_fillers("আমার কত পয়েন্ট আছে?", n=60, topic="points"))
+    assert said <= set(quick_reply._topic_lines("points", True)), said
+
+
 def test_other_money_is_not_a_pick():
     assert not quick_reply._CHOICE_RE.search("অন্য টাকা কেটেছে")
 
@@ -835,6 +874,12 @@ def test_asking_for_more_detail_is_not_asking_for_more_options(utterance):
     lines = set(_fillers(utterance, n=50))
     follow_ups = {*quick_reply._FOLLOW_UP_BN, *quick_reply._FOLLOW_UP_EN}
     assert lines <= follow_ups, lines - follow_ups
+
+
+@pytest.mark.parametrize("words", ["আর কি কি options available আছে?", "হ্যাঁ, আর কী কী প্যাকেজ আছে?"])
+def test_what_else_is_there_with_words_between_is_more_options(words):
+    lines = set(_fillers(words, "packages", n=50, avoid=["জি, ডাটা প্যাকেজগুলো খুঁজে আপনাকে জানাচ্ছি।"]))
+    assert lines <= set(quick_reply._MORE_BN), lines
 
 
 def test_aro_spelt_with_o_kar_is_more_options():

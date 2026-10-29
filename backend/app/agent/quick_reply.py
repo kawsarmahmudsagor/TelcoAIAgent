@@ -92,9 +92,9 @@ Choose a style that fits the request and vary the sentence structure, not just i
 Styles to vary:
 - Brief acknowledgement: "জি, বুঝেছি।"
 - Understanding: "আপনার কথাটা বুঝতে পেরেছি।"
-- Checking: "আচ্ছা, ব্যাপারটা একটু দেখি।"
+- Checking: "আচ্ছা, একটু চেক করে নিই।"
 - Polite request: "একটু সময় দেবেন, প্লিজ?"
-- Empathy: "আপনার অসুবিধাটা বুঝতে পারছি।"
+- Empathy: "আপনার অসুবিধাটা বুঝতে পেরেছি।"
 - Neutral response to a choice or follow-up: "আচ্ছা, ওটা নিয়ে বলছি।"
 
 Language:
@@ -104,6 +104,7 @@ Language:
 - Say "দাম", not "প্রাইস".
 - Say "প্যাকেজ", not "প্যাক".
 - Avoid literary words such as মিলিয়ে, ঘেঁটে and খুলছি.
+- Never a vague "বিষয়টা" or "ব্যাপারটা" ("বিষয়টা দেখছি"): name what you check, or leave it out.
 - Keep familiar customer-care phrases such as "দেখে জানাচ্ছি", "দেখে বলছি",
   "আপনাকে জানাচ্ছি", and "আপনাকে বলছি" in the template pool.
 - Use those update phrases when a lookup is actually happening or an answer is about to follow.
@@ -225,24 +226,18 @@ _CHECKING_BN = (
     "একটু অপেক্ষা করুন, চেক করছি।",
     "আচ্ছা, এক মিনিট সময় দিন।",
     "জি, একটু দেখছি।",
-    "আচ্ছা, ব্যাপারটা দেখছি।",
     "জি, একটু চেক করে নিই।",
-    "একটু সময় দিন, বিষয়টা দেখছি।",
     "জি, দেখে আপনাকে জানাচ্ছি।",
     "দেখে আপনাকে জানাচ্ছি।",
     "একটু দেখে আপনাকে বলছি।",
     "জি, চেক করে বলছি।",
-    "বিষয়টা দেখে জানাচ্ছি আপনাকে।",
     "জি, আপনাকে জানাচ্ছি।",
     "আচ্ছা, দেখে আপনাকে বলছি।",
 )
 _UNDERSTANDING_BN = (
     "জি, বুঝতে পেরেছি। একটু সময় দিন।",
     "বুঝতে পেরেছি, একটু সময় দিন।",
-    "আচ্ছা, ব্যাপারটা আমাকে একটু দেখতে দিন।",
-    "ঠিক আছে, আপনার বিষয়টা দেখছি।",
     "বুঝতে পেরেছি, একটু সময় দিন, দেখে বলছি।",
-    "জি, বিষয়টা বুঝেছি, দেখে আপনাকে বলছি।",
 )
 _GENERIC_BN = (*_CHECKING_BN, *_UNDERSTANDING_BN)
 
@@ -280,29 +275,38 @@ _GENERIC_EN = (*_CHECKING_EN, *_UNDERSTANDING_EN)
 _ECHO_BN: dict[str, tuple[str, ...]] = {
     "search": (
         "জি, {x} খুঁজে আপনাকে জানাচ্ছি।",
-        "আচ্ছা, {x} খুঁজে দেখে বলছি।",
+        "আচ্ছা, {x} খুঁজে আপনাকে তথ্য দিচ্ছি",
         "ঠিক আছে, {x} খুঁজে আপনাকে দেখাচ্ছি।",
-        "একটু সময় দিন, {x} খুঁজে জানাচ্ছি।",
+        "একটু সময় দিন, {x} খুঁজছি।",
     ),
     "lookup": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "আচ্ছা, {x} একটু দেখে আপনাকে বলছি।",
+        "আচ্ছা, {x} একটু দেখছি।",
         "ঠিক আছে, {x} যাচাই করে জানাচ্ছি আপনাকে।",
         "এক মিনিট, {x} দেখে আপনাকে জানাচ্ছি।",
-        "একটু সময় দিন, {x} দেখে আপনাকে বলছি।",
+        "একটু সময় দিন, {x} দেখছি।",
     ),
     "status": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "ঠিক আছে, {x_of} স্ট্যাটাসটা যাচাই করে জানাচ্ছি।",
+        "ঠিক আছে, {x_of} স্ট্যাটাসটা যাচাই করছি",
         "আচ্ছা, {x_of} আপডেটটা দেখে আপনাকে জানাচ্ছি।",
-        "একটু সময় দিন, {x_of} স্ট্যাটাস চেক করে বলছি।",
+        "একটু সময় দিন, {x_of} স্ট্যাটাস চেক করছি।",
     ),
-    # A complaint or a rule has no status: "ব্যাপারটার স্ট্যাটাস" is wrong.
+    # A care centre is looked for, in the area named: "মিরপুর এলাকার কেয়ার
+    # সেন্টার খুঁজছি". x_cc says it as কাস্টমার কেয়ার.
+    "place": (
+        "ওকে, {x} খুঁজছি।",
+        "এক মিনিট, {x_cc} খুঁজছি।",
+        "আচ্ছা, {x_cc} খুঁজছি।",
+        "একটু সময় দিন, {x} খুঁজছি।",
+        "জি, {x} খুঁজে দেখছি।",
+    ),
+    # A complaint or a rule has no status: "সমস্যাটার স্ট্যাটাস" is wrong.
     "issue": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
         "আচ্ছা, {x} একটু দেখে আপনাকে বলছি।",
         "ঠিক আছে, {x} খোঁজ নিয়ে জানাচ্ছি।",
-        "একটু সময় দিন, {x} দেখে বলছি।",
+        "একটু সময় দিন, {x} দেখছি।",
     ),
 }
 
@@ -330,6 +334,7 @@ _ECHO_EN: dict[str, tuple[str, ...]] = {
     ),
 }
 _ECHO_EN["issue"] = _ECHO_EN["status"]
+_ECHO_EN["place"] = _ECHO_EN["search"]
 
 # What each topic checks, for the echo lines: (Bangla, English, verb family).
 _TOPIC_X: dict[str, tuple[str, str, str]] = {
@@ -339,15 +344,15 @@ _TOPIC_X: dict[str, tuple[str, str, str]] = {
     "sms": ("এসএমএস প্যাকেজগুলো", "the SMS packages", "search"),
     "pack": ("প্যাকেজগুলো", "the packages", "search"),
     "offer": ("আপনার অফারগুলো", "your offers", "search"),
-    "care": ("কাছের কেয়ার সেন্টারটা", "the nearest care centre", "search"),
+    "care": ("কাছের কেয়ার সেন্টার", "the nearest care centre", "place"),
     "balance": ("আপনার ব্যালেন্সটা", "your balance", "lookup"),
     "usage": ("আপনার ইউসেজটা", "your usage", "lookup"),
     "points": ("আপনার পয়েন্টগুলো", "your points", "lookup"),
     "transactions": ("ট্রানজেকশনগুলো", "your recent transactions", "lookup"),
     "recharge": ("রিচার্জটা", "your recharge", "status"),
     "network": ("আপনার এলাকার নেটওয়ার্কটা", "the network in your area", "status"),
-    "complaint": ("ব্যাপারটা", "the issue", "issue"),
-    "policy": ("বিষয়টা", "the details", "issue"),
+    "complaint": ("সমস্যাটা", "the issue", "issue"),
+    "policy": ("তথ্যটা", "the details", "issue"),
 }
 
 _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
@@ -363,7 +368,7 @@ _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
     "points": ("কত পয়েন্ট জমেছে, চেক করে আপনাকে জানাচ্ছি।",),
     "transactions": ("কীসে কেটেছে, খুঁজে আপনাকে বলছি।",),
     "network": ("আপনার এলাকায় নেটওয়ার্ক কেমন, দেখে জানাচ্ছি।",),
-    "care": ("আপনার কাছের কেয়ার সেন্টারটা খুঁজে বলছি।",),
+    "care": ("ঠিক আছে, আপনার কাছের কাস্টমার কেয়ার খুঁজছি।",),
     "complaint": ("সরি, সমস্যাটা চেক করে আপনাকে জানাচ্ছি।", "বুঝতে পেরেছি, কী করা যায় দেখে বলছি।"),
     "policy": ("আচ্ছা, এটার নিয়মটা দেখে আপনাকে জানাচ্ছি।",),
 }
@@ -389,13 +394,14 @@ _TOPIC_EXTRA_EN: dict[str, tuple[str, ...]] = {
 # about one recharge, "সর্বনিম্ন কত রিচার্জ করা যায়?" about the rule. The
 # first kind whose words the customer used wins; none, the topic's default.
 _RECHARGE_STATUS_BN = (
-    "জি, আপনার রিচার্জটা হয়েছে কি না, একটু চেক করে জানাচ্ছি।",
+    "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।",
+    "জি, আপনার রিচার্জটা হয়েছে কি না, চেক করছি।",
     "আচ্ছা, রিচার্জটা ব্যালেন্সে যোগ হয়েছে কি না দেখে আপনাকে বলছি।",
-    "বুঝতে পেরেছি, রিচার্জের স্ট্যাটাসটা চেক করে আপনাকে জানাচ্ছি।",
-    "জি, রিচার্জের ব্যাপারটা একটু যাচাই করছি, আমাকে একটু সময় দিন।",
+    "বুঝতে পেরেছি, রিচার্জের স্ট্যাটাসটা চেক করছি।",
+    "জি, রিচার্জের ব্যাপারটা যাচাই করছি, আমাকে একটু সময় দিন।",
     "রিচার্জের আপডেটটা দেখে আপনাকে জানাচ্ছি।",
     "জি, আপনার রিচার্জের তথ্যটা যাচাই করে জানাচ্ছি আপনাকে।",
-    "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।",
+    "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।"
 )
 _RECHARGE_STATUS_EN = (
     "Let me check the recharge status.",
@@ -405,11 +411,11 @@ _RECHARGE_STATUS_EN = (
     "Let me take a look at the recharge update.",
 )
 _RECHARGE_LIMIT_BN = (
-    "জি, রিচার্জের সীমাটা যাচাই করে আপনাকে জানাচ্ছি।",
-    "একটু সময় দিন, রিচার্জের লিমিটটা দেখে বলছি।",
-    "বুঝতে পেরেছি, রিচার্জ লিমিট নিয়ে বিষয়টা চেক করছি।",
-    "জি, রিচার্জের সীমা সংক্রান্ত তথ্যটা দেখে আপনাকে জানাচ্ছি।",
-    "রিচার্জের সীমার ব্যাপারটা একটু দেখে আপনাকে আপডেট দিচ্ছি।",
+    "জি, রিচার্জের লিমিট যাচাই করে আপনাকে জানাচ্ছি।",
+    "রিচার্জের লিমিটটা দেখে আপনাকে আপডেট দিচ্ছি।",
+    "একটু সময় দিন, রিচার্জের লিমিটটা দেখছি।",
+    "আচ্ছা, রিচার্জ লিমিট চেক করছি।",
+    "জি, রিচার্জের সীমা সংক্রান্ত তথ্য আপনাকে জানাচ্ছি।"
 )
 _RECHARGE_LIMIT_EN = (
     "Let me check the recharge limit.",
@@ -419,12 +425,11 @@ _RECHARGE_LIMIT_EN = (
 )
 _RECHARGE_HOW_BN = (
     "আচ্ছা, কীভাবে রিচার্জ করবেন, সেটা একটু বুঝিয়ে বলছি।",
-    "জি, রিচার্জ করার পদ্ধতিটা দেখে আপনাকে জানাচ্ছি।",
+    "জি, রিচার্জ করার পদ্ধতিটা আপনাকে বলছি।",
     "ঠিক আছে, কীভাবে রিচার্জ করবেন, সেটা বলছি।",
     "জি, রিচার্জ করার ধাপগুলো আপনাকে জানাচ্ছি, একটু সময় দিন।",
-    "আচ্ছা, রিচার্জের পদ্ধতিটা আপনাকে বুঝিয়ে বলছি।",
-    "আপনি কীভাবে রিচার্জ করতে পারবেন, সেটা জানাচ্ছি।",
-    "একটু সময় দিন, রিচার্জ করার পদ্ধতিটা চেক করে আপনাকে জানাচ্ছি।",
+    "আপনি কীভাবে রিচার্জ করতে পারবেন, সেটা বলছি।",
+    "একটু সময় দিন, রিচার্জ করার পদ্ধতিটা চেক করছি",
 )
 _RECHARGE_HOW_EN = (
     "I understand your question about recharging.",
@@ -433,11 +438,11 @@ _RECHARGE_HOW_EN = (
     "One moment while I check the recharge process.",
 )
 _RECHARGE_PERKS_BN = (
-    "আচ্ছা, বর্তমানে কী কী রিচার্জ অফার আছে, সেটা দেখে আপনাকে বলছি।",
-    "রিচার্জের সুবিধাগুলো সম্পর্কে আপনাকে বিস্তারিত বলছি।",
-    "জি, রিচার্জে কী কী সুবিধা পাবেন, সেটা চেক করে বলছি।",
+    "বর্তমানে কী কী রিচার্জ অফার আছে, সেটা দেখে আপনাকে বলছি।",
+    "রিচার্জের সুবিধাগুলো সম্পর্কে আপনাকে জানাচ্ছি।",
+    "জি, রিচার্জে কী কী সুবিধা পাবেন, সেটা চেক করছি।",
     "আচ্ছা, রিচার্জের অফারগুলো একটু যাচাই করে আপনাকে জানাচ্ছি।",
-    "জি, রিচার্জের অফার ও সুবিধাগুলো দেখে আপনাকে আপডেট দিচ্ছি।",
+    "জি, রিচার্জের অফার দেখে আপনাকে আপডেট দিচ্ছি।",
 )
 _RECHARGE_PERKS_EN = (
     "I understand your question about recharge offers.",
@@ -450,6 +455,36 @@ _RECHARGE_PERKS_EN = (
 # কত?" is about the cashback. A question of no kind gets a generic line: a
 # guessed kind ("রিচার্জটা ঠিকমতো হয়েছে কি না") is worse than none.
 _KINDS: dict[str, tuple[tuple[str, re.Pattern[str], tuple[str, ...], tuple[str, ...]], ...]] = {}
+# Topics whose own lines fit a question of no kind: "পয়েন্টগুলো কি জমা
+# হয়েছে?" is about how many there are.
+_PLAIN_FITS = {"points"}
+
+# "reward point কিভাবে accumulate করা যায়?" asks how points are earned, not
+# how many there are; "পয়েন্ট দিয়ে কী নিতে পারি?" what they buy.
+_POINTS_EARN_BN = (
+    "ঠিক আছে, কীভাবে পয়েন্ট পাবেন, সেটা বলছি।"
+    "একটু সময় দিন, পয়েন্ট পাওয়ার উপায়গুলো দেখছি।",
+    "জি, পয়েন্ট কীভাবে জমানো যায়, সেটা দেখছি।",
+    "আচ্ছা, পয়েন্ট জমানোর নিয়মটা জানাচ্ছি।"
+)
+_POINTS_EARN_EN = (
+    "Let me check how you can earn points.",
+    "Sure, I'll look into how points are earned.",
+    "One moment, checking the points rules.",
+    "Okay, let me see how points add up.",
+)
+_POINTS_REDEEM_BN = (
+    "আচ্ছা, পয়েন্ট রিডিমের অপশনগুলো দেখছি।",
+    "জি, পয়েন্ট দিয়ে কী কী নিতে পারবেন, দেখে বলছি।",
+    "ঠিক আছে, পয়েন্ট কীভাবে ব্যবহার করবেন দেখছি",
+    "একটু সময় দিন, রিওয়ার্ডগুলো দেখে আপনাকে বলছি।",
+)
+_POINTS_REDEEM_EN = (
+    "Let me check what your points can get you.",
+    "Sure, I'll look at the redeem options.",
+    "One moment, checking the rewards.",
+    "Okay, let me see how you can use your points.",
+)
 
 _CORRECTION_BN = (
     "আচ্ছা, বুঝেছি।",
@@ -507,8 +542,8 @@ _FOLLOW_UP_ECHO_EN = (
 )
 # "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?"
 _MORE_BN = (
-    "ঠিক আছে, আর কোনো অপশন আছে কি না দেখছি।",
-    "জি, অন্য বিকল্প আছে কি না দেখে বলছি।",
+    "ঠিক আছে, অপশনগুলো দেখছি।",
+    "জি, অন্য বিকল্পগুলো দেখছি।",
     "জি, আরও কিছু অপশন দেখে আপনাকে জানাচ্ছি।",
     "আচ্ছা, অন্য বিকল্পগুলোও একটু দেখে বলছি।",
     "আচ্ছা, আর কী কী অপশন আছে, একটু দেখে নিই।",
@@ -526,9 +561,7 @@ _MORE_EN = (
 # code or a shortfall may come next.
 _ACTION_BN = (
     "জি, ঠিক আছে।",
-    "জি, আপনার অনুরোধটা বুঝতে পেরেছি।",
     "ঠিক আছে, একটু সময় দিন।",
-    "আচ্ছা, বিষয়টা দেখে নিই।",
     "জি, এক মুহূর্ত সময় দিন।",
     "জি, অবশ্যই।",
     "আচ্ছা, ঠিক আছে।",
@@ -573,6 +606,15 @@ _KINDS["recharge"] = (
                    r"\bdid(?:n'?t|\s+not)\s+(?:get|go|come|arrive|receive)\b"),
      _RECHARGE_STATUS_BN, _RECHARGE_STATUS_EN),
 )
+# Redeem before earn: "কিভাবে রিডিম করব?" is about redeeming.
+_KINDS["points"] = (
+    ("redeem", _re(r"রিডিম|ব্যবহার|খরচ|দিয়ে\s*(?:কী|কি)|\bredeem\w*|\buse\b|\bspend\b"),
+     _POINTS_REDEEM_BN, _POINTS_REDEEM_EN),
+    ("earn", _re(r"কিভাবে|কীভাবে|কি\s*ভাবে|জমা(?:নো|তে|ব|বো|য়)|জমে|পাওয়া\s*যায়|"
+                 r"পাব|পাবো|উপায়|নিয়ম|\bearn\w*|\baccumulat\w*|\bcollect\w*|"
+                 r"\bhow\s+(?:do|can|to)\b"),
+     _POINTS_EARN_BN, _POINTS_EARN_EN),
+)
 
 
 def _kind(topic: str | None, utterance: str) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
@@ -598,7 +640,8 @@ def _echo(templates: tuple[str, ...], x: str) -> tuple[str, ...]:
     আপনি twice: with x already "আপনার …", the আপনাকে goes."""
     if "আপনার" in x:
         templates = tuple(t.replace(" আপনাকে ", " ") for t in templates)
-    return tuple(t.format(x=x, x_of=_of(x)) for t in templates)
+    cc = x.replace("কেয়ার সেন্টার", "কাস্টমার কেয়ার")
+    return tuple(t.format(x=x, x_of=_of(x), x_cc=cc) for t in templates)
 
 
 def _of(x: str) -> str:
@@ -719,11 +762,12 @@ def _filler_topic(utterance: str, lookup: str | None) -> str | None:
 
 # The customer takes back or corrects what they said: "না, ডাটা না, মিনিট
 # চাচ্ছিলাম", "ডাটা প্যাক চাই না", "I didn't ask for that". A "না" that ends
-# a complaint ("নেট পাচ্ছি না") is not one.
+# a complaint ("নেট পাচ্ছি না") is not one, nor is "নাকি" ("লাগবে নাকি
+# ফটোকপি আনলেও হবে?" asks a question): each word ends where it ends.
 _CORRECTION_RE = _re(
     r"^\s*(?:জি\s*)?(?:না|নাহ)(?=[\s,।!]|$)|"
-    r"চাইনি|চাই\s*নি|চাই\s*না|চাচ্ছি\s*না|চাচ্ছিলাম\s*না|বলিনি|বলি\s*নি|বলি\s*নাই|"
-    r"লাগবে\s*না|দরকার\s*নেই|ভুল\s*বুঝেছেন|"
+    r"(?:চাইনি|চাই\s*নি|চাই\s*না|চাচ্ছি\s*না|চাচ্ছিলাম\s*না|বলিনি|বলি\s*নি|বলি\s*নাই|"
+    r"লাগবে\s*না|দরকার\s*নেই|ভুল\s*বুঝেছেন)(?![ঀ-৿])|"
     r"^\s*(?:no|nope)\b|\bnot\s+that\b|\bdon'?t\s+want\b|"
     r"\bi\s+(?:didn'?t|did\s+not)\s+(?:ask|mean|want|say)\b"
 )
@@ -906,7 +950,7 @@ def _entity_x(topic: str | None, utterance: str) -> tuple[str, str, str] | None:
         family = _TOPIC_X[topic][2]
         if topic == "network":
             return f"{bn} এলাকার নেটওয়ার্কটা", f"the network in {en}", family
-        return f"{bn} এলাকার কাছের কেয়ার সেন্টারটা", f"the care centre nearest {en}", family
+        return f"{bn} এলাকার কেয়ার সেন্টার", f"the care centre nearest {en}", family
     if topic in _PACK_KIND_BN:
         validity = _validity(utterance)
         size = _size(utterance)
@@ -963,9 +1007,10 @@ _VERB_RE = _re(
 _WAIT_WORDS = {"সেকেন্ড", "মিনিট", "সময়", "moment", "second"}
 _CLOSING_RE = _re(r"জানাচ্ছি|বলছি|দেখাচ্ছি")
 
-# "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?", "any others?"
+# "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?", "আর কি কি options
+# available আছে?", "any others?"
 _MORE_RE = _re(
-    r"আর[ওো]|আর\s*(?:কী|কি)\s*(?:কী|কি)?\s*আছে|আর\s*কোনো|বাকিগুলো|অন্য\s*(?:কোনো|কিছু|অপশন)|ছাড়া|"
+    r"আর[ওো]|আর\s*(?:কী|কি)\s*(?:কী|কি)?(?:\s+\S+){0,3}\s*আছে|আর\s*কোনো|বাকিগুলো|অন্য\s*(?:কোনো|কিছু|অপশন)|ছাড়া|"
     r"\bmore\b|\bothers?\b|\banything else\b"
 )
 # A purchase or recharge asked for, not a question about what exists ("নতুন
@@ -1067,8 +1112,10 @@ def _tiers(
             return [_echo(echo, x), _FOLLOW_UP_BN if bangla else _FOLLOW_UP_EN]
     tiers = [_topic_lines(topic, bangla)]
     if kind is not None:
-        tiers.insert(0, kind[1] if bangla else kind[2])
-    elif topic in _KINDS:
+        # Its own lines only: the topic's plain ones are about another
+        # question ("কত পয়েন্ট জমেছে" for how points are earned).
+        tiers = [kind[1] if bangla else kind[2]]
+    elif topic in _KINDS and topic not in _PLAIN_FITS:
         # "রিচার্জের process টা জানতে চাচ্ছিলাম" in words no kind knows.
         return []
     if entity is not None:

@@ -77,7 +77,10 @@ async def run_get_usage_breakdown(
         lines = [f"Usage {when}:"]
         for t in b.totals:
             amount = format_data(int(t.amount)) if t.kind == UsageKind.data else f"{int(t.amount)} {t.unit}"
-            lines.append(f"- {t.kind.value}: {amount}, charged {format_amount(t.charge)}.")
+            # A zero charge goes unsaid: "charged 0.00 taka" made the model tell
+            # the customer "এগুলোর জন্য কোনো চার্জ হয়নি", which nobody asked.
+            charge = f", charged {format_amount(t.charge)}" if t.charge else ""
+            lines.append(f"- {t.kind.value}: {amount}{charge}.")
         peak = max(b.daily, key=lambda d: d[1], default=None)
         if peak and peak[1] > 0 and b.period_days > 1:
             lines.append(f"Heaviest data day: {_day_name(peak[0])}, {format_data(int(peak[1]))}.")

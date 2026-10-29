@@ -73,6 +73,15 @@ def test_usage_and_deductions_text(bss_world):
     assert "30 taka" in out
 
 
+def test_usage_inside_a_package_says_no_charge(bss_world):
+    from app.models.telco import UsageKind
+
+    sub = bss_world.subscriber()
+    bss_world.usage(sub, UsageKind.voice, 120, charge=0)
+    out = asyncio.run(account.run_get_usage_breakdown(_ud(sub), 7))
+    assert "voice: 120" in out and "charged" not in out
+
+
 def test_search_packages_filters_and_caps_detail(bss_world):
     for i in range(5):
         bss_world.package(
@@ -366,3 +375,14 @@ def test_registry_lists_read_tools():
         "create_support_case",
         "request_human_agent",
     }
+
+
+def test_each_list_suggests_a_new_way_to_offer_the_rest():
+    from app.agent.tools import _common
+
+    hints = [_common.listed(["- a", "- b", "- c", "- d"], 4)[-1] for _ in range(30)]
+    assert all("To offer the rest" in h for h in hints)
+    assert all(a != b for a, b in zip(hints, hints[1:]))
+    assert len(set(hints)) > 3
+    assert not _common.listed(["- a", "- b"], 2)[-1].startswith("Name")
+

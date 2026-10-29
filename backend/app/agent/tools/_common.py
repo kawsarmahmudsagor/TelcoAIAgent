@@ -3,6 +3,7 @@ loop, and fixed guidance text for every BssError (no codes or exception text
 ever reach the customer)."""
 
 import asyncio
+import random
 from collections.abc import Awaitable, Callable
 from enum import Enum
 from typing import TypeVar
@@ -110,15 +111,38 @@ E = TypeVar("E", bound=Enum)
 READ_OUT = 3
 LISTED = 10
 
+# How to offer the rest, one pair per list: told only to "word it differently",
+# the model ended every list with "আরও … প্যাকেজ সম্পর্কে জানতে চান?". A
+# suggestion last in its context, changed each time, it does follow.
+_MORE_OFFERS = (
+    ("বাকিগুলোর কথাও বলব?", "Shall I go through the rest?"),
+    ("আরও কয়েকটা আছে, সেগুলোও জানাব?", "There are a few more, shall I tell you about them?"),
+    ("এগুলো ছাড়াও আরও আছে, বলব?", "There are others too, want me to share them?"),
+    ("চাইলে বাকিগুলোও জানাতে পারি।", "I can tell you about the others if you like."),
+    ("বাকি অপশনগুলোও দেখাব?", "Should I show you the other options too?"),
+    ("আরও কিছু অপশন জানাব?", "Would you like a few more options?"),
+)
+_last_offer: int | None = None
+
+
+def _more_offer() -> tuple[str, str]:
+    """A wording for offering the rest, never the one the last list got."""
+    global _last_offer
+    _last_offer = random.choice([i for i in range(len(_MORE_OFFERS)) if i != _last_offer])
+    return _MORE_OFFERS[_last_offer]
+
 
 def listed(lines: list[str], total: int) -> list[str]:
     """`lines` (one per item, in order) cut to LISTED, with how to read them
-    out; past LISTED, the rest are only counted."""
+    out and a fresh wording for offering the rest; past LISTED, the rest are
+    only counted."""
     out = lines[:LISTED]
     if total > READ_OUT:
+        bn, en = _more_offer()
         out.append(
             f"Name {READ_OUT} at a time; keep the others above for when the customer wants "
-            "the rest."
+            f'the rest. To offer the rest, say it like "{bn}" (Bangla) or "{en}" (English), '
+            "not like an offer you have already made."
         )
     if total > LISTED:
         out.append(f"{total - LISTED} more not listed; offer to narrow it down.")
