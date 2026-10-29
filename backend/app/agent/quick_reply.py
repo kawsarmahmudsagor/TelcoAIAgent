@@ -14,9 +14,11 @@ That one answer picks the path (route):
   runs, and after it in front of the reply if the line is ready before the
   reply's first words, else dropped. The line comes from fast_filler's
   templates in under a millisecond (and its audio from app.agent.audio_cache
-  once said before); only a turn they don't fit asks the small model
-  (compose_filler). The line states no facts: safe_filler drops one with
-  numbers, money or contact details the customer didn't say.
+  once said before), picked by what the turn is about: Jev's topic answer
+  when it is sure (judged_topic), else the customer's words; only a turn they
+  don't fit asks the small model (compose_filler). The line states no facts:
+  safe_filler drops one with numbers, money or contact details the customer
+  didn't say.
 
 Anything less sure stays on the main model, as without quick replies.
 """
@@ -81,36 +83,47 @@ Reply with exactly {HANDOFF} and nothing else when the customer:
 - asks anything you are not sure you can answer from the conversation.
 Never guess a fact. When in doubt, reply with exactly {HANDOFF}."""
 
-_FILLER_SYSTEM = """You write the line a mobile operator's phone assistant says the moment a customer \
-finishes speaking, while the full answer is still being looked up by someone else. It is spoken aloud.
-Write one short, warm, natural spoken sentence (under 10 words) that fits this request and tells the \
-customer you are on it. Vary it: pick a different style each time, whichever suits the request:
-- echo what they asked for ("ইন্টারনেট প্যাকেজ, ওকে।", "Data packages. Okay.");
-- a short reaction and the next step ("ওকে, দেখে জানাচ্ছি।", "ওকে, প্যাকেজগুলো খুঁজে আপনাকে বলছি।", \
-"ঠিক আছে, আমি দেখে বলছি।");
-- a plain, warm wait ("জি, এক সেকেন্ড, আমি দেখে জানাচ্ছি।", "একটু সময় দিন, আমি জেনে বলছি।", \
-"শিওর, চেক করে বলছি।");
-- a professional, to-the-point line ("Checking your account.", "ব্যালেন্সটা চেক করে জানাচ্ছি।", \
-"প্যাকেজগুলো দেখে বলছি।");
-- by request type: a balance or usage question says so ("ব্যালেন্সটা চেক করে বলছি।"); a package search \
-names what they want ("ডাটা প্যাকেজগুলো খুঁজে জানাচ্ছি।"); a question about a rule or a limit names it ("বুঝেছি, \
-সর্বনিম্ন কত রিচার্জ করা যায় দেখে জানাচ্ছি।"); a policy question stays simple ("জি, দেখে বলছি।").
-Say what you are doing and that you'll tell them ("…দেখে জানাচ্ছি", "…খুঁজে আপনাকে বলছি", \
-"আমি জেনে বলছি"), never a bare "…দেখছি" or "…দেখে নিচ্ছি"; "আপনাকে" and "আমি" only sometimes.
-Language: the language of the customer's NEW message alone. Bangla (in Bengali script or written in \
-Latin letters) gets a Bangla line in Bengali script, in the respectful আপনি form, in the way people \
-actually speak, not a word-for-word translation. Use everyday English words in Bengali script where \
-Bangla speakers do (চেক, প্যাকেজ, ব্যালেন্স, ওকে, ওয়েট); say "দাম", not "প্রাইস", and "প্যাকেজ" \
-("package"), never "প্যাক" ("pack"). Never use literary \
-Bangla words such as মিলিয়ে, যাচাই, ঘেঁটে, খুলছি. When you echo an amount or a number the customer \
-said, say it in the customer's language: Bangla words for Bangla ("তিনশো টাকার মধ্যে, ওকে।"), English \
-words for English. English gets an English line.
-Never state a price, a number, a balance, availability, or a result of your own (only echo what the \
-customer said), and never describe how many or how good the results are (nothing is found yet; there \
-may be none). Never answer the question; never promise an outcome; never say a person is joining. \
-No greeting, no question, no emoji.
-Don't repeat any of the lines listed as already said, nor their verb or sentence shape.
-Reply with JSON only: {"text": "..."}"""
+_FILLER_SYSTEM = """You write the short line a mobile operator's phone assistant says
+while the main assistant handles the customer's request. The line is spoken aloud.
+
+Write one short, warm, natural spoken sentence, preferably under 10 words.
+Choose a style that fits the request and vary the sentence structure, not just individual words.
+
+Styles to vary:
+- Brief acknowledgement: "জি, বুঝেছি।"
+- Understanding: "আপনার কথাটা বুঝতে পেরেছি।"
+- Checking: "আচ্ছা, ব্যাপারটা একটু দেখি।"
+- Polite request: "একটু সময় দেবেন, প্লিজ?"
+- Empathy: "আপনার অসুবিধাটা বুঝতে পারছি।"
+- Neutral response to a choice or follow-up: "আচ্ছা, ওটা নিয়ে বলছি।"
+
+Language:
+- Follow the language of the customer's newest message.
+- For Bangla or Banglish, reply in natural spoken Bangla using Bengali script and respectful language.
+- Use everyday words such as চেক, প্যাকেজ, ব্যালেন্স and ওকে.
+- Say "দাম", not "প্রাইস".
+- Say "প্যাকেজ", not "প্যাক".
+- Avoid literary words such as মিলিয়ে, ঘেঁটে and খুলছি.
+- Keep familiar customer-care phrases such as "দেখে জানাচ্ছি", "দেখে বলছি",
+  "আপনাকে জানাচ্ছি", and "আপনাকে বলছি" in the template pool.
+- Use those update phrases when a lookup is actually happening or an answer is about to follow.
+- Vary them with acknowledgements, empathy, and polite requests; do not remove them or use
+  the same phrase in every reply.
+- Do not repeat recent lines or their sentence structures.
+- Avoid overly formal, robotic, or exaggeratedly apologetic language.
+
+Safety:
+- Never state a price, number, balance, availability, policy, or result that has not been verified.
+- Only echo numbers or amounts the customer explicitly said.
+- Never claim a recharge, payment, purchase, activation, complaint, or message has completed or succeeded.
+- Never claim an operation has started or is being processed unless the current operation state explicitly confirms it.
+- Never answer the customer's actual question; the main assistant will do that.
+- Never promise an outcome or say a person is joining.
+- Do not describe results as available, found, successful, or suitable before they have been checked.
+- Do not imply that you are checking something unless a lookup or check is actually about to happen.
+- No greeting, question, or emoji.
+
+Return JSON only: {"text": "..."}"""
 
 
 @dataclass
@@ -151,15 +164,22 @@ class QuickReplyRuntime:
         return [line for line in self.said if turn_gate.classify_script(line) == script][-_AVOID:]
 
     async def compose(
-        self, utterance: str, lookup: str | None, history: list[Exchange]
+        self,
+        utterance: str,
+        lookup: str | None,
+        history: list[Exchange],
+        *,
+        topic: str | None = None,
     ) -> str | None:
+        """topic: Jev's, when it is sure (judged_topic)."""
         avoid = self.avoid(utterance)
-        line = fast_filler(utterance, lookup, history, avoid, cache=self.audio_cache)
+        line = fast_filler(utterance, lookup, history, avoid, cache=self.audio_cache, topic=topic)
         if line is not None:
             # One echoing the customer's words is new: its audio may be cached too.
             remember_filler(line)
             if self.on_event is not None:
-                self.on_event(f'filler: template line "{line}"')
+                by = f" (Jev topic: {topic})" if topic else ""
+                self.on_event(f'filler: template line "{line}"{by}')
             return line
         line = await compose_filler(
             self.client,
@@ -172,6 +192,7 @@ class QuickReplyRuntime:
             avoid,
             timeout_s=self.settings.filler_timeout_ms / 1000,
             on_event=self.on_event,
+            topic=topic,
         )
         if line is not None:
             remember_filler(line)
@@ -200,48 +221,56 @@ def _re(pattern: str) -> re.Pattern[str]:
 
 
 _CHECKING_BN = (
-    "জি, এক সেকেন্ড, আমি দেখে জানাচ্ছি।",
-    "এক সেকেন্ড, চেক করে আপনাকে বলছি।",
-    "একটু সময় দিন, আমি জেনে বলছি।",
-    "আচ্ছা, দেখে আপনাকে জানাচ্ছি।",
-    "জি, এক মিনিট, চেক করে জানাচ্ছি।",
-    "ঠিক আছে, বিষয়টা দেখে বলছি।",
+    "একটু সময় দেবেন, প্লিজ।",
+    "একটু অপেক্ষা করুন, চেক করছি।",
+    "আচ্ছা, এক মিনিট সময় দিন।",
+    "জি, একটু দেখছি।",
+    "আচ্ছা, ব্যাপারটা দেখছি।",
+    "জি, একটু চেক করে নিই।",
+    "একটু সময় দিন, বিষয়টা দেখছি।",
+    "জি, দেখে আপনাকে জানাচ্ছি।",
+    "দেখে আপনাকে জানাচ্ছি।",
+    "একটু দেখে আপনাকে বলছি।",
+    "জি, চেক করে বলছি।",
+    "বিষয়টা দেখে জানাচ্ছি আপনাকে।",
+    "জি, আপনাকে জানাচ্ছি।",
+    "আচ্ছা, দেখে আপনাকে বলছি।",
 )
 _UNDERSTANDING_BN = (
-    "জি, বুঝতে পেরেছি, দেখে জানাচ্ছি।",
-    "আচ্ছা, বুঝেছি, আমি চেক করে বলছি।",
-    "বুঝতে পেরেছি, একটু সময় দিন, আমি জেনে বলছি।",
-    "ঠিক আছে, বুঝেছি, দেখে আপনাকে বলছি।",
+    "জি, বুঝতে পেরেছি। একটু সময় দিন।",
+    "বুঝতে পেরেছি, একটু সময় দিন।",
+    "আচ্ছা, ব্যাপারটা আমাকে একটু দেখতে দিন।",
+    "ঠিক আছে, আপনার বিষয়টা দেখছি।",
+    "বুঝতে পেরেছি, একটু সময় দিন, দেখে বলছি।",
+    "জি, বিষয়টা বুঝেছি, দেখে আপনাকে বলছি।",
 )
-_AFFIRM_BN = (
-    "অবশ্যই, এক্ষুনি দেখে জানাচ্ছি।",
-    "শিওর, আমি চেক করে বলছি।",
-    "ওকে, দেখে আপনাকে জানাচ্ছি।",
-    "জি, অবশ্যই, আমি জেনে আপনাকে বলছি।",
-    "জি, আমি দেখছি কী করা যায়।",
-)
-_GENERIC_BN = (*_CHECKING_BN, *_AFFIRM_BN, *_UNDERSTANDING_BN)
+_GENERIC_BN = (*_CHECKING_BN, *_UNDERSTANDING_BN)
 
 _CHECKING_EN = (
-    "Sure, one moment.",
-    "Okay, checking that now.",
+    "Sure, let me check that.",
+    "One moment, please.",
     "Let me take a quick look.",
+    "I'll check that for you.",
+    "Please give me a moment.",
+    "All right, let me look into it.",
     "Just a moment while I check.",
-    "Alright, give me a second.",
-    "One moment, I'll check the details.",
+    "Let me take a closer look.",
+    "Thanks, give me a moment.",
+    "I'll have a look.",
 )
 _UNDERSTANDING_EN = (
-    "Got it, let me check.",
-    "Understood, looking into it.",
-    "I see, one moment.",
+    "I understand. Give me a moment.",
+    "I see what you mean.",
+    "Got it, let me look into that.",
+    "I understand your concern.",
+    "All right, I understand.",
+    "I see what you're saying.",
+    "Understood, just a moment.",
+    "I understand what you need.",
+    "Got it, one moment please.",
+    "I follow you. Give me a moment.",
 )
-_AFFIRM_EN = (
-    "Of course, let me check.",
-    "Sure, I'll look into that.",
-    "No problem, checking now.",
-    "Alright, I'll take a look.",
-)
-_GENERIC_EN = (*_CHECKING_EN, *_AFFIRM_EN, *_UNDERSTANDING_EN)
+_GENERIC_EN = (*_CHECKING_EN, *_UNDERSTANDING_EN)
 
 # x: what is being checked, with its article or classifier ("আপনার
 # ব্যালেন্সটা", "the data packages"). Each topic takes the verbs of what is
@@ -251,24 +280,29 @@ _GENERIC_EN = (*_CHECKING_EN, *_AFFIRM_EN, *_UNDERSTANDING_EN)
 _ECHO_BN: dict[str, tuple[str, ...]] = {
     "search": (
         "জি, {x} খুঁজে আপনাকে জানাচ্ছি।",
-        "ঠিক আছে, {x} খুঁজে দেখাচ্ছি।",
-        "আচ্ছা, আমি {x} বের করে বলছি।",
-        "ওকে, {x} দেখে জানাচ্ছি।",
-        "এক সেকেন্ড, {x} খুঁজে আপনাকে বলছি।",
+        "আচ্ছা, {x} খুঁজে দেখে বলছি।",
+        "ঠিক আছে, {x} খুঁজে আপনাকে দেখাচ্ছি।",
+        "একটু সময় দিন, {x} খুঁজে জানাচ্ছি।",
     ),
     "lookup": (
-        "জি, {x} চেক করে জানাচ্ছি।",
-        "ঠিক আছে, আমি {x} দেখে বলছি।",
-        "আচ্ছা, {x} দেখে আপনাকে জানাচ্ছি।",
-        "ওকে, {x} চেক করে আপনাকে বলছি।",
-        "এক সেকেন্ড, {x} দেখে জানাচ্ছি।",
+        "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
+        "আচ্ছা, {x} একটু দেখে আপনাকে বলছি।",
+        "ঠিক আছে, {x} যাচাই করে জানাচ্ছি আপনাকে।",
+        "এক মিনিট, {x} দেখে আপনাকে জানাচ্ছি।",
+        "একটু সময় দিন, {x} দেখে আপনাকে বলছি।",
     ),
     "status": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "ঠিক আছে, {x} দেখে বলছি।",
-        "আচ্ছা, আমি {x} একটু চেক করে জানাচ্ছি।",
-        "ওকে, {x} দেখে আপনাকে জানাচ্ছি।",
-        "এক সেকেন্ড, {x} চেক করে বলছি।",
+        "ঠিক আছে, {x_of} স্ট্যাটাসটা যাচাই করে জানাচ্ছি।",
+        "আচ্ছা, {x_of} আপডেটটা দেখে আপনাকে জানাচ্ছি।",
+        "একটু সময় দিন, {x_of} স্ট্যাটাস চেক করে বলছি।",
+    ),
+    # A complaint or a rule has no status: "ব্যাপারটার স্ট্যাটাস" is wrong.
+    "issue": (
+        "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
+        "আচ্ছা, {x} একটু দেখে আপনাকে বলছি।",
+        "ঠিক আছে, {x} খোঁজ নিয়ে জানাচ্ছি।",
+        "একটু সময় দিন, {x} দেখে বলছি।",
     ),
 }
 
@@ -295,6 +329,7 @@ _ECHO_EN: dict[str, tuple[str, ...]] = {
         "One moment, I'll find out about {x}.",
     ),
 }
+_ECHO_EN["issue"] = _ECHO_EN["status"]
 
 # What each topic checks, for the echo lines: (Bangla, English, verb family).
 _TOPIC_X: dict[str, tuple[str, str, str]] = {
@@ -311,8 +346,8 @@ _TOPIC_X: dict[str, tuple[str, str, str]] = {
     "transactions": ("ট্রানজেকশনগুলো", "your recent transactions", "lookup"),
     "recharge": ("রিচার্জটা", "your recharge", "status"),
     "network": ("আপনার এলাকার নেটওয়ার্কটা", "the network in your area", "status"),
-    "complaint": ("ব্যাপারটা", "the issue", "status"),
-    "policy": ("বিষয়টা", "the details", "status"),
+    "complaint": ("ব্যাপারটা", "the issue", "issue"),
+    "policy": ("বিষয়টা", "the details", "issue"),
 }
 
 _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
@@ -326,7 +361,7 @@ _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
     "recharge": ("রিচার্জটা ঠিকমতো হয়েছে কি না, দেখে জানাচ্ছি।",),
     "offer": ("আপনার নম্বরে কী কী অফার আছে, দেখে বলছি।",),
     "points": ("কত পয়েন্ট জমেছে, চেক করে আপনাকে জানাচ্ছি।",),
-    "transactions": ("কোথায় কেটেছে, খুঁজে আপনাকে বলছি।",),
+    "transactions": ("কীসে কেটেছে, খুঁজে আপনাকে বলছি।",),
     "network": ("আপনার এলাকায় নেটওয়ার্ক কেমন, দেখে জানাচ্ছি।",),
     "care": ("আপনার কাছের কেয়ার সেন্টারটা খুঁজে বলছি।",),
     "complaint": ("সরি, সমস্যাটা চেক করে আপনাকে জানাচ্ছি।", "বুঝতে পেরেছি, কী করা যায় দেখে বলছি।"),
@@ -354,40 +389,61 @@ _TOPIC_EXTRA_EN: dict[str, tuple[str, ...]] = {
 # about one recharge, "সর্বনিম্ন কত রিচার্জ করা যায়?" about the rule. The
 # first kind whose words the customer used wins; none, the topic's default.
 _RECHARGE_STATUS_BN = (
-    "জি, রিচার্জটা ঠিকমতো হয়েছে কি না দেখে জানাচ্ছি।",
-    "এক সেকেন্ড, চেক করে বলছি।",
-    "সরি, আমি রিচার্জটার খোঁজ নিয়ে আপনাকে জানাচ্ছি।",
+    "জি, আপনার রিচার্জটা হয়েছে কি না, একটু চেক করে জানাচ্ছি।",
+    "আচ্ছা, রিচার্জটা ব্যালেন্সে যোগ হয়েছে কি না দেখে আপনাকে বলছি।",
+    "বুঝতে পেরেছি, রিচার্জের স্ট্যাটাসটা চেক করে আপনাকে জানাচ্ছি।",
+    "জি, রিচার্জের ব্যাপারটা একটু যাচাই করছি, আমাকে একটু সময় দিন।",
+    "রিচার্জের আপডেটটা দেখে আপনাকে জানাচ্ছি।",
+    "জি, আপনার রিচার্জের তথ্যটা যাচাই করে জানাচ্ছি আপনাকে।",
+    "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।",
 )
 _RECHARGE_STATUS_EN = (
-    "Sure, I'll check whether the recharge went through.",
-    "One moment, I'll check and tell you.",
-    "Sorry about that, I'll look into the recharge for you.",
+    "Let me check the recharge status.",
+    "I'll look into whether the recharge went through.",
+    "I understand your concern about the recharge.",
+    "One moment while I check the recharge status.",
+    "Let me take a look at the recharge update.",
 )
 _RECHARGE_LIMIT_BN = (
-    "বুঝেছি, কত টাকা রিচার্জ করা যায় দেখে জানাচ্ছি।",
-    "জি, রিচার্জের লিমিটটা চেক করে বলছি।",
-    "এক সেকেন্ড, আমি রিচার্জের নিয়মটা দেখে আপনাকে বলছি।",
+    "জি, রিচার্জের সীমাটা যাচাই করে আপনাকে জানাচ্ছি।",
+    "একটু সময় দিন, রিচার্জের লিমিটটা দেখে বলছি।",
+    "বুঝতে পেরেছি, রিচার্জ লিমিট নিয়ে বিষয়টা চেক করছি।",
+    "জি, রিচার্জের সীমা সংক্রান্ত তথ্যটা দেখে আপনাকে জানাচ্ছি।",
+    "রিচার্জের সীমার ব্যাপারটা একটু দেখে আপনাকে আপডেট দিচ্ছি।",
 )
 _RECHARGE_LIMIT_EN = (
-    "Got it, I'll check how much you can recharge.",
-    "Sure, let me check the recharge limits.",
-    "One moment, I'll look up the recharge rules for you.",
+    "Let me check the recharge limit.",
+    "I understand your question about the recharge limit.",
+    "One moment while I look into the limit.",
+    "Got it, regarding the recharge limit.",
 )
 _RECHARGE_HOW_BN = (
-    "জি, কিভাবে রিচার্জ করবেন দেখে বলছি।",
-    "আচ্ছা, রিচার্জ করার উপায়গুলো আমি জেনে জানাচ্ছি।",
+    "আচ্ছা, কীভাবে রিচার্জ করবেন, সেটা একটু বুঝিয়ে বলছি।",
+    "জি, রিচার্জ করার পদ্ধতিটা দেখে আপনাকে জানাচ্ছি।",
+    "ঠিক আছে, কীভাবে রিচার্জ করবেন, সেটা বলছি।",
+    "জি, রিচার্জ করার ধাপগুলো আপনাকে জানাচ্ছি, একটু সময় দিন।",
+    "আচ্ছা, রিচার্জের পদ্ধতিটা আপনাকে বুঝিয়ে বলছি।",
+    "আপনি কীভাবে রিচার্জ করতে পারবেন, সেটা জানাচ্ছি।",
+    "একটু সময় দিন, রিচার্জ করার পদ্ধতিটা চেক করে আপনাকে জানাচ্ছি।",
 )
 _RECHARGE_HOW_EN = (
-    "Sure, I'll tell you how to recharge.",
-    "Okay, let me find the ways you can recharge.",
+    "I understand your question about recharging.",
+    "Let me look into the recharge steps.",
+    "Got it, regarding how to recharge.",
+    "One moment while I check the recharge process.",
 )
 _RECHARGE_PERKS_BN = (
-    "জি, রিচার্জে কী কী পাবেন দেখে জানাচ্ছি।",
-    "এক সেকেন্ড, রিচার্জের অফারগুলো চেক করে বলছি।",
+    "আচ্ছা, বর্তমানে কী কী রিচার্জ অফার আছে, সেটা দেখে আপনাকে বলছি।",
+    "রিচার্জের সুবিধাগুলো সম্পর্কে আপনাকে বিস্তারিত বলছি।",
+    "জি, রিচার্জে কী কী সুবিধা পাবেন, সেটা চেক করে বলছি।",
+    "আচ্ছা, রিচার্জের অফারগুলো একটু যাচাই করে আপনাকে জানাচ্ছি।",
+    "জি, রিচার্জের অফার ও সুবিধাগুলো দেখে আপনাকে আপডেট দিচ্ছি।",
 )
 _RECHARGE_PERKS_EN = (
-    "Sure, I'll check what you get with a recharge.",
-    "One moment, let me check the recharge offers.",
+    "I understand your question about recharge offers.",
+    "Let me look into the recharge offers.",
+    "Got it, regarding the available offers.",
+    "One moment while I check the offers.",
 )
 # topic -> ((kind, its words, Bangla lines, English lines), ...), first match
 # wins. Perks before limits before how-to: "বিকাশে রিচার্জ করলে ক্যাশব্যাক
@@ -396,83 +452,107 @@ _RECHARGE_PERKS_EN = (
 _KINDS: dict[str, tuple[tuple[str, re.Pattern[str], tuple[str, ...], tuple[str, ...]], ...]] = {}
 
 _CORRECTION_BN = (
-    "জি, বুঝতে পেরেছি, আবার চেক করে জানাচ্ছি।",
-    "ঠিক আছে, সেভাবেই দেখে আপনাকে বলছি।",
-    "আচ্ছা, বুঝেছি, এক সেকেন্ড, আমি দেখে জানাচ্ছি।",
-    "সরি, ঠিক আছে, আবার দেখে বলছি।",
+    "আচ্ছা, বুঝেছি।",
+    "জি, আপনি কী বোঝাতে চাচ্ছেন বুঝতে পেরেছি।",
+    "ঠিক আছে, এবার বুঝতে পেরেছি।",
 )
 _CORRECTION_EN = (
-    "Got it, let me look again.",
-    "Understood, checking that instead.",
-    "Sorry about that, one moment.",
+    "All right, understood.",
+    "Got it, thanks for clarifying.",
+    "Okay, I see what you mean now.",
+    "Understood, let me adjust that.",
+    "Thanks for clearing that up.",
 )
 _CHOICE_BN = (
-    "জি, প্যাকেজটার ডিটেইলস দেখে জানাচ্ছি।",
-    "আচ্ছা, এক সেকেন্ড, চেক করে বলছি।",
-    "ঠিক আছে, ওটা দেখে আপনাকে জানাচ্ছি।",
-    "ওকে, আমি প্যাকেজটা দেখে বলছি।",
+    "ঠিক আছে, তাহলে এই প্যাকেজটার বিস্তারিত আপনাকে জানাচ্ছি।",
+    "ঠিক আছে, আপনি যেটা সিলেক্ট করেছেন, সেটা নিয়ে বলছি।",
+    "জি, এই প্যাকেজটার তথ্য দেখে আপনাকে জানাচ্ছি।",
 )
 _CHOICE_EN = (
-    "Sure, checking that one.",
-    "Okay, pulling up that option.",
-    "Got it, looking at that package now.",
+    "All right, that one.",
+    "Sure, let's go with that one.",
+    "Got it, you mean that option.",
+    "Okay, that option it is.",
 )
 
 # A follow-up on what the last filler already named: a person says "এটাও
 # দেখছি", not "তিন জিবির ডাটা প্যাকেজগুলো দেখছি" turn after turn.
 _FOLLOW_UP_BN = (
-    "জি, এক সেকেন্ড, দেখে জানাচ্ছি।",
-    "আচ্ছা, সেটাও চেক করে আপনাকে বলছি।",
-    "ঠিক আছে, আমি খুঁজে জানাচ্ছি।",
-    "ওকে, এক্ষুনি বের করে দেখাচ্ছি।",
-    "এক মিনিট, সেটাও দেখে বলছি।",
-    "শিওর, সেটাও খুঁজে বলছি।",
-    "অবশ্যই, আমি চেক করে জানাচ্ছি।",
-    "বুঝেছি, সেটাও বের করে আপনাকে জানাচ্ছি।",
+    "জি, আরও বলছি।",
+    "ঠিক আছে, বিস্তারিত বলছি।",
+    "আচ্ছা, আরও তথ্য দিচ্ছি।",
+    "অবশ্যই, আপনাকে বিস্তারিত জানাচ্ছি।",
 )
 _FOLLOW_UP_EN = (
-    "Sure, checking that too.",
-    "Okay, one second.",
-    "Got it, let me see.",
-    "Alright, looking now.",
+    "Sure, I'll explain a bit more.",
+    "Let me add some detail.",
+    "Of course, here's a little more.",
+    "All right, I'll elaborate.",
+    "Let me clarify that a little.",
+    "Sure, I'll go into more detail.",
 )
 # ... and when it names something new on the same topic ("চার জিবির?" after
 # "তিন জিবির"): x with "also".
 _FOLLOW_UP_ECHO_BN = (
-    "জি, {x}ও খুঁজে জানাচ্ছি।",
-    "আচ্ছা, {x}ও চেক করে আপনাকে বলছি।",
-    "ঠিক আছে, আমি {x}ও বের করে দেখাচ্ছি।",
-    "ওকে, {x}ও দেখে বলছি।",
+    "জি, {x}ও একটু দেখছি।",
+    "আচ্ছা, {x}ও চেক করে বলছি।",
+    "ঠিক আছে, এবার {x} দেখে বলছি।",
+    "{x}ও দেখে আপনাকে জানাচ্ছি।",
 )
 _FOLLOW_UP_ECHO_EN = (
-    "Sure, checking {x} too.",
-    "Okay, looking at {x} as well.",
-    "Got it, {x} too, one moment.",
+    "Sure, I'll check {x} too.",
+    "Let me look at {x} as well.",
+    "All right, checking {x} now.",
+    "Okay, I'll look for {x} too.",
 )
 # "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?"
 _MORE_BN = (
-    "জি, আরও অপশন খুঁজে জানাচ্ছি।",
-    "আচ্ছা, বাকিগুলো বের করে আপনাকে দেখাচ্ছি।",
-    "ঠিক আছে, আর কী কী আছে আমি দেখে বলছি।",
-    "ওকে, আরও কিছু চেক করে জানাচ্ছি।",
+    "ঠিক আছে, আর কোনো অপশন আছে কি না দেখছি।",
+    "জি, অন্য বিকল্প আছে কি না দেখে বলছি।",
+    "জি, আরও কিছু অপশন দেখে আপনাকে জানাচ্ছি।",
+    "আচ্ছা, অন্য বিকল্পগুলোও একটু দেখে বলছি।",
+    "আচ্ছা, আর কী কী অপশন আছে, একটু দেখে নিই।",
+    "ঠিক আছে, আরও কিছু বিকল্প খুঁজে আপনাকে জানাচ্ছি।",
+    "আচ্ছা, এই অপশনগুলো ছাড়াও আর কী আছে, দেখছি।",
 )
 _MORE_EN = (
-    "Sure, checking what else there is.",
-    "Okay, pulling up the others.",
-    "Let me see what else we have.",
+    "Sure, let's look at more options.",
+    "I'll check what else is available.",
+    "All right, let me check for other options.",
+    "Let me look at the alternatives.",
+    "Sure, I'll look for other options.",
 )
 # "এই প্যাকেজটা নিতে চাচ্ছি", "আগে রিচার্জ করুন": no outcome promised, the
 # code or a shortfall may come next.
 _ACTION_BN = (
-    "ঠিক আছে, প্রসেস করছি।",
-    "জি, এক সেকেন্ড, প্রসেস করছি।",
-    "আচ্ছা, ব্যবস্থা করছি।",
-    "ওকে, শুরু করছি।",
+    "জি, ঠিক আছে।",
+    "জি, আপনার অনুরোধটা বুঝতে পেরেছি।",
+    "ঠিক আছে, একটু সময় দিন।",
+    "আচ্ছা, বিষয়টা দেখে নিই।",
+    "জি, এক মুহূর্ত সময় দিন।",
+    "জি, অবশ্যই।",
+    "আচ্ছা, ঠিক আছে।",
+    "আচ্ছা, বুঝতে পেরেছি।",
 )
 _ACTION_EN = (
-    "Sure, setting that up.",
-    "Okay, one moment, processing.",
-    "Alright, getting that started.",
+    "Sure, understood.",
+    "All right, I understand.",
+    "Got it, one moment.",
+    "Okay, I understand your request.",
+    "Sure, that's clear.",
+    "Understood, give me a moment.",
+    "All right, noted.",
+    "Okay, I follow.",
+    "Certainly, understood.",
+    "Got it.",
+    "All right.",
+    "Absolutely.",
+    "Okay, understood.",
+    "Sure, no problem.",
+    "All right, I follow.",
+    "Understood, thanks.",
+    "Okay, I hear you.",
+    "Certainly.",
 )
 
 
@@ -518,7 +598,12 @@ def _echo(templates: tuple[str, ...], x: str) -> tuple[str, ...]:
     আপনি twice: with x already "আপনার …", the আপনাকে goes."""
     if "আপনার" in x:
         templates = tuple(t.replace(" আপনাকে ", " ") for t in templates)
-    return tuple(t.format(x=x) for t in templates)
+    return tuple(t.format(x=x, x_of=_of(x)) for t in templates)
+
+
+def _of(x: str) -> str:
+    """x's possessive for {x_of}: "রিচার্জটা" -> "রিচার্জের", not "রিচার্জটা এর"."""
+    return f"{x[:-2]}ের" if x.endswith("টা") else f"{x}র"
 
 
 def _echo_lines(topic: str, x: str, bangla: bool) -> tuple[str, ...]:
@@ -595,6 +680,28 @@ _BANGLISH_RE = re.compile(
 )
 
 
+def judged_topic(judgement: Judgement | None, settings: Settings) -> str | None:
+    """The filler topic Jev gave the turn (turn_judge.TOPIC_KEY), or None when
+    it wasn't asked, gave none ("other"), or isn't sure enough."""
+    if judgement is None or judgement.topic not in _TOPIC_X:
+        return None
+    if judgement.topic_p is None or judgement.topic_p < settings.filler_topic_min_p:
+        return None
+    return judgement.topic
+
+
+def _turn_topic(utterance: str, lookup: str | None, judged: str | None) -> str | None:
+    """What the turn is about: Jev's topic, read in context, over the words'.
+    Only "pack" yields to the words, when they name the package kind ("নেট
+    প্যাক" is data)."""
+    words = _filler_topic(utterance, lookup)
+    if judged is None:
+        return words
+    if judged == "pack" and words in _PACK_TOPICS:
+        return words
+    return judged
+
+
 def _filler_topic(utterance: str, lookup: str | None) -> str | None:
     # NFC splits a precomposed য় (U+09DF) the way the patterns spell it.
     utterance = unicodedata.normalize("NFC", utterance)
@@ -624,12 +731,15 @@ _CORRECTION_RE = _re(
 _NEGATION_RE = _re(r"(?:^|[\s,।])(?:না|নয়|not|no)(?=[\s,।!?]|$)")
 
 # A pick from a list the agent just showed: "দ্বিতীয়টা", "দুই নম্বরটা",
-# "the second one".
+# "অন্যটা", "the second one", "the other one". Not "অন্য টাকা": no letter
+# may follow টা beyond its own suffix.
 _CHOICE_RE = _re(
     r"(?:প্রথম|দ্বিতীয়|তৃতীয়|চতুর্থ|পঞ্চম|শেষের|লাস্টের)\s*(?:টা|টি)|"
+    r"(?:অন্য|পরের|আগের)\s*(?:টা|টি)(?:ই|ও|র|কে)?(?![ঀ-৿])|"
     r"(?:এক|দুই|তিন|চার|পাঁচ|[১-৫1-5])\s*নম্বর|ওই\s*প্যাক|"
-    r"\b(?:first|second|third|fourth|fifth|last)\s+(?:one|option|pack|offer)\b|"
-    r"\bthat\s+(?:pack|offer|option)\b"
+    r"\b(?:first|second|third|fourth|fifth|last|other|next|previous)\s+"
+    r"(?:one|option|pack|package|offer)\b|"
+    r"\bthat\s+(?:one|pack|package|offer|option)\b"
 )
 
 
@@ -855,7 +965,7 @@ _CLOSING_RE = _re(r"জানাচ্ছি|বলছি|দেখাচ্ছ�
 
 # "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?", "any others?"
 _MORE_RE = _re(
-    r"আরও|আর\s*(?:কী|কি)\s*(?:কী|কি)?\s*আছে|আর\s*কোনো|বাকিগুলো|অন্য\s*(?:কোনো|কিছু|অপশন)|ছাড়া|"
+    r"আর[ওো]|আর\s*(?:কী|কি)\s*(?:কী|কি)?\s*আছে|আর\s*কোনো|বাকিগুলো|অন্য\s*(?:কোনো|কিছু|অপশন)|ছাড়া|"
     r"\bmore\b|\bothers?\b|\banything else\b"
 )
 # A purchase or recharge asked for, not a question about what exists ("নতুন
@@ -863,6 +973,13 @@ _MORE_RE = _re(
 _ACTION_RE = _re(
     r"(?:নিতে|কিনতে)\s*(?:চাই|চাচ্ছি)|কিনব|কিনে\s*(?:দিন|দেন)|অ্যাক্টিভেট|চালু\s*করে\s*দিন|"
     r"রিচার্জ\s*(?:করুন|করেন|করব|করবো|করে\s*দিন)|\b(?:buy|purchase|activate)\b"
+)
+# More about what was just said, not more options: "আরো বলেন", "tell me
+# more". Only with no topic named: "সাত দিনের প্যাকেজটার বিস্তারিত বলুন" echoes it.
+_DETAIL_RE = _re(
+    r"(?:আর[ওো]|বিস্তারিত)\s*(?:একটু\s*)?(?:বলেন|বলুন|বলো|জানান|বুঝিয়ে)|"
+    r"\btell me more\b|\bmore (?:details?|info(?:rmation)?|about (?:it|that|this))\b|"
+    r"\bexplain\b|\belaborate\b"
 )
 _QUESTION_RE = _re(r"(?:কী|কি)\s*(?:কী|কি)|কোন|অপশন|\boptions?\b|\bwhich\b|\bwhat\b|\?")
 _PACK_TOPICS = {"data", "voice", "bundle", "sms", "pack"}
@@ -897,7 +1014,11 @@ def _closing(line: str) -> str:
 
 
 def _tiers(
-    utterance: str, lookup: str | None, bangla: bool, last: str | None = None
+    utterance: str,
+    lookup: str | None,
+    bangla: bool,
+    last: str | None = None,
+    judged: str | None = None,
 ) -> list[tuple[str, ...]]:
     """The lines that fit this turn, in tiers, best first; [] when only a
     generic line does. First match wins: a correction, a pick from a list, a
@@ -905,6 +1026,7 @@ def _tiers(
     lines in the customer's own words a tier above the plain ones. `last`:
     the filler said before; a follow-up on its topic gets a short line
     ("এটাও দেখছি"), or the new thing it names ("চার জিবির প্যাকেজগুলোও").
+    `judged`: Jev's topic for the turn (judged_topic), over the words' topic.
     """
     if _CORRECTION_RE.search(utterance):
         topic = _corrected_topic(utterance)
@@ -915,7 +1037,9 @@ def _tiers(
     elif _ACTION_RE.search(utterance) and not _QUESTION_RE.search(utterance):
         return [_ACTION_BN if bangla else _ACTION_EN]
     else:
-        topic = _filler_topic(utterance, lookup)
+        topic = _turn_topic(utterance, lookup, judged)
+        if topic is None and _DETAIL_RE.search(utterance):
+            return [_FOLLOW_UP_BN if bangla else _FOLLOW_UP_EN]
         if _family(topic) in ("pack", None) and _MORE_RE.search(utterance):
             return [_MORE_BN if bangla else _MORE_EN]
         if topic is None:
@@ -928,14 +1052,19 @@ def _tiers(
     new_kind = kind is not None and last is not None and _line_kind(last) not in (None, kind[0])
     if last is not None and _same_topic(last_topic, topic) and not new_kind:
         last_entity = _entity_x(last_topic, unicodedata.normalize("NFC", last))
+        # The same thing said again ("মিরপুরে নেট পাচ্ছি না"), or a problem
+        # gone on with: still being checked, not "বিস্তারিত বলছি".
+        checking = _CHECKING_BN if bangla else _CHECKING_EN
+        if (x is not None and x in last) or _TOPIC_X[topic][2] in ("status", "issue"):
+            if x is not None and last_entity is not None and x not in last:
+                return [_echo(_FOLLOW_UP_ECHO_BN if bangla else _FOLLOW_UP_ECHO_EN, x), checking]
+            return [checking]
         if x is None:
             return [_FOLLOW_UP_BN if bangla else _FOLLOW_UP_EN]
-        if last_entity is not None and x not in last:
+        if last_entity is not None:
             # Something specific after something specific: "চার জিবির…ও".
             echo = _FOLLOW_UP_ECHO_BN if bangla else _FOLLOW_UP_ECHO_EN
             return [_echo(echo, x), _FOLLOW_UP_BN if bangla else _FOLLOW_UP_EN]
-        if x in last:
-            return [_FOLLOW_UP_BN if bangla else _FOLLOW_UP_EN]
     tiers = [_topic_lines(topic, bangla)]
     if kind is not None:
         tiers.insert(0, kind[1] if bangla else kind[2])
@@ -979,6 +1108,7 @@ def fast_filler(
     *,
     cache: AudioCache | None = None,
     rng: random.Random | None = None,
+    topic: str | None = None,
 ) -> str | None:
     """A template filler for the turn, in well under a millisecond, or None
     when the utterance is empty. Picks at random, so a call doesn't open with
@@ -987,14 +1117,18 @@ def fast_filler(
       (_tiers: the customer's own words, the topic, then generic lines);
     - within it, the lines that open and end on other words than the last
       fillers, when there are any;
-    - weighted towards a line whose audio is already cached."""
+    - weighted towards a line whose audio is already cached.
+    topic: Jev's for the turn (judged_topic), else the words decide."""
     if not utterance.strip():
         return None
     utterance = unicodedata.normalize("NFC", utterance)
     bangla = _speaks_bangla(utterance, history)
     avoid = avoid or []
     last = avoid[-1] if avoid else None
-    tiers = [*_tiers(utterance, lookup, bangla, last), _GENERIC_BN if bangla else _GENERIC_EN]
+    tiers = [
+        *_tiers(utterance, lookup, bangla, last, topic),
+        _GENERIC_BN if bangla else _GENERIC_EN,
+    ]
 
     def usable(line: str) -> bool:
         return safe_filler(line, utterance) is not None
@@ -1281,6 +1415,7 @@ def build_filler_request(
     lookup: str | None,
     history: list[Exchange],
     avoid: list[str],
+    topic: str | None = None,
 ) -> dict:
     lines = ["Conversation so far:"]
     lines += [f"{'Customer' if e.role == 'user' else 'Assistant'}: {e.text}" for e in history]
@@ -1288,6 +1423,8 @@ def build_filler_request(
         lines.append("(none yet)")
     if lookup:
         lines.append(f"What is being looked up: {lookup.replace('_', ' ')}.")
+    if topic in _TOPIC_X:
+        lines.append(f"What the customer asks about: {_TOPIC_X[topic][1]}.")
     if avoid:
         lines.append("Already said (don't repeat): " + " | ".join(avoid))
     lines.append(f"Customer's new message: {utterance}")
@@ -1318,9 +1455,10 @@ async def compose_filler(
     *,
     timeout_s: float,
     on_event: Callable[[str], None] | None = None,
+    topic: str | None = None,
 ) -> str | None:
     """A filler line for the turn, or None on any error, timeout or unsafe line."""
-    payload = build_filler_request(model, utterance, lookup, history, avoid)
+    payload = build_filler_request(model, utterance, lookup, history, avoid, topic)
     started = time.perf_counter()
 
     def note(text: str) -> None:

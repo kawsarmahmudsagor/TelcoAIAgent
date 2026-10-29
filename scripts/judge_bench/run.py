@@ -9,6 +9,8 @@ Run from backend/ so the backend environment and .env are used:
 
 --lookup also asks the turn router's lookup question on listening cases, as the
 agent does with ROUTER_ENABLED, to compare latency and the timeout rate.
+--topic (with --lookup) also asks the filler's topic question, as the agent
+does with quick fillers on, and prints Jev's topic for each listening case.
 """
 
 import argparse
@@ -32,7 +34,7 @@ DROP_P = Thresholds().drop_p
 INTERRUPT_P = 0.5
 
 
-async def _run(model: str, cases_path: Path, lookup: bool) -> None:
+async def _run(model: str, cases_path: Path, lookup: bool, topic: bool) -> None:
     data = json.loads(cases_path.read_text(encoding="utf-8"))
     histories = {
         k: [Exchange(e["role"], e["text"]) for e in v] for k, v in data["histories"].items()
@@ -52,15 +54,18 @@ async def _run(model: str, cases_path: Path, lookup: bool) -> None:
                 case["bot_state"],
                 address_form(case["utterance"]),
                 lookup=lookup and case["bot_state"] == "listening",
+                topic=topic and lookup and case["bot_state"] == "listening",
             )
             started = time.perf_counter()
-            p = (await judge(client, url, settings.openrouter_api_key, payload, timeout_s=15)).p
+            judgement = await judge(client, url, settings.openrouter_api_key, payload, timeout_s=15)
+            p = judgement.p
             ms = (time.perf_counter() - started) * 1000
             results.append({**case, "p": p, "ms": ms})
             shown = "ERR " if p is None else f"{p:.2f}"
             mark = _mark(case["expected"], p)
             print(f"{case['id']:5} {case['expected'][:4]:4} {case['bot_state'][:5]:5} "
-                  f"{shown} {ms:6.0f}ms {mark} {case['utterance']}")
+                  f"{shown} {ms:6.0f}ms {mark} {case['utterance']}"
+                  + (f"  [topic {judgement.topic} {judgement.topic_p}]" if judgement.topic else ""))
 
     _report(results, settings.turn_judge_timeout_ms)
 
@@ -123,8 +128,11 @@ def main() -> None:
     parser.add_argument("--model", default="typesafe/jev-1.13")
     parser.add_argument("--cases", type=Path, default=_HERE / "cases.json")
     parser.add_argument("--lookup", action="store_true", help="also ask the lookup question")
+    parser.add_argument(
+        "--topic", action="store_true", help="also ask the topic question (with --lookup)"
+    )
     args = parser.parse_args()
-    asyncio.run(_run(args.model, args.cases, args.lookup))
+    asyncio.run(_run(args.model, args.cases, args.lookup, args.topic))
 
 
 if __name__ == "__main__":

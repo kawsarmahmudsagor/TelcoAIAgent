@@ -91,9 +91,11 @@ def _gate(
         setattr(resolved, key, value)
     quick = QuickReplyRuntime(resolved, settings, "or-key", httpx.AsyncClient())
     composed: list[str] = []
+    topics: list[str | None] = []
 
-    async def compose(text, lookup, history):
+    async def compose(text, lookup, history, topic=None):
         composed.append(text)
+        topics.append(topic)
         if compose_s:
             await asyncio.sleep(compose_s)
         return line
@@ -122,7 +124,7 @@ def _gate(
     gate.attach()
     return SimpleNamespace(
         gate=gate, session=session, composed=composed, judged=judged, fillers=fillers,
-        stored=stored, quick=quick,
+        stored=stored, quick=quick, topics=topics,
     )  # fmt: skip
 
 
@@ -404,6 +406,18 @@ def test_a_weak_lookup_guess_gets_no_filler():
         g = _gate(Judgement(0.9, "listings", 0.3), prefetcher=None)
         assert await _turn(g) is True
         assert g.composed == [] and _says(g.session) == []
+
+    asyncio.run(go())
+
+
+def test_the_filler_gets_jevs_topic_only_when_jev_is_sure():
+    async def go():
+        sure = _gate(Judgement(0.9, "listings", 0.9, topic="balance", topic_p=0.9), prefetcher=None)
+        assert await _turn(sure) is True
+        unsure = _gate(Judgement(0.9, "listings", 0.9, topic="balance", topic_p=0.4), prefetcher=None)
+        assert await _turn(unsure) is True
+        await asyncio.sleep(0)  # the lines' tasks start
+        assert sure.topics == ["balance"] and unsure.topics == [None]
 
     asyncio.run(go())
 

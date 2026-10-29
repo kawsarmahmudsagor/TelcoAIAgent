@@ -180,11 +180,13 @@ def jev_judge(
     *,
     router: bool = False,
     knowledge_base: bool = False,
+    topic: bool = False,
 ) -> JudgeFn:
     """A JudgeFn that asks Jev, with the last few exchanges as context.
     on_judged gets (text, bot_state, seconds, p) after every call. With router
     on, a routed call also asks which lookup the reply needs (knowledge_base:
-    whether the knowledge base is one of the options)."""
+    whether the knowledge base is one of the options), and with topic on what
+    the turn is about, for its filler line."""
     url = turn_judge.decisions_url(settings.openrouter_base_url)
     timeout_s = settings.turn_judge_timeout_ms / 1000
 
@@ -206,6 +208,7 @@ def jev_judge(
             turn_gate.address_form(text),
             lookup=lookup,
             knowledge_base=knowledge_base,
+            topic=lookup and topic,
         )
         started = time.perf_counter()
         judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s, utterance=text)
@@ -227,6 +230,7 @@ def jev_warm_up(
     *,
     router: bool = False,
     knowledge_base: bool = False,
+    topic: bool = False,
 ) -> Callable[[], Coroutine[Any, Any, None]]:
     """One throwaway Jev request, shaped like a real first turn's, to send
     while the greeting plays. Otherwise the first real one pays for Jev's cold
@@ -243,6 +247,7 @@ def jev_warm_up(
             turn_gate.address_form("hello"),
             lookup=router,
             knowledge_base=knowledge_base,
+            topic=router and topic,
         )
         await turn_judge.judge(client, url, api_key, payload, _JUDGE_WARM_TIMEOUT_S)
 
@@ -1095,7 +1100,12 @@ class TurnGateController:
         task = self._fillers.get(key)
         if task is None:
             task = asyncio.ensure_future(
-                self.quick.compose(text, judgement.lookup, _recent_exchanges(self.session))
+                self.quick.compose(
+                    text,
+                    judgement.lookup,
+                    _recent_exchanges(self.session),
+                    topic=quick_reply.judged_topic(judgement, self.quick.settings),
+                )
             )
             self._fillers[key] = task
         return task

@@ -153,6 +153,9 @@ class Settings(BaseSettings):
     # safety for a hung connection: a filler is spoken whenever it is ready before
     # the reply's first words, however long that takes, and dropped after.
     filler_timeout_ms: int = Field(10000, ge=100, le=30000)
+    # A filler takes Jev's word for what the turn is about when Jev is at least
+    # this sure; else the topic comes from the customer's words (quick_reply._TOPIC_RES).
+    filler_topic_min_p: float = Field(0.7, ge=0.0, le=1.0)
     # The small model's first chunk must arrive within this, or the main model
     # answers instead: every handoff pays it before the main model starts.
     fast_timeout_ms: int = Field(1000, ge=300, le=5000)

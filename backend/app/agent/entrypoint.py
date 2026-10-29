@@ -752,6 +752,8 @@ def _build_session(
     userdata.defer_cards = quick is not None
     # Quick replies route on Jev's lookup answer, so they ask for it too.
     routed = _router_enabled(settings, config) or quick is not None
+    # Fillers pick their lines by what the turn is about: Jev says so in the same request.
+    ask_topic = quick is not None and quick.filler
     gate = gated_agent.TurnGateController(
         session=session,
         room=room,
@@ -764,9 +766,15 @@ def _build_session(
             timing.judged if timing is not None else None,
             router=routed,
             knowledge_base=_rag_enabled(config),
+            topic=ask_topic,
         ),
         warm_judge=gated_agent.jev_warm_up(
-            settings, gate_key, client, router=routed, knowledge_base=_rag_enabled(config)
+            settings,
+            gate_key,
+            client,
+            router=routed,
+            knowledge_base=_rag_enabled(config),
+            topic=ask_topic,
         ),
         on_gate_reply=timing.gate_reply if timing is not None else None,
         prefetcher=prefetcher,

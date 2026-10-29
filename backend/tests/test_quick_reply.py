@@ -338,8 +338,9 @@ def test_fast_rules_hand_off_telco_facts_and_codes():
 
 
 def test_filler_examples_are_telco():
-    for line in ("ব্যালেন্সটা চেক করে জানাচ্ছি।", "প্যাকেজগুলো দেখে বলছি।", "Checking your account."):
+    for line in ("আপনার অসুবিধাটা বুঝতে পারছি।", "Say \"প্যাকেজ\", not \"প্যাক\"."):
         assert line in quick_reply._FILLER_SYSTEM
+    assert not real_estate_words(quick_reply._FILLER_SYSTEM)
 
 
 # --- template fillers -------------------------------------------------------------------
@@ -357,7 +358,7 @@ def _fillers(utterance, lookup="none", n=200, seed=7, **kwargs):
         ("সাত দিনের মিনিট প্যাক আছে?", "packages", "সাত দিনের মিনিট প্যাকেজগুলো"),
         ("৩০০ টাকার মধ্যে ১০ জিবি ইন্টারনেট প্যাক কী আছে?", "packages", "আপনার বাজেটের মধ্যে ১০ জিবির ডাটা প্যাকেজগুলো"),
         ("আমার নেটওয়ার্ক কাজ করছে না", "none", "আপনার এলাকা"),
-        ("মিরপুরে নেট পাচ্ছি না", "none", "মিরপুর এলাকার নেটওয়ার্কটা"),
+        ("মিরপুরে নেট পাচ্ছি না", "none", "মিরপুর এলাকার নেটওয়ার্ক(টা|ের)"),
         ("অফিসে নেট পাই না", "none", "আপনার এলাকা"),
         ("আমার ৫০ টাকা কেটে গেছে", "none", "কেটেছে|ট্রানজেকশনগুলো"),
         ("How much data do I have left?", "none", "usage|used"),
@@ -464,10 +465,10 @@ def test_a_follow_up_gets_a_short_line(last, utterance, pool):
     assert set(_fillers(utterance, "packages", n=50, avoid=[last])) <= set(pool)
 
 
-def test_something_new_after_something_specific_is_named_with_also():
+def test_something_new_after_something_specific_is_named():
     lines = set(_fillers("চার জিবির কোনো প্যাকেজ আছে?", "packages", n=50,
                          avoid=["জি, তিন জিবির প্যাকেজটা চেক করছি।"]))
-    assert all("চার জিবির ডাটা প্যাকেজগুলোও" in line for line in lines), lines
+    assert all("চার জিবির ডাটা প্যাকেজগুলো" in line for line in lines), lines
 
 
 def test_a_new_topic_is_named_not_followed_up():
@@ -593,7 +594,7 @@ def test_fillers_in_a_row_never_share_an_opener_or_a_verb(utterance):
 def test_a_line_already_cached_is_picked_more_often(tmp_path):
     from app.agent.audio_cache import AudioCache
 
-    cached = "আচ্ছা, আপনার ব্যালেন্সটা দেখে জানাচ্ছি।"
+    cached = "আচ্ছা, আপনার ব্যালেন্সটা একটু দেখে বলছি।"
     cache = AudioCache(tmp_path)
     cache.save(cached, b"\x00\x00" * 100, 24000, 1, "voice:model")
     picks = Counter(_fillers("আমার ব্যালেন্স কত আছে?", n=2000, cache=cache))
@@ -632,7 +633,7 @@ def test_template_lines_are_safe_short_and_telco():
         assert safe_filler(line, "") == line, line
         assert not real_estate_words(line), line
         # The filler prompt's own rule: no literary Bangla.
-        assert not any(word in line for word in ("যাচাই", "মিলিয়ে", "ঘেঁটে", "খুলছি")), line
+        assert not any(word in line for word in ("মিলিয়ে", "ঘেঁটে", "খুলছি")), line
         assert quick_reply.is_filler_line(line)
 
 
@@ -659,7 +660,7 @@ def test_every_echo_of_the_longest_entities_fits(utterance):
     utterance = unicodedata.normalize("NFC", utterance)
     bangla = quick_reply._speaks_bangla(utterance, None)
     own_words = quick_reply._tiers(utterance, "packages", bangla)[0]
-    assert len(own_words) == 5
+    assert len(own_words) == len((quick_reply._ECHO_BN if bangla else quick_reply._ECHO_EN)["search"])
     for line in own_words:
         assert safe_filler(line, utterance) == line, line
 
@@ -752,3 +753,111 @@ def test_a_recharge_question_of_no_known_kind_gets_a_generic_line():
 def test_a_broad_package_ask_gets_no_filler(text, expected):
     judgement = Judgement(0.9, "packages", 0.95)
     assert route(judgement, _Userdata(), _config(), _settings(), text=text) == expected
+
+
+# --- Jev's topic ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("judgement", "expected"),
+    [
+        (Judgement(0.9, "none", 0.9, topic="network", topic_p=0.9), "network"),
+        (Judgement(0.9, "none", 0.9, topic="network", topic_p=0.5), None),  # not sure enough
+        (Judgement(0.9, "none", 0.9, topic="network"), None),  # no probability
+        (Judgement(0.9, "none", 0.9, topic="other", topic_p=0.99), None),  # no filler topic
+        (Judgement(0.9, "none", 0.9, topic="listings", topic_p=0.99), None),  # not a topic
+        (Judgement(0.9, "none", 0.9), None),  # the question wasn't asked
+        (None, None),
+    ],
+)
+def test_judged_topic(judgement, expected):
+    assert quick_reply.judged_topic(judgement, _settings()) == expected
+
+
+def test_jevs_topic_picks_the_lines_the_words_miss():
+    # No topic's words: without Jev, a generic line.
+    utterance = "কথা বলার সময় বারবার কেটে যায়"
+    network = set(quick_reply._topic_lines("network", True))
+    assert not network & set(_fillers(utterance))
+    assert set(_fillers(utterance, topic="network")) <= network
+
+
+def test_jevs_topic_wins_over_the_words():
+    # "অফার" in the words, but Jev reads the turn as points.
+    utterance = "অফারের পয়েন্টগুলো কি জমা হয়েছে?"
+    points = set(quick_reply._topic_lines("points", True))
+    assert set(_fillers(utterance, topic="points")) <= points
+
+
+def test_a_plain_package_topic_yields_to_the_kind_the_words_name():
+    lines = set(_fillers("নেট প্যাক দেখান তো, সাত দিনের", "packages", topic="pack"))
+    assert lines and all("ডাটা" in line for line in lines)
+
+
+def test_jevs_topic_leaves_corrections_and_picks_alone():
+    assert set(_fillers("দ্বিতীয়টা", topic="balance")) <= set(quick_reply._CHOICE_BN)
+
+
+def test_compose_filler_is_told_the_topic():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return _completion(json.dumps({"text": "জি, দেখে জানাচ্ছি।"}))
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await compose_filler(
+                client, _BASE, "or-key", "m", "এটা কেন হলো?", None, [], [],
+                timeout_s=1.0, topic="transactions",
+            )  # fmt: skip
+
+    assert asyncio.run(go()) == "জি, দেখে জানাচ্ছি।"
+    user = seen["body"]["messages"][1]["content"]
+    assert "What the customer asks about: your recent transactions." in user
+
+
+@pytest.mark.parametrize(
+    "utterance", ["অন্যটা", "পরেরটা", "আগেরটাই", "অন্যটার দাম কত?", "The other one", "the next one"]
+)
+def test_a_pick_by_position_gets_the_pick_lines(utterance):
+    lines = set(_fillers(utterance, n=50))
+    picks = {*quick_reply._CHOICE_BN, *quick_reply._CHOICE_EN}
+    assert lines <= picks, lines - picks
+
+
+def test_other_money_is_not_a_pick():
+    assert not quick_reply._CHOICE_RE.search("অন্য টাকা কেটেছে")
+
+
+@pytest.mark.parametrize("utterance", ["আরো বলেন", "আরও একটু বুঝিয়ে বলুন", "Tell me more"])
+def test_asking_for_more_detail_is_not_asking_for_more_options(utterance):
+    lines = set(_fillers(utterance, n=50))
+    follow_ups = {*quick_reply._FOLLOW_UP_BN, *quick_reply._FOLLOW_UP_EN}
+    assert lines <= follow_ups, lines - follow_ups
+
+
+def test_aro_spelt_with_o_kar_is_more_options():
+    lines = set(_fillers("আরো কিছু অপশন আছে?", "packages", n=50))
+    assert lines <= set(quick_reply._MORE_BN), lines
+
+
+@pytest.mark.parametrize(
+    ("utterance", "lookup", "last"),
+    [
+        ("মিরপুরে নেট পাচ্ছি না", "none", "জি, মিরপুর এলাকার নেটওয়ার্কটা চেক করে আপনাকে জানাচ্ছি।"),
+        (
+            "সাত দিনের তিন জিবির ডাটা প্যাকেজ আছে?",
+            "packages",
+            "জি, সাত দিনের তিন জিবির ডাটা প্যাকেজগুলো খুঁজে আপনাকে জানাচ্ছি।",
+        ),
+    ],
+)
+def test_the_same_thing_said_again_is_still_being_checked(utterance, lookup, last):
+    lines = set(_fillers(utterance, lookup, n=50, avoid=[last]))
+    assert lines <= set(quick_reply._CHECKING_BN), lines
+
+
+def test_no_pick_line_names_a_position():
+    for line in quick_reply._CHOICE_EN:
+        assert not any(word in line for word in ("other", "next", "previous")), line

@@ -224,3 +224,59 @@ def test_the_wrap_up_answer_is_read():
     question = build_request("m", [], "ok", "listening")["questions"][turn_judge.WRAP_UP_KEY]
     assert question["type"] == "noul" and set(question["criteria"]) == {"true", "false"}
     assert turn_judge.WRAP_UP_KEY not in build_request("m", [], "ok", "listening", wrap_up=False)["questions"]
+
+
+def test_the_topic_question_is_added_only_when_asked_and_names_filler_topics():
+    from app.agent import quick_reply
+
+    assert turn_judge.TOPIC_KEY not in build_request("m", [], "hi", "listening", lookup=True)["questions"]
+    question = build_request("m", [], "hi", "listening", lookup=True, topic=True)["questions"][
+        turn_judge.TOPIC_KEY
+    ]
+    assert question["type"] == "choice"
+    assert set(question["criteria"]) == {*quick_reply._TOPIC_X, "other"}
+    assert not real_estate_words(json.dumps(question, ensure_ascii=False))
+
+
+def test_returns_the_topic_choice_and_its_probability():
+    def handler(request):
+        return httpx.Response(200, json={"answers": {
+            "addressed": {"noul": 0.9},
+            "lookup": {"choice": "none", "probabilities": {"none": 0.9}},
+            "topic": {"choice": "usage", "probabilities": {"usage": 0.85, "data": 0.1}},
+        }})  # fmt: skip
+
+    judgement = _judgement(handler, lookup=True, topic=True)
+    assert (judgement.topic, judgement.topic_p) == ("usage", 0.85)
+    assert _judgement(lambda r: httpx.Response(200, json={"answers": {
+        "addressed": {"noul": 0.9}, "topic": {"oops": 1},
+    }})).topic is None  # fmt: skip
+
+
+def test_jev_is_asked_the_topic_only_with_the_lookup():
+    from types import SimpleNamespace
+
+    from app.agent import gated_agent
+
+    sent: list[dict] = []
+
+    def handler(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(500)
+
+    session = SimpleNamespace(history=SimpleNamespace(items=[]))
+    settings = SimpleNamespace(
+        openrouter_base_url="https://openrouter.ai/api/v1",
+        turn_judge_model="typesafe/jev-1.13",
+        turn_judge_timeout_ms=1000,
+    )
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            judge_fn = gated_agent.jev_judge(session, settings, "k", client, router=True, topic=True)
+            await judge_fn("আমার ব্যালেন্স কত?", "listening", route=True)
+            await judge_fn("আমার ব্যালেন্স কত?", "speaking")
+
+    asyncio.run(go())
+    assert turn_judge.TOPIC_KEY in sent[0]["questions"]
+    assert turn_judge.TOPIC_KEY not in sent[1]["questions"]

@@ -30,6 +30,9 @@ LOOKUP_KEY = "lookup"
 # Whether the customer is closing the topic, so the reply offers more help
 # (app.agent.closing_offer), asked in the same request.
 WRAP_UP_KEY = "wrap_up"
+# What the turn is about, for the filler line (app.agent.quick_reply), asked
+# with the lookup question when quick fillers are on.
+TOPIC_KEY = "topic"
 
 _INSTRUCTIONS = (
     "A mobile operator's voice assistant is in a live call with a customer in Bangladesh. "
@@ -110,17 +113,60 @@ _WRAP_UP_CRITERIA = {
 }
 
 
+_TOPIC_INSTRUCTIONS = (
+    "What is the latest utterance asking about? Pick the customer's request in this "
+    "utterance, read with the recent conversation (a short follow-up such as 'চার জিবির?' "
+    "after data packages is still about data packages). When it asks two things, pick the "
+    "main one."
+)
+
+# The names are quick_reply's filler topics (_TOPIC_X), so a choice picks its lines.
+_TOPIC_CRITERIA = {
+    "balance": "The customer's main account balance (ব্যালেন্স).",
+    "usage": (
+        "How much of their own data, minutes or SMS is used or left, or what they spent "
+        "lately, not packages to buy."
+    ),
+    "data": "Data or internet packages to buy, by amount, price or validity.",
+    "voice": "Minute or talk-time packages to buy.",
+    "bundle": "Combo or bundle packages (data and minutes together) to buy.",
+    "sms": "SMS packages to buy.",
+    "pack": (
+        "Packages to buy of no named kind, or one package already shown or named, "
+        "without saying data, minutes, combo or SMS."
+    ),
+    "offer": "Offers or deals on their number.",
+    "points": "Reward points: how many, earning them or redeeming them.",
+    "transactions": "Money or balance deducted, a charge they don't recognise, recent transactions.",
+    "recharge": (
+        "Recharging or top-up: a recharge that didn't arrive, how to recharge, limits, or "
+        "recharge bonuses."
+    ),
+    "network": "Network, signal, slow internet or dropped calls where they are.",
+    "care": "Where a care centre, customer care office, branch or store is.",
+    "complaint": "A complaint or a problem with the service not covered above.",
+    "policy": "How a service, rule, fee or policy of the operator works.",
+    "other": (
+        "None of these: a greeting, thanks, goodbye, a code or yes/no, a purchase "
+        "confirmation, or anything else."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class Judgement:
     """Jev's answers for one utterance. p = P(addressed), None when the call failed
-    or timed out. lookup / lookup_p only when the lookup question was asked.
-    wrap_up_p: P(the customer is closing the topic), None when not answered."""
+    or timed out. lookup / lookup_p only when the lookup question was asked, and
+    topic / topic_p only when the topic question was. wrap_up_p: P(the customer
+    is closing the topic), None when not answered."""
 
     p: float | None
     lookup: str | None = None
     lookup_p: float | None = None
     text: str | None = None
     wrap_up_p: float | None = None
+    topic: str | None = None
+    topic_p: float | None = None
 
 
 @dataclass(frozen=True)
@@ -175,9 +221,11 @@ def build_request(
     lookup: bool = False,
     knowledge_base: bool = False,
     wrap_up: bool = True,
+    topic: bool = False,
 ) -> dict:
     """lookup adds the router's choice question (knowledge_base: whether that's
-    an option); wrap_up the closing-the-topic question."""
+    an option); wrap_up the closing-the-topic question; topic the filler's
+    what-is-it-about question."""
     questions: dict = {
         QUESTION_KEY: {
             "type": "noul",
@@ -192,6 +240,12 @@ def build_request(
             "type": "noul",
             "instructions": _WRAP_UP_INSTRUCTIONS,
             "criteria": _WRAP_UP_CRITERIA,
+        }
+    if topic:
+        questions[TOPIC_KEY] = {
+            "type": "choice",
+            "instructions": _TOPIC_INSTRUCTIONS,
+            "criteria": _TOPIC_CRITERIA,
         }
     return {
         "model": model,
@@ -223,19 +277,23 @@ async def judge(
         answers = body["answers"]
         p = min(1.0, max(0.0, float(answers[QUESTION_KEY]["noul"])))
         lookup, lookup_p = _lookup_answer(answers.get(LOOKUP_KEY))
+        topic, topic_p = _lookup_answer(answers.get(TOPIC_KEY))
         wrap_up_p = _noul(answers.get(WRAP_UP_KEY))
         usage = body.get("usage") or {}
         cost = usage.get("cost")
         usage_logger.info(
-            "Jev %s: %s input tokens, $%s, %dms, P=%.2f%s",
+            "Jev %s: %s input tokens, $%s, %dms, P=%.2f%s%s",
             body.get("model") or payload.get("model"),
             usage.get("input_tokens", "?"),
             f"{cost:.6f}" if isinstance(cost, (int, float)) else "?",
             (time.perf_counter() - started) * 1000,
             p,
             f", lookup={lookup}" if lookup is not None else "",
+            f", topic={topic}" if topic is not None else "",
         )
-        return Judgement(p, lookup, lookup_p, text=utterance, wrap_up_p=wrap_up_p)
+        return Judgement(
+            p, lookup, lookup_p, text=utterance, wrap_up_p=wrap_up_p, topic=topic, topic_p=topic_p
+        )
     except (TimeoutError, asyncio.TimeoutError):
         logger.warning("turn judge timed out after %.2fs", timeout_s)
     except Exception as exc:
