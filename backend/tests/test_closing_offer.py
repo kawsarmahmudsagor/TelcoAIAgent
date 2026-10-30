@@ -63,3 +63,37 @@ def test_no_reminder_while_a_code_or_a_case_is_awaited(pending):
 )
 def test_wraps_up(wrap_up_p, text, expected):
     assert closing_offer.wraps_up(wrap_up_p, text) is expected
+
+
+def _lang_ud(lang, **kwargs):
+    ud = _ud(**kwargs)
+    ud.reply_language = lang
+    return ud
+
+
+def test_reminder_language_only():
+    assert (
+        closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud("en"))
+        == "Reply in English, whatever language the customer used."
+    )
+
+
+def test_reminder_wrap_up_with_language():
+    note = closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud("en", wrap_up=True))
+    assert "in English" in note and "language of their message" not in note
+    assert note.endswith("Reply in English.")
+
+
+def test_reminder_backstop_with_language():
+    note = closing_offer.reminder(_ctx(*(["ঠিক আছে।"] * 5)), _lang_ud("bn"))
+    assert "in Bangla (Bengali script)" in note and "language of their message" not in note
+
+
+def test_reminder_pending_action_still_language():
+    note = closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud("bn", pending_action=object()))
+    assert note == "Reply in Bangla (Bengali script), whatever language the customer used."
+
+
+def test_reminder_unset_unchanged():
+    assert closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud(None, wrap_up=True)) == closing_offer.WRAP_UP_REMINDER
+    assert closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud(None)) is None

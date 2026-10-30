@@ -16,22 +16,23 @@ import unicodedata
 
 from livekit.agents import llm
 
-from app.agent import turn_gate
+from app.agent import reply_language, turn_gate
 
 # Replies in a row ending without a question before the backstop reminder.
 _BACKSTOP = 5
 # P(closing the topic) from the judge that counts as closing.
 WRAP_UP_P = 0.5
 
+_THEIR_LANGUAGE = "in the language of their message"
 WRAP_UP_REMINDER = (
     "The customer is closing this topic (accepting your answer, thanking you or saying what "
     "they'll do). Reply briefly, then ask whether they need help with anything else, in short "
-    "words different from any offer you've made, in the language of their message."
+    f"words different from any offer you've made, {_THEIR_LANGUAGE}."
 )
 BACKSTOP_REMINDER = (
     "Your last few replies ended without a question or an offer of more help. If your reply "
     "to this message answers what they asked, end it with one short offer of more help, "
-    "worded differently from any you've used, in the language of their message."
+    f"worded differently from any you've used, {_THEIR_LANGUAGE}."
 )
 
 # A short turn that only acknowledges: what the judge would say, for a turn
@@ -73,8 +74,21 @@ def _assistant_replies(chat_ctx: llm.ChatContext) -> list[str]:
 
 
 def reminder(chat_ctx: llm.ChatContext, userdata: object) -> str | None:
-    """The reminder this reply gets, or None. None while a code or a yes/no is
-    awaited: the next reply is about that."""
+    """The reminder this reply gets, or None. With a picked reply language
+    (app.agent.reply_language) every reply gets one, so the model doesn't drift
+    into the customer's language; the offer reminder is then worded in it."""
+    lang = reply_language.fixed(userdata)
+    offer = _offer_reminder(chat_ctx, userdata)
+    if lang is None:
+        return offer
+    if offer is None:
+        return f"Reply in {reply_language.name(lang)}, whatever language the customer used."
+    picked = reply_language.in_language(lang, _THEIR_LANGUAGE)
+    return f"{offer.replace(_THEIR_LANGUAGE, picked)} Reply in {reply_language.name(lang)}."
+
+
+def _offer_reminder(chat_ctx: llm.ChatContext, userdata: object) -> str | None:
+    """None while a code or a yes/no is awaited: the next reply is about that."""
     if getattr(userdata, "pending_action", None) or getattr(userdata, "pending_case", None):
         return None
     if getattr(userdata, "wrap_up", False):
