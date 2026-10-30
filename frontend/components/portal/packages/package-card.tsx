@@ -25,6 +25,11 @@ export function validity(days: number): string {
   return days === 1 ? '1 day' : `${days} days`;
 }
 
+/** Whether the pack renews itself: "Auto-renews" or "No auto-renew". */
+export function renewal(pkg: PackageView): string {
+  return pkg.auto_renewable ? 'Auto-renews' : 'No auto-renew';
+}
+
 /**
  * One pack in the reference's offer-card style: tag, name, contents, validity, price, "Buy pack".
  * The POPULAR pack gets the featured lilac card; `highlighted` rings the card a link pointed at.
@@ -67,6 +72,7 @@ export const PackageCard = forwardRef<
       </h3>
       <p className={cn('text-[11px]', muted)}>{packageContents(pkg)}</p>
       <p className={cn('text-[11px]', muted)}>Valid for {validity(pkg.validity_days)}</p>
+      <p className={cn('text-[11px]', muted)}>{renewal(pkg)}</p>
       <div className="mt-auto flex items-center justify-between gap-2 pt-[17px]">
         <p className="text-sm font-extrabold">{formatTaka(pkg.price)}</p>
         <PortalButton

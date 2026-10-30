@@ -132,7 +132,7 @@ def test_search_packages_publishes_cards(bss_world, monkeypatch):
     card = payload["packages"][0]
     assert card["name"] == "PYTEST Card" and card["kind"] == "data"
     assert isinstance(card["price"], float) and card["price"] == 49.0
-    assert set(card) == {"code", "name", "kind", "data_mb", "minutes", "sms", "validity_days", "price", "tag"}
+    assert set(card) == {"code", "name", "kind", "data_mb", "minutes", "sms", "validity_days", "price", "tag", "auto_renewable"}
 
 
 def test_empty_search_publishes_nothing(bss_world, monkeypatch):

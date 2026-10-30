@@ -139,6 +139,8 @@ export interface PackageView {
   validity_days: number;
   price: number;
   tag: string | null;
+  /** Renews itself at expiry from the main balance. */
+  auto_renewable: boolean;
 }
 
 /** `GET /api/me/recommendations` item. */

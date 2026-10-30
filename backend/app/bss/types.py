@@ -88,6 +88,7 @@ class PackageView(_Base):
     validity_days: int
     price: Decimal
     tag: str | None
+    auto_renewable: bool = False
 
 
 class Recommendation(_Base):

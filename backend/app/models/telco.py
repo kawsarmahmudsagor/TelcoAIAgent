@@ -194,6 +194,8 @@ class Package(TimestampedBase):
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Renews itself at expiry from the main balance; a subscription to it starts with auto_renew on.
+    auto_renewable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Subscription(TimestampedBase):

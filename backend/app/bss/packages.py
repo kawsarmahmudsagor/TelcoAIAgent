@@ -202,6 +202,7 @@ def grant_package(db: Session, subscriber_id: uuid.UUID, pkg: Package, now: date
             sms_left=pkg.sms,
             activated_at=now,
             expires_at=expires_at,
+            auto_renew=pkg.auto_renewable,
         )
     )
     return expires_at

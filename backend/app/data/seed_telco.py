@@ -72,6 +72,12 @@ PACKAGES = [
     ("S1000-30D", "1000 SMS", "sms", 0, 0, 1000, 30, 129, None),
 ]
 
+# Packages that renew themselves at expiry; the rest are bought again when they end.
+AUTO_RENEWABLE = {
+    "D8-7D", "D15-30D", "D30-30D", "D50-30D", "D100-30D", "V300-30D", "V1000-30D",
+    "B15-300", "B40-500", "B60-1000", "S500-30D",
+}
+
 # Packs only reward points buy: inactive (not on sale) and free.
 # code, name, kind, data_mb, minutes, sms, days
 REWARD_PACKAGES = [
@@ -255,6 +261,7 @@ def seed(db: Session, *, now: datetime | None = None) -> dict[str, int]:
                 price=D(price),
                 is_active=True,
                 tag=tag,
+                auto_renewable=code in AUTO_RENEWABLE,
             )
             db.add(pkg)
             counts["packages"] += 1

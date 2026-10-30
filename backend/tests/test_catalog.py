@@ -11,7 +11,8 @@ def test_catalog_is_public_and_active_only(db):
     active = {p.code for p in db.query(Package).filter(Package.is_active.is_(True))}
     assert {p["code"] for p in body} == active
     assert set(body[0]) == {
-        "code", "name", "kind", "data_mb", "minutes", "sms", "validity_days", "price", "tag"
+        "code", "name", "kind", "data_mb", "minutes", "sms", "validity_days", "price", "tag",
+        "auto_renewable",
     }
     assert isinstance(body[0]["price"], (int, float))
 

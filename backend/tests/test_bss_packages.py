@@ -139,6 +139,18 @@ def test_execute_purchase_creates_subscription_and_txn(bss_world, db):
     assert n == 1
 
 
+@pytest.mark.parametrize("renewable", [True, False])
+def test_purchase_turns_auto_renew_on_only_for_auto_renewable_packages(bss_world, db, renewable):
+    s = bss_world.subscriber(main_balance=Decimal("500"))
+    p = bss_world.package(price=Decimal("69"), auto_renewable=renewable)
+    req = _req(p)
+    aid = _confirm(db, s, req)
+    out = packages.execute_purchase(db, s.id, req, action_id=aid, actor=Actor.agent)
+    assert out.package.auto_renewable is renewable
+    sub = db.scalars(select(Subscription).where(Subscription.subscriber_id == s.id)).one()
+    assert sub.auto_renew is renewable
+
+
 def test_execute_purchase_same_action_twice_is_noop(bss_world, db):
     s = bss_world.subscriber(main_balance=Decimal("500"))
     p = bss_world.package(price=Decimal("69"))

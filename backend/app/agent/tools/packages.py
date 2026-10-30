@@ -44,6 +44,7 @@ def _card(p: PackageView) -> dict:
         "validity_days": p.validity_days,
         "price": float(p.price),
         "tag": p.tag,
+        "auto_renewable": p.auto_renewable,
     }
 
 
@@ -115,7 +116,15 @@ def describe_package(p: PackageView) -> str:
     if p.sms:
         parts.append(f"{p.sms} SMS")
     contents = ", ".join(parts) or "no allowance"
-    return f"{p.name} (code {p.code}): {contents}, {p.validity_days} days, {format_amount(p.price)}"
+    renew = (
+        "auto-renews at expiry from the main balance (hotline 121 turns it off)"
+        if p.auto_renewable
+        else "does not auto-renew (bought again when it ends)"
+    )
+    return (
+        f"{p.name} (code {p.code}): {contents}, {p.validity_days} days, "
+        f"{format_amount(p.price)}, {renew}"
+    )
 
 
 def _search(

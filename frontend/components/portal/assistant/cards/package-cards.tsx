@@ -1,7 +1,7 @@
 'use client';
 
-import { PackageIcon, SparklesIcon } from 'lucide-react';
-import { packageContents, validity } from '@/components/portal/packages/package-card';
+import { PackageIcon, RefreshCwIcon, SparklesIcon } from 'lucide-react';
+import { packageContents, renewal, validity } from '@/components/portal/packages/package-card';
 import { PortalButton } from '@/components/portal/ui/link-button';
 import { cn } from '@/lib/shadcn/utils';
 import { formatTaka } from '@/lib/telco-format';
@@ -72,6 +72,18 @@ export function PackageCards({
                 )}
               >
                 {packageContents(pkg)} · {validity(pkg.validity_days)}
+              </p>
+              <p
+                className={cn(
+                  'mt-0.5 flex items-center gap-1 text-[10px] font-semibold',
+                  featured ? 'text-featured-muted' : 'text-muted-foreground'
+                )}
+              >
+                <RefreshCwIcon
+                  className={cn('size-3', !pkg.auto_renewable && 'opacity-40')}
+                  aria-hidden="true"
+                />
+                {renewal(pkg)}
               </p>
               <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                 <p className="text-[13px] font-extrabold tabular-nums">{formatTaka(pkg.price)}</p>
