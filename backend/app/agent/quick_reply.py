@@ -167,13 +167,19 @@ _CARE_FILLER_SYSTEM = f"""You are a mobile operator's care agent on a phone call
 request needs a lookup or an account action; another assistant gives the real answer next.
 Say the one short spoken line a good care agent says first.
 
-- React to what this customer said, naming what you'll check in their own terms (area,
-  package size or validity, amount, balance). No stock phrases.
-- Problem or complaint: a little empathy, then what you'll look into. Pick, correction or
-  follow-up: a calm acknowledgement. Action (recharge, purchase): "I'll take care of it",
-  never that it's done.
-- Warm, natural, not robotic, over-apologetic or pushy. One sentence or two very short,
-  max {CARE_FILLER_MAX_WORDS} words. Don't echo the shape of lines already said.
+- Sound like a person who just listened, not a form being filled in. Say back what they
+  want the way you yourself would say it, in your own grammar ("পাঁচ জিবির সাত দিনের
+  প্যাকেজ"), never their sentence copied and glued to a verb ("পাঁচ জিবি সাত দিনের প্যাকেজ
+  কেনা নিয়ে খুঁজে বলছি", "... বিষয়ে চেক করছি"). You don't have to name everything they said:
+  the one detail that matters is enough, or none.
+- React to what they want before what you'll do, as a person would: glad to help with a
+  purchase or recharge, sorry about a problem, fine with a pick or correction, curious about
+  a question. Purchase or recharge: you'll take care of it, never that it's done.
+- End on what comes next for them (you'll find it, tell them, sort it out), never on a bare
+  "I'm checking" (দেখছি, চেক করছি).
+- Warm, natural, a little personal, never robotic, stock, over-apologetic or pushy. One
+  sentence or two very short, max {CARE_FILLER_MAX_WORDS} words. Each line should feel newly
+  said: don't reuse the shape, opening or ending of lines already said.
 
 Language: match the customer's newest message. Bangla/Banglish: modern spoken Bangla,
 Bengali script, আপনি. Use চেক, প্যাকেজ, ব্যালেন্স, রিচার্জ, অফার, নেটওয়ার্ক, কমপ্লেইন, সরি,
@@ -289,6 +295,17 @@ class QuickReplyRuntime:
             language=self.language,
             guest=guest,
         )
+        if line is not None and care and not guest and avoid and _sounds_like(line, avoid[-1]):
+            # Asked for another build and still wrote the last line reworded:
+            # a template is built another way (fast_filler). A guest gets none,
+            # as a template may promise an account check.
+            template = fast_filler(
+                utterance, lookup, history, avoid,
+                cache=self.audio_cache, topic=topic, language=self.language,
+            )
+            if self.on_event is not None:
+                self.on_event(f'filler: "{line}" sounds like the last line, template "{template}" instead')
+            line = template
         if line is not None:
             remember_filler(line)
         return line
@@ -1094,11 +1111,11 @@ def _opener(line: str) -> str:
 _TWO_SENTENCES_RE = re.compile(r"[।.!]\s+\S")
 _WAIT_END_RE = _re(
     r"(?:এক\s*মিনিট|এক\s*সেকেন্ড|এক\s*মুহূর্ত|সময়\s*দিন|অপেক্ষা\s*করুন|প্লিজ|"
-    r"one moment|a moment|one second|please)[।.!]?\s*$"
+    r"\bone moment\b|\ba moment\b|\bone second\b|\bplease\b)[।.!]?\s*$"
 )
 _ACTION_WORD_RE = _re(
     r"জানাচ্ছি|বলছি|দেখাচ্ছি|দিচ্ছি|চেক|দেখে|খুঁজ|যাচাই|খোঁজ|"
-    r"(?:check|find|look|pull|get|see|tell|show)"
+    r"\b(?:check|find|look|pull|get|see|tell|show)"
 )
 
 
@@ -1383,11 +1400,12 @@ def quick_on(config: ResolvedAgentConfig) -> bool:
 _NEEDS_TOOL_RE = re.compile(
     r"ব্যালেন্স|ডাটা|ডেটা|ইন্টারনেট|মিনিট|এসএমএস|প্যাক|প্যাকেজ|রিচার্জ|অফার|পয়েন্ট|পয়েন্ট|"
     r"রিডিম|বিল|লেনদেন|কেটে|কাটল|কাটা|নেটওয়ার্ক|নেটওয়ার্ক|সিগন্যাল|অভিযোগ|সমস্যা|ইউসেজ|"
-    r"মেয়াদ|মেয়াদ|রোমিং|সিম|কেন|কীভাবে|কিভাবে|"
+    r"মেয়াদ|মেয়াদ|রোমিং|সিম|কেন|কীভাবে|কিভাবে|টাকা|অ্যাকাউন্ট|একাউন্ট|সাজেস্ট|রেকমেন্ড|"
     r"কে(?:\u09df|\u09af\u09bc)ার|সেন্টার|ব্রাঞ্চ|শোরুম|"
     r"\b(?:balance|data|internet|minutes?|sms|packs?|packages?|recharge|top\s*up|offers?|"
     r"points?|redeem|bill|transactions?|deduct\w*|charged?|network|signal|complaint|problem|"
-    r"usage|validity|roaming|sim|why|how|branch(?:es)?|showrooms?)\b|"
+    r"usage|validity|roaming|sim|why|how|branch(?:es)?|showrooms?|account|suggest\w*|"
+    r"recommend\w*|taka)\b|"
     r"\bcustomer\s*care\b|\bcare\s*cent(?:re|er)s?\b|"
     r"\b(?:koto|keno|kivabe|kete|takar)\b",
     re.I,
@@ -1408,8 +1426,8 @@ _NEEDS_TOOL_RE = re.compile(
 # points, "পয়েন্ট কীভাবে পাব" is answered for anyone.
 _OWN_PACK_RE = _re(
     r"আমার\s*(?:এখন(?:কার)?\s*)?(?:কোন\s*)?(?:ডাটা\s*|মিনিট\s*)?(?:প্যাক|প্যাকেজ)|"
-    r"(?:চালু|অ্যাক্টিভ|এক্টিভ)\s*(?:আছে\s*)?(?:কোন\s*)?(?:প্যাক|প্যাকেজ)|"
-    r"(?:প্যাক|প্যাকেজ)\S*\s*(?:চালু|অ্যাক্টিভ|এক্টিভ)|"
+    r"(?:চালু|অ্যাক্টিভ|এক্টিভ)\s*(?:আছে\s*)?(?:কোন\s*)?(?:প্যাক|প্যাকেজ|pack)|"
+    r"(?:প্যাক|প্যাকেজ|pack)\S*\s*(?:চালু|অ্যাক্টিভ|এক্টিভ)|"
     r"\bmy\s+(?:current\s+|active\s+)?(?:data\s+|minute\s+)?(?:packs?|packages?)\b|"
     r"\bwhich\s+(?:pack|package)s?\s+(?:do\s+)?i\s+have\b|"
     r"\b(?:packs?|packages?)\s+(?:i\s+have|i'?m\s+on)\b"
@@ -1432,12 +1450,46 @@ _RECHARGE_DO_RE = _re(
     r"\b(?:want|like|need)\s+to\s+(?:recharge|top\s*up)\b|\b(?:recharge|top\s*up)\s+(?:my|me)\b|"
     r"\brecharge\s+(?:korbo|korte\s+chai|kore\s+(?:den|dao|din))\b"
 )
-# Buying a package: "এটা কিনব", "প্যাকেজটা নিতে চাই", "I'll buy it".
+# Buying a package: "এটা কিনব", "প্যাকেজটা নিতে চাই", "packageটা চালু করে দিন", "I'll buy it".
 _BUY_RE = _re(
     r"কিন(?:ব|বো|তে\s*চাই|তে\s*চাচ্ছি|ে\s*(?:দিন|দাও|দেন))|"
-    r"(?:প্যাক|প্যাকেজ)\S*\s*(?:টা\s*)?(?:নিব|নেব|নিবো|নেবো|নিতে\s*চাই|চালু\s*করে\s*(?:দিন|দাও|দেন))|"
+    r"(?:প্যাক|প্যাকেজ|pack)\S*\s*(?:টা\s*)?(?:নিব|নেব|নিবো|নেবো|নিতে\s*চাই|চালু\s*করে\s*(?:দিন|দাও|দেন))|"
     r"\b(?:buy|purchase|activate)\b|\bsubscribe\s+to\b|\bkinbo\b|\bkinte\s+chai\b"
 )
+# The agent offering to get a package: "চাইলে প্যাকেজটা চালু করে দেবো?", "Shall I activate it?"
+_BUY_OFFER_RE = _re(
+    r"(?:চালু|অ্যাক্টিভেট|কিনে)\s*করে\s*(?:দেব|দেবো|দিব|দিবো|দিই)|"
+    r"\b(?:activate|buy|purchase|get)\s+(?:it|this|that|one|the\s+\w+)\s+for\s+you\b|"
+    r"\bshall\s+i\s+(?:activate|buy|purchase|get)\b"
+)
+# A plain yes to it: "হ্যাঁ", "জি, দিন", "ঠিক আছে", "yes please".
+_YES_RE = _re(
+    r"^\W*(?:হ্যাঁ|হ্যা|জি|জ্বি|ঠিক\s*আছে|ওকে|দিন|দেন)(?:$|[\s,।.!])|"
+    r"^\W*(?:yes|yeah|yep|sure|okay|ok|please\s+do|go\s+ahead)\b"
+)
+
+
+# The agent offering to do or tell something ("চাইলে একটা প্যাকেজ সাজেস্ট
+# করবো?", "বাকিগুলোর কথাও বলব?", "Shall I find you one?"): a yes to it starts
+# a tool call or a longer answer, worth a filler.
+_OFFER_RE = _re(
+    r"(?:করবো|করব|দেবো|দেব|দিবো|বলব|বলবো|জানাব|জানাবো|দেখাব|দেখাবো)\s*\?|"
+    r"\b(?:shall|should)\s+i\b|\bwant\s+me\s+to\b|\bwould\s+you\s+like\s+me\s+to\b"
+)
+
+
+def says_yes_to_offer(utterance: str, last_reply: str | None) -> bool:
+    """A plain yes to the agent's offer in its last reply."""
+    return bool(last_reply and _OFFER_RE.search(last_reply) and _YES_RE.search(utterance))
+
+
+def _says_buy(utterance: str, last_reply: str | None) -> bool:
+    """A buy in the customer's words, or a yes to the agent's offer to get one."""
+    if _BUY_RE.search(utterance):
+        return True
+    return bool(last_reply and _BUY_OFFER_RE.search(last_reply) and _YES_RE.search(utterance))
+
+
 # Asking for a person: "মানুষের সাথে কথা বলতে চাই", "talk to a human".
 _HUMAN_RE = _re(
     r"(?:মানুষ|এজেন্ট|প্রতিনিধি|অফিসার|কর্মকর্তা|সুপারভাইজার)\S*\s*(?:এর\s*)?(?:সাথে|সঙ্গে)|"
@@ -1448,14 +1500,16 @@ _HUMAN_RE = _re(
 
 
 # "কীভাবে রিচার্জ করব?" asks how, for anyone: the knowledge base.
-_HOW_RE = _re(r"কীভাবে|কিভাবে|কেমনে|কি\s*ভাবে|how|kivabe")
+_HOW_RE = _re(r"কীভাবে|কিভাবে|কেমনে|কি\s*ভাবে|\bhow\b|\bkivabe\b")
 
 
 def _buy_by_spec(utterance: str) -> bool:
-    """A buy that names what it wants ("৩০০ টাকার মধ্যে ডাটা প্যাকেজ কিনব"):
+    """A buy that names what it wants ("৩০০ টাকার মধ্যে ডাটা প্যাকেজ কিনব"),
+    or asks what there is ("data packages to buy, what are your options?"):
     the main model searches, then says buying needs a login."""
     return (
         broad_package_ask(utterance)
+        or bool(_QUESTION_RE.search(utterance))
         or _size(utterance) is not None
         or _validity(utterance) is not None
         or bool(_NUMBER_RE.search(utterance))
@@ -1579,12 +1633,12 @@ _GUEST_LINES: dict[str, dict[ReplyLanguage, tuple[str, ...]]] = {
     },
     "buy": {
         "bn": (
-            "প্যাকেজ কিনতে হলে আগে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই প্যাকেজটা কেনার ব্যবস্থা করে দিচ্ছি।",
-            "জি, প্যাকেজ কেনার জন্য আপনার অ্যাকাউন্টে লগইন থাকতে হবে। ওপরের Log in বাটনে লগইন করে নিন, তারপর সাথে সাথে করে দিচ্ছি।",
+            "প্যাকেজটা চালু করতে ওপরের Log in বাটনে একবার লগইন করে নিন। লগইন হলেই সাথে সাথে চালু করে দিচ্ছি।",
+            "জি, প্যাকেজটা আপনার অ্যাকাউন্টেই চালু হবে, তাই একবার লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই সাথে সাথে চালু করে দিচ্ছি।",
         ),
         "en": (
-            "To buy a package, you'll need to log in first. Use the Log in button at the top and I'll set it up for you right after.",
-            "Sure, buying a package needs you to be logged in. Once you log in with the button at the top, I'll take care of it straight away.",
+            "To activate the package, just log in with the Log in button at the top. As soon as you're in, I'll activate it for you.",
+            "Sure, the package goes on your account, so you'll need to log in once. Use the Log in button at the top and I'll activate it right away.",
         ),
     },
     "case": {
@@ -1623,12 +1677,59 @@ def _word_topics(utterance: str) -> set[str]:
     return {_PACK_KIND_TOPIC.get(name, name) for name, pattern in _TOPIC_RES if pattern.search(utterance)}
 
 
+# Jev's intents (turn_judge.INTENT_KEY) that act on the account: a guest needs
+# a login for them, a logged-in customer the main model's tools.
+_ACCOUNT_INTENTS = frozenset({"buy_named", "recharge_do", "own_account", "person"})
+# The guest topic of each, own_account's by Jev's topic (_ACCOUNT_TOPICS).
+_INTENT_TOPICS = {"buy_named": "buy", "recharge_do": "recharge_do", "person": "human"}
+_ACCOUNT_TOPICS = {
+    "balance": "balance",
+    "usage": "usage",
+    "transactions": "transactions",
+    "recharge": "recharge",
+    "points": "points",
+    "offer": "offer",
+    "complaint": "case",
+    **{kind: "my_pack" for kind in _PACKS},
+}
+
+
+def sure_intent(judgement: Judgement | None, settings: Settings) -> str | None:
+    """Jev's intent for the turn, or None when it wasn't asked or isn't sure
+    enough (guest_intent_min_p): the words decide then."""
+    if judgement is None or judgement.intent is None:
+        return None
+    if judgement.intent_p is None or judgement.intent_p < settings.guest_intent_min_p:
+        return None
+    return judgement.intent
+
+
+def _intent_topic(intent: str, judged: str | None, words: set[str]) -> str | None:
+    """The guest topic for Jev's intent, or None: not a login topic, an
+    account ask of no topic a line answers, or a second ask in the turn."""
+    name = _INTENT_TOPICS.get(intent)
+    if intent == "own_account":
+        name = _ACCOUNT_TOPICS.get(judged or "")
+    if name is None:
+        return None
+    allowed = _GUEST_TOPICS[name][2]
+    if allowed is not None and words - allowed:
+        return None
+    return name
+
+
 def guest_topic(
-    judgement: Judgement | None, userdata: object, settings: Settings, text: str | None = None
+    judgement: Judgement | None,
+    userdata: object,
+    settings: Settings,
+    text: str | None = None,
+    *,
+    last_reply: str | None = None,
 ) -> str | None:
     """The guest topic (_GUEST_TOPICS) of a guest's turn about their own
     account, or None: not a guest, Jev not sure, a lookup to run, or a second
-    ask in the same turn."""
+    ask in the same turn. last_reply: the agent's line before the turn, whose
+    offer to get a package a "হ্যাঁ" takes up."""
     if judgement is None or not is_guest(userdata):
         return None
     if judgement.lookup != "none":
@@ -1636,8 +1737,15 @@ def guest_topic(
     judged = judged_topic(judgement, settings)
     utterance = unicodedata.normalize("NFC", text or judgement.text or "")
     words = _word_topics(utterance)
+    if (intent := sure_intent(judgement, settings)) is not None:
+        return _intent_topic(intent, judged, words)
     for name, (jev, needs, allowed) in _GUEST_TOPICS.items():
-        if judged not in jev or (needs is not None and not needs.search(utterance)):
+        if judged not in jev:
+            continue
+        if name == "buy":
+            if not _says_buy(utterance, last_reply):
+                continue
+        elif needs is not None and not needs.search(utterance):
             continue
         if name in ("recharge_do", "buy") and _HOW_RE.search(utterance):
             return None
@@ -1672,8 +1780,9 @@ def guest_line(
 _GUEST_ACCOUNT_WORDS = frozenset({"balance", "usage", "transactions", "offer"})
 
 
-def guest_account_ask(userdata: object, utterance: str) -> bool:
-    """Whether a guest's turn asks about their own account by its words alone.
+def guest_account_ask(userdata: object, utterance: str, last_reply: str | None = None) -> bool:
+    """Whether a guest's turn asks about their own account by its words alone
+    (or says yes to the agent's offer to get a package, last_reply).
     It gets no filler, template or model-written: any "let me check" would
     promise a lookup the login guidance then takes back."""
     if not is_guest(userdata):
@@ -1687,7 +1796,7 @@ def guest_account_ask(userdata: object, utterance: str) -> bool:
     if _HOW_RE.search(utterance):
         # How to recharge or buy is for anyone; only their own account isn't.
         return any(pattern.search(utterance) for pattern in own)
-    if _BUY_RE.search(utterance) and not _buy_by_spec(utterance):
+    if _says_buy(utterance, last_reply) and not _buy_by_spec(utterance):
         return True
     return any(pattern.search(utterance) for pattern in (*own, _RECHARGE_DO_RE))
 
@@ -1714,12 +1823,14 @@ def route(
     *,
     text: str | None = None,
     closing: bool = False,
+    last_reply: str | None = None,
 ) -> Route | None:
     """Which quick path an accepted turn takes; None = the main model, as
     without quick replies. closing: the gate took the turn as a goodbye
     (turn_gate.is_closing) without asking Jev -- it needs no lookup, and ending
     the call is the one tool the small model has. text: the turn (else the
-    judgement's): one that needs a tool gets a filler whatever Jev's lookup."""
+    judgement's): one that needs a tool gets a filler whatever Jev's lookup.
+    last_reply: the agent's line before the turn (guest_topic)."""
     if not config.quick_reply_enabled:
         return None
     # An OTP or a yes/no for a waiting action, or a case being drafted, belongs to
@@ -1734,9 +1845,14 @@ def route(
         return None
     lookup_p = judgement.lookup_p or 0.0
     turn_text = text or judgement.text or ""
-    if guest_topic(judgement, userdata, settings, turn_text) is not None:
+    if guest_topic(judgement, userdata, settings, turn_text, last_reply=last_reply) is not None:
         return "guest"
-    if guest_account_ask(userdata, turn_text):
+    intent = sure_intent(judgement, settings) if is_guest(userdata) else None
+    if (
+        intent in _ACCOUNT_INTENTS
+        if intent is not None
+        else guest_account_ask(userdata, turn_text, last_reply)
+    ):
         # No filler: the small model gives the login line (FAST_GUEST_RULES)
         # or hands off to the main model, which has GUEST_SNAPSHOT.
         return "fast" if config.quick_fast_answer else None
@@ -1744,7 +1860,18 @@ def route(
         # The reply is a question back ("কোন ধরনের প্যাকেজ?"), at once: a
         # "একটু সময় দিন" before it promises a lookup that never comes.
         return None
-    if config.quick_filler and _NEEDS_TOOL_RE.search(turn_text):
+    if (
+        config.quick_filler
+        and not is_guest(userdata)
+        and sure_intent(judgement, settings) in _ACCOUNT_INTENTS
+    ):
+        # Logged in, their account, a purchase, a recharge or a person: the
+        # main model's tools answer it. The small model could only hand off
+        # (FAST_RULES), so it gets a filler however Jev's lookup came out.
+        return "filler"
+    if config.quick_filler and (
+        _NEEDS_TOOL_RE.search(turn_text) or says_yes_to_offer(turn_text, last_reply)
+    ):
         return "filler"
     if judgement.lookup == "none":
         if config.quick_fast_answer and lookup_p >= settings.quick_route_min_p:
@@ -1901,6 +2028,32 @@ def _split_marker_tail(text: str) -> tuple[str, str]:
     return text, ""
 
 
+# The line in the model's {"text": "..."}, read without JSON: a quote left
+# unescaped inside it breaks json.loads ("Expecting ',' delimiter").
+_TEXT_FIELD_RE = re.compile(r'"text"\s*:\s*"(.*)"\s*}?\s*$', re.S)
+
+
+def _filler_text(content: str) -> str:
+    """The filler model's line from its JSON answer, also from JSON broken by
+    a stray quote in the line."""
+    try:
+        return json.loads(content)["text"]
+    except (ValueError, KeyError, TypeError):
+        match = _TEXT_FIELD_RE.search(content.strip())
+        if match is None:
+            raise
+        return match.group(1).replace('\\"', '"')
+
+
+def _without_question(text: str) -> str:
+    """The line minus any sentence that asks: "ডাটা প্যাকেজ চাচ্ছেন তো? আমি
+    সবগুলো চেক করে বলছি।" keeps its second sentence. A line that only asks
+    stays whole, for safe_filler to drop."""
+    sentences = re.split(r"(?<=[?？])\s+", text.strip())
+    kept = [s for s in sentences if not s.rstrip().endswith(("?", "？"))]
+    return " ".join(kept) if kept else text
+
+
 def safe_filler(text: str, utterance: str, max_words: int = FILLER_MAX_WORDS) -> str | None:
     """The line, if it is one: short, and stating no number, price or contact of
     its own (which could only be a guess -- nothing has been looked up yet).
@@ -1915,9 +2068,46 @@ def safe_filler(text: str, utterance: str, max_words: int = FILLER_MAX_WORDS) ->
     # "কত টাকা রিচার্জ করা যায়" asks about an amount without naming one.
     if _MONEY_RE.search(_HOW_MUCH_RE.sub("", text)) and not _MONEY_RE.search(utterance):
         return None
-    if text.rstrip().endswith(("?", "？")):
+    # "সিলেটে সমস্যা হচ্ছে? ..." asks too, mid-line.
+    if "?" in text or "？" in text:
         return None
     return text
+
+
+# For a model-written line (care): the build the line should have, one the
+# last line didn't (_shape). Sampling alone kept "অবশ্যই, X দেখে দিচ্ছি।" with
+# only X changing from turn to turn.
+_CARE_SHAPES: dict[str, str] = {
+    "two": "two very short sentences: a brief acknowledgement or a little empathy, then what "
+    "you'll check",
+    "action": "one sentence that starts with what you'll do for them, in your own words (not "
+    "theirs copied), with no opening word (no জি, আচ্ছা, অবশ্যই, ওকে, Sure)",
+    "wait_end": "what you'll check, then a short polite wait at the end (এক মিনিট, একটু সময় দিন, "
+    "one moment)",
+}
+
+
+# The spoken ways a Bangla care line says what follows (telco filler style).
+_CARE_CLOSINGS_BN = (
+    "দেখে জানাচ্ছি",
+    "দেখে বলছি",
+    "চেক করে বলছি",
+    "চেক করে জানাচ্ছি",
+    "খুঁজে বলছি",
+    "খুঁজে জানাচ্ছি",
+)
+
+
+def _ending(line: str) -> str:
+    """The line's last two words ("দেখে দিচ্ছি"): two lines ending alike sound
+    like one line reworded."""
+    return " ".join(line.strip().rstrip("।.!").split()[-2:])
+
+
+def _sounds_like(line: str, last: str) -> bool:
+    """Whether the line opens or ends like the last one: "আচ্ছা, মিনিট
+    প্যাকেজগুলো দেখে দিচ্ছি।" after "অবশ্যই, ডাটা প্যাকেজগুলো দেখে দিচ্ছি।"."""
+    return _opener(line) == _opener(last) or _ending(line) == _ending(last)
 
 
 def build_filler_request(
@@ -1930,11 +2120,14 @@ def build_filler_request(
     care: bool = False,
     language: ReplyLanguage | None = None,
     guest: bool = False,
+    shape: str | None = None,
 ) -> dict:
     """guest: the customer isn't logged in (_FILLER_GUEST_NOTE). care: the model writes every line (_CARE_FILLER_SYSTEM), sampled so
     turns alike don't get the same line; else it fills in for the templates.
     language: the customer's picked reply language, which outranks the
-    system prompt's "match the customer's newest message"."""
+    system prompt's "match the customer's newest message". shape: the
+    _CARE_SHAPES build a care line is asked for; else one at random, not the
+    last line's."""
     lines = ["Conversation so far:"]
     lines += [f"{'Customer' if e.role == 'user' else 'Assistant'}: {e.text}" for e in history]
     if not history:
@@ -1945,6 +2138,27 @@ def build_filler_request(
         lines.append(f"What the customer asks about: {_TOPIC_X[topic][1]}.")
     if avoid:
         lines.append("Already said (don't repeat): " + " | ".join(avoid))
+    if care:
+        if avoid:
+            openers = sorted({o for x in avoid[-3:] if (o := _opener(x))})
+            endings = sorted({e for x in avoid[-3:] if (e := _ending(x))})
+            lines.append(
+                "Start with none of: " + ", ".join(openers) + ". End with none of: "
+                + ", ".join(endings) + "."
+            )
+        if language == "bn" or (language is None and _speaks_bangla(utterance, history)):
+            # Told only "another verb", the model reached for bookish ones
+            # (মিলিয়ে নিচ্ছি, যাচাই করে নিচ্ছি): offer the spoken ones instead.
+            fresh = [c for c in _CARE_CLOSINGS_BN if not any(c in x for x in avoid[-2:])]
+            pick = _RNG.sample(fresh, 2) if len(fresh) >= 2 else list(_CARE_CLOSINGS_BN[:2])
+            lines.append(
+                f"If you say what you'll do, spoken words such as {pick[0]} or {pick[1]} fit, "
+                "or your own; never a bare দেখছি or চেক করছি."
+            )
+        if shape not in _CARE_SHAPES:
+            last = _shape(avoid[-1]) if avoid else None
+            shape = _RNG.choice([s for s in _CARE_SHAPES if s != last])
+        lines.append(f"Build this line as {_CARE_SHAPES[shape]}.")
     lines.append(f"Customer's new message: {utterance}")
     if guest:
         lines.append(_FILLER_GUEST_NOTE)
@@ -2019,7 +2233,7 @@ async def compose_filler(
             f"{cost:.6f}" if isinstance(cost, (int, float)) else "?",
             (time.perf_counter() - started) * 1000,
         )
-        text = json.loads(content)["text"]
+        text = _filler_text(content)
     except (TimeoutError, asyncio.TimeoutError):
         logger.info("filler timed out after %.2fs", timeout_s)
         note(f"{model} timed out after {timeout_s:.2f} s, no line")
@@ -2030,7 +2244,7 @@ async def compose_filler(
         return None
     took = time.perf_counter() - started
     max_words = CARE_FILLER_MAX_WORDS if care else FILLER_MAX_WORDS
-    line = safe_filler(text, utterance, max_words) if isinstance(text, str) else None
+    line = safe_filler(_without_question(text), utterance, max_words) if isinstance(text, str) else None
     if line is not None and not reply_language.fits(line, language):
         line = None
     if line is None:

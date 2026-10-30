@@ -958,11 +958,8 @@ async def entrypoint(ctx: JobContext) -> None:
         "agent_state_changed",
         lambda ev: ev.new_state == "listening" and actions.age_case_draft(userdata),
     )
-    account_link.AccountLink(
-        session=session, agent=agent, userdata=userdata, room=ctx.room, config=config
-    ).attach()
     try:
-        # Tells the browser whose session this is (it links or ends it on login/logout).
+        # Tells the browser whose session this is (it ends it on a login, logout or switch).
         await account_link.publish_account(ctx.room, userdata)
     except Exception:
         logger.exception("could not publish the account attribute")

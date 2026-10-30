@@ -1056,6 +1056,18 @@ def test_sound_tags_are_stripped_from_an_accepted_turn():
     asyncio.run(go())
 
 
+def test_a_code_read_out_alone_as_digits_is_accepted():
+    # Realtime Scribe writes a spoken code as digits ("308367."), which has no
+    # letters; the empty-turn check dropped it before the code rule (run_92).
+    async def go():
+        for code in ("308367.", "৪০০৮০৬"):
+            gate, session, room, _ = _controller(0.1)
+            assert await _complete(gate, code) is True
+            assert room.sent == [(USER_TURN_TOPIC, code)]
+
+    asyncio.run(go())
+
+
 def test_a_spoken_phone_number_reaches_the_agent_as_digits():
     # The LLM miscounts "double"/"triple" when it writes the digits itself.
     async def go():

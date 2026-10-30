@@ -232,6 +232,7 @@ def jev_judge(
             lookup=lookup,
             knowledge_base=knowledge_base,
             topic=lookup and topic,
+            intent=lookup and topic,
         )
         started = time.perf_counter()
         judgement = await turn_judge.judge(client, url, api_key, payload, timeout_s, utterance=text)
@@ -271,10 +272,19 @@ def jev_warm_up(
             lookup=router,
             knowledge_base=knowledge_base,
             topic=router and topic,
+            intent=router and topic,
         )
         await turn_judge.judge(client, url, api_key, payload, _JUDGE_WARM_TIMEOUT_S)
 
     return _warm
+
+
+def _last_reply(session: AgentSession) -> str | None:
+    """The agent's last line, whose offer a "হ্যাঁ" may take up (quick_reply.route)."""
+    for item in reversed(session.history.items):
+        if getattr(item, "type", None) == "message" and item.role == "assistant" and item.text_content:
+            return item.text_content
+    return None
 
 
 def _recent_exchanges(session: AgentSession) -> list[Exchange]:
@@ -753,8 +763,14 @@ class TurnGateController:
         if self.quick is None or judgement is None:
             return
         path = quick_reply.route(
-            judgement, self.session.userdata, self.quick.config, self.quick.settings, text=text
+            judgement,
+            self.session.userdata,
+            self.quick.config,
+            self.quick.settings,
+            text=text,
+            last_reply=_last_reply(self.session),
         )
+        self._note_intent(judgement)
         key = _text_key(text)
         if path == "fast":
             self.fast_for = key
@@ -791,8 +807,11 @@ class TurnGateController:
         self._buffer.clear()
         now = self.clock()
         raw_text = new_message.text_content or ""
+        # A bare code ("308367.") has no letters but is never empty (run_92).
         if not self._greeting_done() or (
-            not turn_gate.normalize(raw_text) and not turn_gate.has_contact(raw_text)
+            not turn_gate.normalize(raw_text)
+            and not turn_gate.has_contact(raw_text)
+            and not turn_gate.has_code(raw_text)
         ):
             raise StopResponse()
         # Sound tags ("[clears throat]") stay out of the conversation the agent
@@ -972,7 +991,9 @@ class TurnGateController:
                     self.quick.settings,
                     text=text,
                     closing=closing,
+                    last_reply=_last_reply(self.session),
                 )
+                self._note_intent(judgement)
             if path == "fast":
                 self.fast_for = new_message.id
             elif path == "guest" and judgement is not None:
@@ -1071,10 +1092,23 @@ class TurnGateController:
             pending = replace(pending, message_id=message_id)
         return self._filler_before(stream, pending)
 
+    def _note_intent(self, judgement: Judgement | None) -> None:
+        """Jev's intent in the run log, to score it against what the turn was."""
+        if self.quick is None or self.quick.on_event is None:
+            return
+        if judgement is None or judgement.intent is None:
+            return
+        p = f" ({judgement.intent_p:.2f})" if judgement.intent_p is not None else ""
+        self.quick.on_event(f"Jev intent: {judgement.intent}{p}")
+
     def _route_guest(self, key: str, text: str, judgement: Judgement) -> None:
         assert self.quick is not None
         topic = quick_reply.guest_topic(
-            judgement, self.session.userdata, self.quick.settings, text
+            judgement,
+            self.session.userdata,
+            self.quick.settings,
+            text,
+            last_reply=_last_reply(self.session),
         )
         if topic is not None:
             self.guest_for = (key, self.quick.guest_reply(topic, text))
@@ -1146,7 +1180,12 @@ class TurnGateController:
             self._drop_early_filler(text)
             return
         route = quick_reply.route(
-            judgement, self.session.userdata, self.quick.config, self.quick.settings, text=text
+            judgement,
+            self.session.userdata,
+            self.quick.config,
+            self.quick.settings,
+            text=text,
+            last_reply=_last_reply(self.session),
         )
         if route == "filler":
             self._filler_task(text, judgement)

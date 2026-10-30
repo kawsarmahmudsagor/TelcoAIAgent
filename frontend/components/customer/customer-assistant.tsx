@@ -22,8 +22,8 @@ export function useSignedIn(): SignedIn {
 
 /**
  * The assistant for the whole customer site (home, log in and portal): one LiveKit session and
- * one bubble above every page, so a chat survives navigation, including a guest logging in
- * mid-conversation (AccountLink then links the session to their account). The signed-in customer
+ * one bubble above every page, so a chat survives navigation. A login, logout or switch of
+ * customer starts the conversation over (AccountLink). The signed-in customer
  * is re-checked on every page change, so a login or logout is picked up; the previous answer
  * stays in place while it's checked.
  */

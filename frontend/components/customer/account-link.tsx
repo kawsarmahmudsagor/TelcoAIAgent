@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useSessionContext } from '@livekit/components-react';
+import { useAssistant } from '@/components/portal/assistant/assistant-provider';
 import { useAgentAttribute } from '@/lib/livekit-text-streams';
 import type { PortalMe } from '@/lib/types/portal';
 
@@ -10,41 +11,30 @@ import type { PortalMe } from '@/lib/types/portal';
 const ACCOUNT_ATTRIBUTE = 'account';
 
 /**
- * Keeps the assistant session's account in step with the login. A guest who logs in mid-chat
- * gets the same session linked to their account (`/api/assistant/link`), so the conversation
- * carries on. A session that belongs to a customer is ended once that customer logs out or
- * another one logs in: it never moves between accounts. `me` is undefined while still loading.
+ * Keeps the assistant session's account in step with the login. A session never moves between
+ * accounts: a guest who logs in mid-chat gets a new conversation (the guest's is ended and
+ * cleared), and a customer's session is ended once they log out or another one logs in. `me` is
+ * undefined while still loading.
  */
 export function AccountLink({ me }: { me: PortalMe | null | undefined }) {
   const session = useSessionContext();
   const account = useAgentAttribute(ACCOUNT_ATTRIBUTE);
-  const linkedRoomRef = useRef<string | null>(null);
+  const { startOverForLogin } = useAssistant();
+  const signedInRef = useRef<string | null | undefined>(undefined);
 
+  // A guest just logged in (not a page load that finds a customer already signed in).
   useEffect(() => {
-    if (!session.isConnected || account === undefined || me === undefined) return;
+    if (me === undefined) return;
     const mine = me?.subscriber_id ?? null;
-    const theirs = account || null;
-    if (theirs === mine) return;
+    const before = signedInRef.current;
+    signedInRef.current = mine;
+    if (before === null && mine !== null) startOverForLogin();
+  }, [me, startOverForLogin]);
 
-    if (theirs === null && mine !== null) {
-      const room = session.room;
-      if (linkedRoomRef.current === room.name) return;
-      linkedRoomRef.current = room.name;
-      void fetch('/api/assistant/link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_name: room.name, identity: room.localParticipant.identity }),
-      }).then(
-        (res) => {
-          if (!res.ok) console.warn('The assistant session was not linked:', res.status);
-        },
-        (error: unknown) => console.warn('The assistant session was not linked:', error)
-      );
-      return;
-    }
-
-    // Logged out, or now a different customer: this session isn't theirs any more.
-    void session.end();
+  // Logged out, or now a different customer: this customer's session isn't theirs any more.
+  useEffect(() => {
+    if (!session.isConnected || !account || me === undefined) return;
+    if (account !== (me?.subscriber_id ?? null)) void session.end();
   }, [session, account, me]);
 
   return null;

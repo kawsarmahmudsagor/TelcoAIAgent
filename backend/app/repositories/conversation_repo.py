@@ -115,16 +115,6 @@ def reopen(
     )
 
 
-def link_subscriber(db: Session, conversation_id: uuid.UUID, subscriber_id: uuid.UUID) -> None:
-    """A guest conversation whose visitor logged in: it now belongs to them."""
-    db.execute(
-        update(Conversation)
-        .where(Conversation.id == conversation_id, Conversation.subscriber_id.is_(None))
-        .values(subscriber_id=subscriber_id)
-    )
-    db.commit()
-
-
 def end_stale(db: Session, *, idle_for: timedelta, now: datetime | None = None) -> int:
     """Ends conversations still `active` with no activity for `idle_for` -- their
     agent worker crashed before closing them. ended_at = their last activity."""

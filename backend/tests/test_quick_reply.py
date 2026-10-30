@@ -1224,9 +1224,12 @@ def test_the_filler_request_tells_the_model_about_a_guest(care):
         ("I want to top up", None, "recharge_do"),
         ("এই প্যাকেজটা কিনব", "pack", "buy"),
         ("I'll buy that one", None, "buy"),
+        # The English word, as the transcript writes it.
+        ("হ্যাঁ, packageটা চালু করে দিন", None, "buy"),
         # By what they want: the main model searches first.
         ("৩০০ টাকার মধ্যে ডাটা প্যাকেজ কিনব", "data", None),
         ("সাত দিনের প্যাকেজ কিনতে চাই", "pack", None),
+        ("I'm looking for some data packages to buy. What are your options?", "data", None),
         # How to, for anyone.
         ("বিকাশ দিয়ে কীভাবে রিচার্জ করব?", "recharge", None),
     ],
@@ -1245,3 +1248,156 @@ def test_the_person_line_says_sorry_and_offers_the_hotline():
         assert no_phone in quick_reply._GUEST_HUMAN_NO_PHONE[lang]
     runtime = QuickReplyRuntime(_config(operator_phone="01999"), _settings(), "k", httpx.AsyncClient())
     assert "01999" in runtime.guest_reply("human", "talk to a human")
+
+
+@pytest.mark.parametrize(
+    ("text", "last_reply", "expected"),
+    [
+        ("হ্যাঁ, দিন", "৩৯ টাকায় ৫০ মিনিট, মেয়াদ ৩ দিন। চাইলে প্যাকেজটা চালু করে দেবো?", "buy"),
+        ("yes please", "It's 2 GB for 7 days. Shall I activate it?", "buy"),
+        # A yes to anything else is not a buy.
+        ("হ্যাঁ, দিন", "বাকিগুলোর কথাও বলব?", None),
+        ("হ্যাঁ", None, None),
+    ],
+)
+def test_a_guest_yes_to_a_buy_offer_is_a_buy(text, last_reply, expected):
+    j = Judgement(0.9, "none", 0.9)
+    got = quick_reply.guest_topic(j, _Guest(), _settings(), text, last_reply=last_reply)
+    assert got == expected
+    got_route = route(j, _Guest(), _config(), _settings(), text=text, last_reply=last_reply)
+    assert (got_route == "guest") == bool(expected)
+
+
+def test_a_care_filler_request_asks_for_another_build_than_the_last_line():
+    said = ["অবশ্যই, নতুন সিম নেওয়ার নিয়মটা দেখে দিচ্ছি।"]
+    for _ in range(20):
+        user = quick_reply.build_filler_request(
+            "m", "ডাটা প্যাকেজ খুঁজছি", "packages", [], said, care=True
+        )["messages"][1]["content"]
+        assert "Start with none of: অবশ্যই. End with none of: দেখে দিচ্ছি." in user
+        assert quick_reply._CARE_SHAPES["action"] not in user  # the last line's build
+    first = quick_reply.build_filler_request("m", "x", None, [], [], care=True)
+    assert "Build this line as" in first["messages"][1]["content"]
+    assert "Build this line as" not in quick_reply.build_filler_request(
+        "m", "x", None, [], said
+    )["messages"][1]["content"]
+
+
+def test_a_care_filler_like_the_last_line_becomes_a_template():
+    async def go(guest):
+        line = "অবশ্যই, ডাটা প্যাকেজগুলো দেখে দিচ্ছি।"
+        handler = lambda _r: _completion(json.dumps({"text": line}))  # noqa: E731
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            runtime = QuickReplyRuntime(
+                _config(quick_filler_llm=True), _settings(), "k", client, language="bn"
+            )
+            runtime.said = ["অবশ্যই, নতুন সিম নেওয়ার নিয়মটা দেখে দিচ্ছি।"]
+            return await runtime.compose("ডাটা প্যাকেজ খুঁজছি", "packages", [], guest=guest)
+
+    template = asyncio.run(go(False))
+    assert template and template != "অবশ্যই, ডাটা প্যাকেজগুলো দেখে দিচ্ছি।"
+    assert asyncio.run(go(True)) == "অবশ্যই, ডাটা প্যাকেজগুলো দেখে দিচ্ছি।"
+
+
+@pytest.mark.parametrize(
+    ("text", "last_reply", "expected"),
+    [
+        # run_74: neither had a tool word, went fast, was handed off: silence.
+        ("আমাকে kindly একটু বলবেন আমার account-এ কত টাকা আছে?", None, "filler"),
+        ("হ্যাঁ suggest করেন", "চাইলে একটা প্যাকেজ সাজেস্ট করবো?", "filler"),
+        ("হ্যাঁ", "আরও কয়েকটা আছে, বাকিগুলোর কথাও বলব?", "filler"),
+        ("yes please", "Want me to find you a data package?", "filler"),
+        # A yes to no offer stays fast.
+        ("হ্যাঁ", "আপনার ব্যালেন্স ১৩৭.৫০ টাকা।", "fast"),
+    ],
+)
+def test_a_turn_that_needs_a_tool_gets_a_filler_not_the_small_model(text, last_reply, expected):
+    j = Judgement(0.9, "none", 1.0)
+    got = route(j, _Userdata(), _config(), _settings(), text=text, last_reply=last_reply)
+    assert got == expected
+
+
+def _intent(intent: str, p: float = 0.9, topic: str | None = None, lookup: str = "none") -> Judgement:
+    return Judgement(
+        0.9, lookup, 0.9, topic=topic, topic_p=0.9 if topic else None, intent=intent, intent_p=p
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "judgement", "expected"),
+    [
+        # Words the rules miss, Jev reads in context.
+        ("দ্বিতীয়টা নিব", _intent("buy_named"), "buy"),
+        ("ok the 49 taka one, activate it", _intent("buy_named"), "buy"),
+        ("আমার কয়টা complain খোলা আছে", _intent("own_account", topic="complaint"), "case"),
+        ("আমার ইন্টারনেট কতটুকু বাকি আছে?", _intent("own_account", topic="usage"), "usage"),
+        ("৫০ টাকা রিচার্জ করে দিন", _intent("recharge_do", topic="recharge"), "recharge_do"),
+        ("মানুষের সাথে কথা বলতে চাই", _intent("person"), "human"),
+        # Jev says it's no login topic: words that look like one don't count.
+        ("data packages to buy, what are your options?", _intent("search", topic="data"), None),
+        ("এই প্যাকেজটা কিনব", _intent("how_to"), None),
+        # An account ask of no topic a line answers: the small model's.
+        ("আমার NID নাম্বার কি?", _intent("own_account", topic="other"), None),
+        # A second ask the line would drop.
+        ("ব্যালেন্স কত, আর সিলেটে নেটওয়ার্ক কেমন?", _intent("own_account", topic="balance"), None),
+    ],
+)
+def test_a_sure_jev_intent_picks_the_guest_topic(text, judgement, expected):
+    assert quick_reply.guest_topic(judgement, _Guest(), _settings(), text) == expected
+
+
+def test_an_unsure_or_missing_intent_leaves_it_to_the_words():
+    text = "এই প্যাকেজটা কিনব"
+    for judgement in (_intent("how_to", p=0.6, topic="pack"), _sure("pack")):
+        assert quick_reply.guest_topic(judgement, _Guest(), _settings(), text) == "buy"
+
+
+def test_route_follows_a_sure_intent_for_a_guest_only():
+    s, c = _settings(), _config()
+    search = _intent("search", topic="data", lookup="packages")
+    text = "I'm looking for some data packages to buy. What are your options?"
+    assert route(search, _Guest(), c, s, text=text) == "filler"
+    account = _intent("own_account", topic="other")
+    c.quick_fast_answer = True
+    assert route(account, _Guest(), c, s, text="আমার NID নাম্বার কি?") == "fast"
+    buy = _intent("buy_named", topic="pack")
+    assert route(buy, _Guest(), c, s, text="দ্বিতীয়টা নিব") == "guest"
+    # A logged-in customer: the intent changes nothing.
+    assert route(buy, _Guest(subscriber_id="sub"), c, s, text="দ্বিতীয়টা নিব") != "guest"
+
+
+def test_a_logged_in_account_ask_gets_a_filler_not_the_small_model():
+    """The small model hands account asks off (FAST_RULES): asked anyway, it
+    only cost a second and the turn got no quick reply (run_74)."""
+    s, c = _settings(), _config()
+    c.quick_fast_answer = True
+    text = "আমাকে kindly একটু বলবেন আমার account-এ কত টাকা আছে?"
+    sub = _Guest(subscriber_id="sub")
+    assert route(_intent("own_account", topic="balance"), sub, c, s, text=text) == "filler"
+    assert route(_intent("person"), sub, c, s, text="মানুষের সাথে কথা বলান") == "filler"
+    # An account ask no word marks: Jev does.
+    suggest = "সব ঠিক আছে তো আমার?"
+    assert route(_intent("own_account", topic="usage"), sub, c, s, text=suggest) == "filler"
+    # Unsure, or small talk: as before.
+    assert route(_intent("own_account", p=0.5, topic="usage"), sub, c, s, text=suggest) == "fast"
+    assert route(_intent("other"), sub, c, s, text="ধন্যবাদ") == "fast"
+    c.quick_filler = False
+    assert route(_intent("own_account", topic="balance"), sub, c, s, text=text) == "fast"
+
+
+def test_a_filler_from_broken_json_or_with_a_question_is_kept():
+    async def go(content):
+        handler = lambda _r: _completion(content)  # noqa: E731
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await compose_filler(
+                client, _BASE, "k", "m", "ডাটা প্যাকেজ খুঁজছি", "packages", [], [], timeout_s=1.0,
+                care=True, language="bn",
+            )  # fmt: skip
+
+    assert asyncio.run(go('{"text": "আপনার "ডাটা" প্যাকেজগুলো চেক করে বলছি।"}')) == (
+        'আপনার "ডাটা" প্যাকেজগুলো চেক করে বলছি।'
+    )
+    asked = json.dumps({"text": "ডাটা প্যাকেজ চাচ্ছেন তো? আমি সবগুলো চেক করে বলছি।"})
+    assert asyncio.run(go(asked)) == "আমি সবগুলো চেক করে বলছি।"
+    only_asks = json.dumps({"text": "ডাটা প্যাকেজ চাচ্ছেন তো?"})
+    assert asyncio.run(go(only_asks)) is None

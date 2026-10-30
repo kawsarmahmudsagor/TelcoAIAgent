@@ -120,6 +120,26 @@ def test_bangla_asks_with_chacchen():
         assert 'use "চাচ্ছেন", never "চাইবেন"' in prompt, name
 
 
+def test_questions_carry_no_sample_answers():
+    for name, prompt in _prompts().items():
+        flat = _flat(prompt)
+        assert "Ask only the question, with no sample answers" in flat, name
+        assert "they must pick from a fixed set" in flat, name
+
+
+def test_answers_fit_the_customer_not_the_document():
+    for rag in (False, True):
+        for name, prompt in _prompts(rag=rag).items():
+            flat = _flat(prompt)
+            assert "Fit what you know to this customer" in flat, (name, rag)
+            assert "only if it could apply to them, and then as an \"if\"" in flat, (name, rag)
+
+
+def test_guest_login_line_waits_until_they_want_to_buy():
+    flat = _flat(GUEST_SNAPSHOT)
+    assert "never as a reminder while they browse or compare" in flat
+
+
 def test_prompt_refs_use_english_digits():
     for name, prompt in _prompts().items():
         assert "TC-2048" in prompt and "TXN-840219" in prompt, name

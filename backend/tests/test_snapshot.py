@@ -44,7 +44,7 @@ def test_snapshot_survives_network_failure(bss_world, monkeypatch):
     monkeypatch.setattr(network, "check_network_status", boom)
     sub = bss_world.subscriber(full_name="Samiha Khan")
     ctx = load_session_context(sub.id, None)
-    assert ctx.subscriber_id == sub.id and ctx.customer_name == "Samiha"
+    assert ctx.subscriber_id == sub.id and ctx.customer_name == "Samiha Khan"
     assert "Network status in" in ctx.snapshot and "unavailable" in ctx.snapshot
 
 
@@ -57,7 +57,7 @@ def test_snapshot_for_prepaid_persona(bss_world):
     ctx = load_session_context(sub.id, None)
 
     assert ctx.subscriber_id == sub.id
-    assert ctx.customer_name == "Samiha"
+    assert ctx.customer_name == "Samiha Khan"
     assert ctx.nudge_text is None
     text = ctx.snapshot
     assert "sample" in text.lower()
@@ -107,7 +107,7 @@ def test_unknown_subscriber_becomes_guest():
 
 
 def test_nudge_text_only_for_own_notification(bss_world, notify):
-    sub = bss_world.subscriber(full_name="Rafi Ahmed")
+    sub = bss_world.subscriber(full_name="Rafiul Hasan")
     other = bss_world.subscriber(full_name="Someone Else")
     expires = datetime.now(timezone.utc) + timedelta(days=2)
     own = notify(

@@ -33,6 +33,9 @@ WRAP_UP_KEY = "wrap_up"
 # What the turn is about, for the filler line (app.agent.quick_reply), asked
 # with the lookup question when quick fillers are on.
 TOPIC_KEY = "topic"
+# What the customer wants done, for the guest route (app.agent.quick_reply),
+# asked with the topic question.
+INTENT_KEY = "intent"
 
 _INSTRUCTIONS = (
     "A mobile operator's voice assistant is in a live call with a customer in Bangladesh. "
@@ -153,12 +156,53 @@ _TOPIC_CRITERIA = {
 }
 
 
+_INTENT_INSTRUCTIONS = (
+    "What does the customer want the assistant to do with the latest utterance? Read it "
+    "with the recent conversation: a short yes right after the assistant offered to "
+    "activate a package is a request to activate it, and a yes after it offered more "
+    "packages is a request to hear them. When the utterance asks two things, pick the main one."
+)
+
+# Scored on 85 past turns (2026-10-30): 95%, against 91% for the word rules it
+# replaces, and every miss below p 0.72.
+_INTENT_CRITERIA = {
+    "buy_named": (
+        "Buy or activate one specific package already shown, named or offered in the "
+        "conversation (ওটা নিব, দ্বিতীয়টা নিব, packageটা চালু করে দিন, yes to চালু করে দেবো?). "
+        "Not when they still describe what they want or ask what is available."
+    ),
+    "search": (
+        "Find or hear about packages to buy: what packages exist, more options, details or "
+        "the price of one, or packages by data, minutes, price, validity or use, even when "
+        "they say they want to buy."
+    ),
+    "recharge_do": "Recharge or top up their number now, not asking how recharging works.",
+    "own_account": (
+        "Their own account: balance, data or minutes left, current package, spending, "
+        "charges or deductions, transactions, a recharge that didn't arrive, reward points, "
+        "offers on their number, their complaints or cases, their registration, or a "
+        "package suggestion based on their own usage."
+    ),
+    "person": "To talk to a human, a real person, an agent or a supervisor.",
+    "how_to": (
+        "How a service, process, rule or fee works, or where to go: a new SIM, SIM "
+        "replacement, porting, postpaid, roaming, closing a SIM, how to recharge or buy, "
+        "auto renewal, care centres."
+    ),
+    "other": (
+        "Anything else: a greeting, thanks, ok, declining an offer, a code or number read "
+        "out, network or signal problems, small talk, or asking what was said earlier."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class Judgement:
     """Jev's answers for one utterance. p = P(addressed), None when the call failed
     or timed out. lookup / lookup_p only when the lookup question was asked, and
-    topic / topic_p only when the topic question was. wrap_up_p: P(the customer
-    is closing the topic), None when not answered."""
+    topic / topic_p only when the topic question was, intent / intent_p only
+    when the intent question was. wrap_up_p: P(the customer is closing the
+    topic), None when not answered."""
 
     p: float | None
     lookup: str | None = None
@@ -167,6 +211,8 @@ class Judgement:
     wrap_up_p: float | None = None
     topic: str | None = None
     topic_p: float | None = None
+    intent: str | None = None
+    intent_p: float | None = None
 
 
 @dataclass(frozen=True)
@@ -222,10 +268,11 @@ def build_request(
     knowledge_base: bool = False,
     wrap_up: bool = True,
     topic: bool = False,
+    intent: bool = False,
 ) -> dict:
     """lookup adds the router's choice question (knowledge_base: whether that's
     an option); wrap_up the closing-the-topic question; topic the filler's
-    what-is-it-about question."""
+    what-is-it-about question; intent the guest route's what-to-do question."""
     questions: dict = {
         QUESTION_KEY: {
             "type": "noul",
@@ -246,6 +293,12 @@ def build_request(
             "type": "choice",
             "instructions": _TOPIC_INSTRUCTIONS,
             "criteria": _TOPIC_CRITERIA,
+        }
+    if intent:
+        questions[INTENT_KEY] = {
+            "type": "choice",
+            "instructions": _INTENT_INSTRUCTIONS,
+            "criteria": _INTENT_CRITERIA,
         }
     return {
         "model": model,
@@ -278,11 +331,14 @@ async def judge(
         p = min(1.0, max(0.0, float(answers[QUESTION_KEY]["noul"])))
         lookup, lookup_p = _lookup_answer(answers.get(LOOKUP_KEY))
         topic, topic_p = _lookup_answer(answers.get(TOPIC_KEY))
+        intent, intent_p = _lookup_answer(answers.get(INTENT_KEY))
+        if intent not in _INTENT_CRITERIA:
+            intent, intent_p = None, None
         wrap_up_p = _noul(answers.get(WRAP_UP_KEY))
         usage = body.get("usage") or {}
         cost = usage.get("cost")
         usage_logger.info(
-            "Jev %s: %s input tokens, $%s, %dms, P=%.2f%s%s",
+            "Jev %s: %s input tokens, $%s, %dms, P=%.2f%s%s%s",
             body.get("model") or payload.get("model"),
             usage.get("input_tokens", "?"),
             f"{cost:.6f}" if isinstance(cost, (int, float)) else "?",
@@ -290,9 +346,18 @@ async def judge(
             p,
             f", lookup={lookup}" if lookup is not None else "",
             f", topic={topic}" if topic is not None else "",
+            f", intent={intent}" if intent is not None else "",
         )
         return Judgement(
-            p, lookup, lookup_p, text=utterance, wrap_up_p=wrap_up_p, topic=topic, topic_p=topic_p
+            p,
+            lookup,
+            lookup_p,
+            text=utterance,
+            wrap_up_p=wrap_up_p,
+            topic=topic,
+            topic_p=topic_p,
+            intent=intent,
+            intent_p=intent_p,
         )
     except (TimeoutError, asyncio.TimeoutError):
         logger.warning("turn judge timed out after %.2fs", timeout_s)

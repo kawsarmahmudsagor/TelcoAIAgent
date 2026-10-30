@@ -92,7 +92,7 @@ REWARD_PACKAGES = [
 # msisdn, name, plan, district, joined_on, balance, due, points, daily data MB range
 PERSONAS = [
     (SAMIHA, "Samiha Khan", "prepaid", "Dhaka", date(2024, 3, 14), "486.50", "0", 840, (150, 350)),
-    (RAFI, "Rafi Ahmed", "prepaid", "Chattogram", date(2023, 9, 2), "42.00", "0", 120, (300, 600)),
+    (RAFI, "Rafiul Hasan", "prepaid", "Chattogram", date(2023, 9, 2), "42.00", "0", 120, (300, 600)),
     (NUSRAT, "Nusrat Mahmud", "postpaid", "Rajshahi", date(2022, 6, 21), "0", "1240.00", 300, (600, 1200)),
     (TANVIR, "Tanvir Hasan", "prepaid", "Sylhet", date(2024, 11, 5), "215.00", "0", 60, (200, 500)),
     (FARHANA, "Farhana Islam", "prepaid", "Gazipur", date(2021, 12, 9), "730.25", "0", 2150, (250, 450)),

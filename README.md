@@ -134,7 +134,7 @@ frontend as in "Local dev setup"; the assistant needs all three, and `seed_all -
 | Persona | MSISDN | Scenario |
 |---|---|---|
 | Samiha | 01712342841 | Pack expiring in 3 days |
-| Rafi | 01812347392 | Low balance, a recharge pending |
+| Rafiul | 01812347392 | Low balance, a recharge pending |
 | Nusrat | 01912345501 | Postpaid bill due |
 | Tanvir | 01612341109 | Low data in a congested area |
 | Farhana | 01512346620 | Lots of reward points, one open case |
@@ -157,7 +157,7 @@ Admin steps (sign in at `/login` in a second window; scheduler running):
     portal ask the agent about the network; it reports the incident. Resolve it afterwards.
 11. Resolve a case: `/dashboard/cases`, open Farhana's case, start review then resolve. Her
     portal bell shows a case update.
-12. Run nudges: on `/dashboard` choose "Run nudges now". Switch to Samiha, Rafi or Tanvir,
+12. Run nudges: on `/dashboard` choose "Run nudges now". Switch to Samiha, Rafiul or Tanvir,
     open the bell and click a notification; `/portal/assistant` opens and the agent greets
     with that nudge.
 

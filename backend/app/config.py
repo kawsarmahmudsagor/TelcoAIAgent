@@ -160,6 +160,9 @@ class Settings(BaseSettings):
     # A filler takes Jev's word for what the turn is about when Jev is at least
     # this sure; else the topic comes from the customer's words (quick_reply._TOPIC_RES).
     filler_topic_min_p: float = Field(0.7, ge=0.0, le=1.0)
+    # A guest's turn is routed on Jev's intent (buy, recharge, own account, a
+    # person) when Jev is at least this sure; else on the customer's words.
+    guest_intent_min_p: float = Field(0.8, ge=0.0, le=1.0)
     # The small model's first chunk must arrive within this, or the main model
     # answers instead: every handoff pays it before the main model starts.
     fast_timeout_ms: int = Field(1000, ge=300, le=5000)

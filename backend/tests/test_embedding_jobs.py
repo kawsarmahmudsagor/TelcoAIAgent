@@ -45,6 +45,9 @@ def _restore():
             db.execute(text(f"select {', '.join(_CONFIG_COLUMNS)} from agent_config")).mappings().one()
         )
         before_jobs = set(db.scalars(select(EmbeddingJob.id)).all())
+        # The dev DB's real sources: reindex-all and a chunk change mark them
+        # too, and with their new jobs deleted they'd stay unsearchable.
+        statuses = db.execute(select(RagSource.id, RagSource.status)).all()
     finally:
         db.close()
     yield
@@ -54,6 +57,8 @@ def _restore():
         new_jobs = set(db.scalars(select(EmbeddingJob.id)).all()) - before_jobs
         if new_jobs:
             db.execute(EmbeddingJob.__table__.delete().where(EmbeddingJob.id.in_(new_jobs)))
+        for source_id, status in statuses:
+            db.execute(update(RagSource).where(RagSource.id == source_id).values(status=status))
         assignments = ", ".join(f"{column} = :{column}" for column in _CONFIG_COLUMNS)
         db.execute(text(f"update agent_config set {assignments}"), snapshot)
         db.commit()

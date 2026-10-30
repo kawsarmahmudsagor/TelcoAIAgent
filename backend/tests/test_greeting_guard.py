@@ -483,10 +483,10 @@ def test_a_customised_nudge_greeting_is_used():
         config = agent_config_service.resolve(None)
         config.greeting_nudge = "Tell {customer_name}: {nudge_text}"
         session, _, _ = await _greet(
-            FakeHandle(), config=config, customer_name="Rafi", nudge_text="low balance"
+            FakeHandle(), config=config, customer_name="Rafiul Hasan", nudge_text="low balance"
         )
         (reply,) = session.replies
-        assert reply["instructions"] == f"Tell Rafi: low balance\n{SALAM_INSTRUCTION}"
+        assert reply["instructions"] == f"Tell Rafiul Hasan: low balance\n{SALAM_INSTRUCTION}"
 
     asyncio.run(go())
 

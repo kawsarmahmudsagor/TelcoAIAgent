@@ -85,6 +85,11 @@ export interface AssistantContextValue {
   openConversation(id: string): Promise<boolean>;
   /** Ends any live session and clears the panel for a new conversation. */
   newChat(): void;
+  /**
+   * A guest just logged in: like newChat, but the language pick stays, and a session that was up
+   * starts again as the customer's (voice when the mic was on), so it opens with their greeting.
+   */
+  startOverForLogin(): void;
   /** Package and case cards, oldest first. */
   cards: TelcoCard[];
   /** The agent's latest confirm card. */
@@ -314,6 +319,19 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     });
   }, [endLive, hideCurrentLive, setResumed, resetReplyLanguage]);
 
+  const startOverForLogin = useCallback(() => {
+    const wasLive = session.connectionState !== ConnectionState.Disconnected;
+    const voice = isMicrophoneEnabled;
+    void endLive().then(() => {
+      setQueued([]);
+      hideCurrentLive();
+      setEarlier([]);
+      setResumed(null);
+      setHistoryOpen(false);
+      if (wasLive) void startSession({ voice, openPanel: false });
+    });
+  }, [session, isMicrophoneEnabled, endLive, hideCurrentLive, setResumed, startSession]);
+
   const me = useOptionalPortalMe();
   const subscriberId = me?.subscriber_id ?? null;
   const subscriberIdRef = useRef(subscriberId);
@@ -335,7 +353,8 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
   // A session that ends leaves its chat in the panel until a new one starts (the room drops the
   // live transcript, so what was said is kept here). Signed in, it joins `resumed` and the next
   // session reopens the same conversation. A guest's only stays on screen. A session that
-  // belonged to another customer (ended by a logout) is dropped.
+  // belongs to anyone else (a customer's, ended by a logout; a guest's, ended by a login) is
+  // dropped.
   const resumedId = resumed?.id ?? null;
   useEffect(() => {
     const keep = () => {
@@ -344,7 +363,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       hideCurrentLive();
       const owner = accountRef.current || null;
       const mine = subscriberIdRef.current;
-      if (owner !== null && owner !== mine) return;
+      if (owner !== mine) return;
       if (resumedId) {
         setResumed((prev) =>
           prev?.id === resumedId ? { id: prev.id, messages: [...prev.messages, ...said] } : prev
@@ -373,6 +392,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       resumedId,
       openConversation,
       newChat,
+      startOverForLogin,
       cards,
       confirm,
       agentState,
@@ -396,6 +416,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       resumedId,
       openConversation,
       newChat,
+      startOverForLogin,
       cards,
       confirm,
       agentState,

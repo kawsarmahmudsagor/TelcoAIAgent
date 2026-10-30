@@ -29,7 +29,7 @@ cases, log out and use the chat bubble on the home page (`/`).
 | Persona | Number | Plan, district | Balance or bill | Active packs | Points | Story |
 |---|---|---|---|---|---|---|
 | Samiha Khan | 01712342841 | prepaid, Dhaka | 486.50 taka | Smart 15 GB + 300 min (8602 MB, 182 min, expires in 3 days), 100 SMS (74 left, 20 days) | 840 | Pack expiring; case TC-2048 in review |
-| Rafi Ahmed | 01812347392 | prepaid, Chattogram | 42.00 taka | 8 GB Weekly (2100 MB, 5 days) | 120 | Low balance; a 300 taka Nagad recharge pending |
+| Rafiul Hasan | 01812347392 | prepaid, Chattogram | 42.00 taka | 8 GB Weekly (2100 MB, 5 days) | 120 | Low balance; a 300 taka Nagad recharge pending |
 | Nusrat Mahmud | 01912345501 | postpaid, Rajshahi | bill due 1240.00 taka | 40 GB + 500 min (30000 MB, 410 min, 18 days) | 300 | Postpaid bill due |
 | Tanvir Hasan | 01612341109 | prepaid, Sylhet | 215.00 taka | 15 GB Monthly (1200 MB, 11 days) | 60 | Low data; Sylhet congestion; open case |
 | Farhana Islam | 01512346620 | prepaid, Gazipur | 730.25 taka | 20 GB + 200 min (12000 MB, 150 min, 20 days) | 2150 | High-priority open case; Gazipur maintenance |
@@ -70,11 +70,11 @@ issued per 15 minutes.
 | A6 | Samiha | Start voice and talk over the greeting ("hello? hello?") | The greeting isn't cut off, and nothing said during it is answered afterwards | | |
 | A7 | Samiha | After the greeting, say "Hi" | Doesn't greet or introduce itself again. Asks briefly how it can help | | |
 | A8 | Any | Ask "Are you a bot?" | "Yes, I'm an AI assistant for telco." or the Bangla equivalent, and nothing about how it works | | |
-| A9 ★ | Guest, then Samiha | On the home page bubble ask "What's my balance?". When the bot asks you to log in, click **Log in** and pick Samiha, leaving the chat open | The chat stays connected through the login, with no reconnect and no new greeting. The bot says she's logged in and answers 486.50 taka without being asked again | | |
+| A9 ★ | Guest, then Samiha | On the home page bubble ask "What's my balance?". When the bot asks you to log in, click **Log in** and pick Samiha, leaving the chat open | The guest chat ends and the panel clears. A new chat starts as Samiha, in the same language, and greets her as Samiha Khan. Ask again and she gets 486.50 taka | | |
 | A10 | Samiha | *continue from A9:* "Which pack do I have?" | Answers from her account (Smart 15 GB + 300 min), so the account tools work in the same chat | | |
 | A11 | Samiha | *continue from A9:* log out from the profile menu | The chat session ends. A new chat afterwards is a guest chat | | |
-| A12 | Samiha | Chat as Samiha, then go to `/signin` and pick Rafi without logging out | Samiha's chat ends. It never continues as Rafi | | |
-| A13 | Admin | After A9, open the conversation in admin Conversations | One conversation under Samiha, including the guest messages from before the login | | |
+| A12 | Samiha | Chat as Samiha, then go to `/signin` and pick Rafiul without logging out | Samiha's chat ends. It never continues as Rafiul | | |
+| A13 | Admin | After A9, open the conversation in admin Conversations | Two conversations: the guest one with the messages from before the login, and a new one under Samiha | | |
 
 ## B. Language and style
 
@@ -94,7 +94,7 @@ issued per 15 minutes.
 |---|---|---|---|---|---|
 | C1 ★ | Samiha | "How much data do I have left?" | About 8.4 GB on Smart 15 GB + 300 min, expiring in 3 days | | |
 | C2 | Samiha | "Minutes and SMS left?" | 182 minutes and 74 SMS | | |
-| C3 | Rafi | "Balance?" | 42 taka. May suggest recharging | | |
+| C3 | Rafiul | "Balance?" | 42 taka. May suggest recharging | | |
 | C4 ★ | Nusrat | "আমার বিল কত?" | Postpaid: bill due 1240 taka (not a prepaid balance) | | |
 | C5 | Farhana | "How many reward points do I have?" | 2150 points | | |
 | C6 | Tanvir | "How much data did I use this week?" | A 7-day data total in a plausible range (Tanvir uses 200 to 500 MB a day) | | |
@@ -117,7 +117,7 @@ issued per 15 minutes.
 | D9 | Samiha | Start a purchase, wait more than 3 minutes, then give the code | Says the code expired. Nothing is charged | | |
 | D10 | Samiha | Start a purchase, then say "no, cancel it" | Cancels. Nothing is charged. The card goes away | | |
 | D11 | Samiha | "Pay with bKash" when buying the 1 GB Daily | Quotes 29 taka via bKash and asks for the code | | |
-| D12 ★ | Rafi | "Buy 8 GB weekly from my balance" | 42 taka isn't enough for 149, so the bot says so and offers a recharge or another payment method. No code is sent | | |
+| D12 ★ | Rafiul | "Buy 8 GB weekly from my balance" | 42 taka isn't enough for 149, so the bot says so and offers a recharge or another payment method. No code is sent | | |
 | D13 | Nusrat | Buy "100 Minutes" (79 taka) | Postpaid: the price is added to the bill. After the code, the bill is 1319 taka | | |
 | D14 | Samiha | "Tell me the code" during a purchase | Never repeats the code. Says it's on her screen | | |
 
@@ -125,7 +125,7 @@ issued per 15 minutes.
 
 | ID | Persona | Say | Expected | Result | Notes |
 |---|---|---|---|---|---|
-| E1 ★ | Rafi | "200 taka recharge koro bKash diye" | Confirm card and code. After the code, the balance is 262 taka (42 + 200 + 20 cashback). Mentions the cashback | | |
+| E1 ★ | Rafiul | "200 taka recharge koro bKash diye" | Confirm card and code. After the code, the balance is 262 taka (42 + 200 + 20 cashback). Mentions the cashback | | |
 | E2 | Samiha | "Recharge 10 taka" | Refused: the minimum is 20 taka per recharge | | |
 | E3 | Samiha | "Recharge 1500 taka" | Refused: the maximum is 1000 taka per recharge | | |
 | E4 | Samiha | "Recharge 50 taka to 01812347392 with Nagad" | Recharges the other number. The code still goes to Samiha. No cashback (the cashback offer covers own-number recharges) | | |
@@ -138,7 +138,7 @@ issued per 15 minutes.
 
 | ID | Persona | Say | Expected | Result | Notes |
 |---|---|---|---|---|---|
-| F1 ★ | Rafi | "I recharged 300 taka by Nagad but didn't get it" | Finds the pending 300 taka Nagad recharge from about 1 hour ago. Explains it's pending and suggests waiting about 30 minutes, then offers a case | | |
+| F1 ★ | Rafiul | "I recharged 300 taka by Nagad but didn't get it" | Finds the pending 300 taka Nagad recharge from about 1 hour ago. Explains it's pending and suggests waiting about 30 minutes, then offers a case | | |
 | F2 | Samiha | "My 300 taka bKash recharge failed" | Finds the failed 300 taka bKash recharge (12 days ago, "Payment timed out") and mentions case TC-2048, already in review | | |
 | F3 | Samiha | "Show my recent recharges" | The 200 taka bKash (2 hours ago) and 100 taka Nagad (8 days ago) successes, plus the failed one | | |
 | F4 | Samiha | "My pack wasn't activated" | Checks the purchase, finds the 399 taka Smart 15 GB purchase successful and the pack active | | |
@@ -151,7 +151,7 @@ issued per 15 minutes.
 | G1 ★ | Samiha | "Ki offer ache amar jonno?" | 840 points. Lists offers, including the 1 GB for 700 points and the 20 GB + 200 min exclusive bundle | | |
 | G2 ★ | Samiha | *continue:* "Redeem the points one" | Confirm card and code for 700 points. After the code, 140 points are left and a 1 GB 3-day pack is added | | |
 | G3 | Samiha | *continue from G1:* "the second one" | Resolves the offer by its number, not by guessing | | |
-| G4 | Rafi | "Redeem 1 GB for points" | 120 points isn't enough for 700. Says so. No code is sent | | |
+| G4 | Rafiul | "Redeem 1 GB for points" | 120 points isn't enough for 700. Says so. No code is sent | | |
 | G5 | Nusrat | "Any cashback offers?" | The 10% cashback offer is prepaid only, so it isn't offered to Nusrat | | |
 
 ## H. Support cases and human handoff
@@ -229,10 +229,10 @@ Needs the KB embedded: on the admin Knowledge base page, sources show **Ready**.
 
 | ID | Persona | Do | Expected | Result | Notes |
 |---|---|---|---|---|---|
-| M1 ★ | Admin | Control center: **Run nudges** | Reports nudges created for at least Samiha (pack expiring), Rafi (low balance) and Tanvir (low data) | | |
+| M1 ★ | Admin | Control center: **Run nudges** | Reports nudges created for at least Samiha (pack expiring), Rafiul (low balance) and Tanvir (low data) | | |
 | M2 ★ | Samiha | Log in. The bell shows "Pack expiring". Click it | The assistant opens. The **greeting is about the expiring pack** and offers a renewal as a question. Nothing is bought until she says yes | | |
 | M3 | Samiha | *continue:* "Yes, renew it" | Starts the purchase with a code, as in D5 | | |
-| M4 | Rafi | Click the low-balance notification | The greeting mentions the low balance and offers a recharge | | |
+| M4 | Rafiul | Click the low-balance notification | The greeting mentions the low balance and offers a recharge | | |
 | M5 | Tanvir | Click the low-data notification | The greeting mentions low data and offers a pack | | |
 | M6 | Samiha | After M2, look at the bell | The badge count drops by one | | |
 | M7 ★ | Admin | Support queue: set Farhana's open case to **Resolved** | Farhana gets a case-update notification. Clicking it gives a greeting about the resolved case | | |

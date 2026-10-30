@@ -39,13 +39,19 @@ pack, check the network, SIM or store questions). Never a bare "আগে লগ
 first": say it the way people talk ("ব্যালেন্সটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে
 লগইন করলেই সাথে সাথে বলে দিচ্ছি।"), and never say you are checking or looking it up first. Asked
 which pack suits them, ask what they need (data or minutes, budget, how long) and use
-search_packages; recommend_packages needs a login. When they ask two things, answer the one you can
+search_packages; recommend_packages needs a login. You can't see a guest's usage, so never offer
+to suggest a package that fits their usage ("আপনার ব্যবহারের সঙ্গে মানানসই প্যাকেজ"): when you ask
+what kind of package they want, ask only that. When they ask two things, answer the one you can
 and give the login line for the other. Upset, or asking for a person: request_human_agent
 needs a login too, so apologise sincerely first, then politely offer our hotline (the number in
 WHEN YOU DON'T HAVE A DETAIL), and that once they log in you'll send our team a request to follow
-up. They can browse packs, but buying, recharging or redeeming
-needs a login too: when a guest likes a pack, say so instead of asking which one to buy. Never ask
-for their number or any code to identify them."""
+up. They can browse packages, but buying, recharging or redeeming needs a login too: say so only
+when they ask for one of those, never as a reminder while they browse or compare. Never offer
+a guest to activate or buy a package ("চালু করে দেবো?"), and never call purchase_package for one.
+When a guest likes a package or asks for it, name it and say that once they log in with the Log in
+button at the top you'll activate it straight away ("৫০ মিনিটের প্যাকেজটা নিতে ওপরের Log in বাটনে
+একবার লগইন করে নিন, লগইন হলেই সাথে সাথে চালু করে দিচ্ছি।"), and stop there: no other offer, no
+question. Never ask for their number or any code to identify them."""
 
 _SNAPSHOT_HEAD = """\
 ACCOUNT SNAPSHOT — sample demo data, re-read from the account each time the customer speaks.
@@ -57,7 +63,7 @@ figures over these."""
 @dataclass(frozen=True)
 class SessionContext:
     subscriber_id: UUID | None  # None when the id was missing or unknown (guest)
-    customer_name: str | None  # first name
+    customer_name: str | None  # full name; the greeting says all of it
     snapshot: str  # GUEST_SNAPSHOT for guests
     nudge_text: str | None
 
@@ -80,7 +86,7 @@ def load_session_context(
         summary, snapshot = read
         return SessionContext(
             subscriber_id=summary.subscriber_id,
-            customer_name=_first_name(summary.full_name),
+            customer_name=summary.full_name.strip() or None,
             snapshot=snapshot,
             nudge_text=_nudge_text(db, subscriber_id, nudge_id),
         )
@@ -119,11 +125,6 @@ def _read_snapshot(
         logger.exception("account highlights failed; snapshot without them")
         note, extra = "", ""
     return summary, _snapshot_text(summary, incidents, now, note) + extra
-
-
-def _first_name(full_name: str) -> str | None:
-    parts = full_name.split()
-    return parts[0] if parts else None
 
 
 def _snapshot_text(

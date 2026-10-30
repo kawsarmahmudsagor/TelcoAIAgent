@@ -280,3 +280,32 @@ def test_jev_is_asked_the_topic_only_with_the_lookup():
     asyncio.run(go())
     assert turn_judge.TOPIC_KEY in sent[0]["questions"]
     assert turn_judge.TOPIC_KEY not in sent[1]["questions"]
+    # The guest route's intent goes with the topic.
+    assert turn_judge.INTENT_KEY in sent[0]["questions"]
+    assert turn_judge.INTENT_KEY not in sent[1]["questions"]
+
+
+def test_the_intent_question_is_added_only_when_asked():
+    assert turn_judge.INTENT_KEY not in build_request("m", [], "hi", "listening", lookup=True, topic=True)["questions"]
+    question = build_request("m", [], "hi", "listening", lookup=True, intent=True)["questions"][
+        turn_judge.INTENT_KEY
+    ]
+    assert question["type"] == "choice"
+    assert set(question["criteria"]) == {
+        "buy_named", "search", "recharge_do", "own_account", "person", "how_to", "other",
+    }
+    assert not real_estate_words(json.dumps(question, ensure_ascii=False))
+
+
+def test_returns_the_intent_choice_and_drops_an_unknown_one():
+    def handler(intent):
+        return lambda request: httpx.Response(200, json={"answers": {
+            "addressed": {"noul": 0.9},
+            "intent": {"choice": intent, "probabilities": {intent: 0.92}},
+        }})  # fmt: skip
+
+    judgement = _judgement(handler("buy_named"), lookup=True, intent=True)
+    assert (judgement.intent, judgement.intent_p) == ("buy_named", 0.92)
+    judgement = _judgement(handler("dance"), lookup=True, intent=True)
+    assert (judgement.intent, judgement.intent_p) == (None, None)
+    assert _judgement(handler("buy_named")).p == 0.9

@@ -6,8 +6,7 @@ full voice. `off` (text only) is left for when the mode cannot be applied.
 The agent enforces the mode: with session input audio off nothing is
 transcribed, even if the browser publishes a mic track, and with output audio
 off livekit runs no TTS and the reply goes out as text only (fillers too).
-The session is built with STT and TTS either way, so the mode can be
-re-applied in place when a guest logs in mid-chat (account_link)."""
+The session is built with STT and TTS either way."""
 
 import logging
 from enum import Enum
