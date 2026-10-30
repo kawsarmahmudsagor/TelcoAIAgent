@@ -3,6 +3,7 @@ from uuid import UUID
 
 from livekit import rtc
 
+from app.agent import reply_language
 from app.agent.userdata import Channel, SessionUserdata
 
 
@@ -26,6 +27,7 @@ def resolve(raw_metadata: str | None, room: rtc.Room) -> SessionUserdata:
         visitor_id=parse_visitor_id(meta.get("visitor_id")),
         text_start=meta.get("text_start") is True,
         resume_conversation_id=parse_uuid(meta.get("resume_conversation_id")),
+        reply_language=reply_language.parse(meta.get("reply_language")),
     )
 
 

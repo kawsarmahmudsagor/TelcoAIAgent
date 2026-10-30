@@ -10,6 +10,7 @@ from livekit import rtc
 
 if TYPE_CHECKING:
     from app.agent.actions import CaseDraft, PendingAction
+    from app.agent.reply_language import ReplyLanguage
     from app.agent.voice_mode import VoiceMode
     from app.bss.types import PackageView
 
@@ -56,6 +57,9 @@ class SessionUserdata:
     # The browser opened this session with a typed message: no greeting, the
     # agent answers that message straight away (a nudge session still greets).
     text_start: bool = False
+    # The language the customer picked when the chat opened (app.agent.reply_language):
+    # every reply is in it. None (phone calls, older chats) follows their latest message.
+    reply_language: "ReplyLanguage | None" = None
     # This session's `conversations` row, once the transcript recorder made it.
     conversation_id: UUID | None = None
     # An earlier conversation the browser picked from its chat history to carry

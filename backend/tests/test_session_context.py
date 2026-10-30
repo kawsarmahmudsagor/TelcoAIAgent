@@ -29,3 +29,9 @@ def test_resolve_reads_text_start():
     # Only a JSON true counts.
     for meta in ({}, {"text_start": "1"}, {"text_start": 1}, {"text_start": False}):
         assert not resolve(json.dumps(meta), room=FakeRoom()).text_start, meta
+
+
+def test_resolve_reads_reply_language():
+    assert resolve(json.dumps({"reply_language": "bn"}), room=FakeRoom()).reply_language == "bn"
+    for meta in ({}, {"reply_language": "xx"}, {"reply_language": "EN"}):
+        assert resolve(json.dumps(meta), room=FakeRoom()).reply_language is None, meta
