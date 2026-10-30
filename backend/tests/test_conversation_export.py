@@ -11,7 +11,7 @@ from docx.oxml.ns import qn
 from sqlalchemy import text
 
 from app.agent.quick_models import reasoning_for
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db.session import SessionLocal
 from app.repositories import conversation_repo
 from app.services import conversation_export
@@ -133,7 +133,9 @@ def test_translate_prompt_rules():
     # Bangla digits kept in English output ("১২০ taka").
     for rule in ("Banglish", "telco", "প্যাকেজ", "*121#", "ব্যালেন্স", "digits 0-9"):
         assert rule in system
-    assert body["model"] == get_settings().export_translate_model == "google/gemini-3.5-flash"
+    assert body["model"] == get_settings().export_translate_model
+    # The code default (a local .env may pick a cheaper model while testing).
+    assert Settings.model_fields["export_translate_model"].default == "google/gemini-3.5-flash"
     # Gemini 3.5 rejects reasoning "none" ("Reasoning is mandatory"); the shared
     # per-model setting is minimal for a model it doesn't list.
     assert body["reasoning"] == reasoning_for(body["model"])
@@ -376,3 +378,17 @@ def test_cors_exposes_the_filename(api):
     origin = get_settings().cors_origins[0]
     res = api.get(f"/api/conversations/{uuid.uuid4()}/export?lang=en", headers={"Origin": origin})
     assert "content-disposition" in res.headers.get("access-control-expose-headers", "").lower()
+
+
+def test_admin_detail_returns_reply_language(api, stored):
+    conversation_id = stored()
+    db = SessionLocal()
+    try:
+        db.execute(
+            text("update conversations set reply_language = 'bn' where id = :i"),
+            {"i": conversation_id},
+        )
+        db.commit()
+    finally:
+        db.close()
+    assert api.get(f"/api/conversations/{conversation_id}").json()["reply_language"] == "bn"

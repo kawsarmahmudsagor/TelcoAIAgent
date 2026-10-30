@@ -3,8 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftIcon, ChevronRightIcon, Trash2Icon, WrenchIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  Trash2Icon,
+  WrenchIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { ExportConversationDialog } from '@/components/customer/export-conversation-dialog';
 import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -27,6 +34,7 @@ export function ConversationDetailView({ id }: { id: string }) {
   const router = useRouter();
   const [live, setLive] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
@@ -115,10 +123,21 @@ export function ConversationDetailView({ id }: { id: string }) {
         title={`Conversation with ${name}`}
         description={formatDateTime(c.started_at)}
         actions={
-          <Button variant="outline" onClick={() => setConfirming(true)}>
-            <Trash2Icon aria-hidden="true" />
-            Delete
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setExporting(true)}
+              disabled={c.status !== 'ended'}
+              title={c.status === 'ended' ? undefined : 'Available once the conversation has ended'}
+            >
+              <DownloadIcon aria-hidden="true" />
+              Export
+            </Button>
+            <Button variant="outline" onClick={() => setConfirming(true)}>
+              <Trash2Icon aria-hidden="true" />
+              Delete
+            </Button>
+          </>
         }
       />
 
@@ -149,6 +168,12 @@ export function ConversationDetailView({ id }: { id: string }) {
         </SectionCard>
       </div>
 
+      <ExportConversationDialog
+        open={exporting}
+        onOpenChange={setExporting}
+        defaultLanguage={c.reply_language}
+        fetchExport={(lang) => api.conversations.export(c.id, lang)}
+      />
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}

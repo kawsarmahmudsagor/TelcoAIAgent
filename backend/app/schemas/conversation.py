@@ -16,6 +16,7 @@ class ConversationOut(BaseModel):
     message_count: int
     started_at: datetime
     ended_at: datetime | None
+    reply_language: str | None = None
 
 
 class ConversationListItem(ConversationOut):
@@ -63,6 +64,7 @@ class VisitorConversationSummary(BaseModel):
     id: uuid.UUID
     started_at: datetime
     ended_at: datetime | None
+    reply_language: str | None = None
     status: str
     # First thing the customer said, trimmed -- the list's title.
     preview: str | None
@@ -92,6 +94,7 @@ class VisitorConversationDetail(BaseModel):
     id: uuid.UUID
     started_at: datetime
     ended_at: datetime | None
+    reply_language: str | None = None
     status: str
     reply_language: str | None = None
     messages: list[VisitorConversationMessage]

@@ -18,6 +18,8 @@ export interface Conversation {
   message_count: number;
   started_at: DateTimeString;
   ended_at: DateTimeString | null;
+  /** The language the customer picked for the chat; null for calls and older chats. */
+  reply_language: ReplyLanguage | null;
 }
 
 export interface ConversationListItem extends Conversation {
