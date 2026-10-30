@@ -1,0 +1,155 @@
+TELCO BOT — REAL-LIFE CONVERSATION TESTS (built from logs/run_49.log)
+=====================================================================
+
+How to use
+----------
+- Log in as a customer with usage history, transactions and at least one failed
+  recharge (run_49 used Samiha). Speak each line by voice; read the ★ lines aloud
+  with the hesitations as written ("আম", "আ-আমি") — they are part of the test.
+- One scenario = one call. Don't hang up between turns inside a scenario.
+- After each turn, check "Expect" and the run log (logs/run_N.log): Tool / Router
+  lines show what the bot looked up.
+- Mark each turn: PASS / PARTIAL / FAIL, and copy the bot's reply on PARTIAL/FAIL.
+
+Things to check on every turn
+- Modern spoken Bangla, polite (আপনি), no bookish words; "প্যাকেজ" never "প্যাক";
+  "বুঝতে পেরেছি" not "বুঝতে পারছি"; brand written "telco".
+- No made-up numbers: every balance, price, date and count comes from a tool.
+- Package answers show package cards on screen (also follow-ups and "আর কি আছে").
+- The filler line ("দেখছি", "চেক করছি") fits the question and states no facts.
+
+
+SCENARIO 1 — Replay of run_49 (the full call, in order)
+-------------------------------------------------------
+1.1 ★ "আচ্ছা, আমার ইন্টারনেট কতটুকু বাকি আছে? আমি না দেখতে পাচ্ছি না।"
+    Expect: remaining data + expiry date of the current package (account snapshot
+    or get_usage). An upsell (points/bonus) is fine but short.
+
+1.2 ★ "না না কিন্তু আমার কথা হচ্ছে আমার uses অনুযায়ী আমার আসলে next এ কত Internet data নেওয়া উচিত?"
+    Expect: recommend_packages. Names one or two packages with reason
+    ("গত ৩০ দিনের ব্যবহার অনুযায়ী"). Cards shown.
+
+1.3 ★ "আচ্ছা আমার জন্য আআ সব থেকে ভালো package কোনটা হবে? আমি YouTube দেখি বেশি"
+    Expect: search_packages (data). Picks a big-data package because of YouTube,
+    says why. Cards for the packages it names.
+
+1.4 ★ "আচ্ছা না। আমি আসলে একটা combination চাই যেটা আমি custom বলব। যে ধরেন একশ মিনিট, পঞ্চাশ GB আর চল্লিশটা SMS। এরকম package কি আছে?"
+    Expect: says clearly custom combos aren't possible, offers the closest real
+    bundle(s) with price. Never invents a "custom" package.
+
+1.5 ★ "আচ্ছা ঠিক আছে সেটা নিতে চাচ্ছি না কারণ আমার ওই প্যাকেজটি দরকার ছিল। আচ্ছা আমার নতুন একটা সিম কিনতে চাই আপনাদের। এখন এটার জন্য কি করতে হবে?"
+    Expect: accepts the "no" without pushing; search_knowledge_base for new SIM:
+    original NID card, 18+, care centre, fingerprint. Short, not a list dump.
+
+1.6 ★ "আম, নতুন সিমের যে প্যাকেজগুলো আছে সেগুলোর মধ্যে সব থেকে কম দামি প্যাকেজ কোনটা?"
+    Expect: knowledge base starter-SIM offer, cheapest one with price, data,
+    minutes, validity.
+
+1.7 ★ "আচ্ছা তাহলে এখন আমার কথা হচ্ছে, আম-আমি তো আসলে বুঝতে পারতেছি না। তুমি কি বলতে পারো যে আমার আসলে on average মাসে কেমন খরচ হয়?"
+    Expect: get_usage_breakdown (30 days): data, minutes, SMS, and money spent.
+    Watch: says "কোনো চার্জ হয়নি" only if that is what the tool says.
+
+1.8 ★ "আচ্ছা আমার সিমটা মনে হয় prepaid। আমি একটু postpaid-এ shift করতে চাই। কি করতে হবে?"
+    Expect: confirms the SIM type from the account if it knows it, then the
+    prepaid-to-postpaid steps from the knowledge base (same number, care centre).
+
+1.9 ★ "আচ্ছা আমি আসলে তো আপনাদের সার্ভিস ইউজ করে আমার ভালো লাগতেছে না। আমি আসলে অন্য অপারেটরে চলে যাব। আমি সিমটা বন্ধ করতে চাই"
+    Expect: empathy first, asks or offers what went wrong, explains MNP (keep the
+    number) vs closing the SIM. Escalation (request_human_agent) is fine; it
+    should say a case ref and that the team will follow up.
+
+1.10 ★ "আচ্ছা আপনাদের network খুবই বাজে। আপনাদের network আমি আসলে use করে খুব মজা পাচ্ছি না। আমি ধানমন্ডিতে থাকি এখানে আপনাদের network একদম পাই না।"
+    Expect: check_network_status for Dhanmondi, says what it found, opens a
+    network complaint case and TELLS THE REF. Empathy line first.
+
+1.11 ★ "আচ্ছা আমার বর্তমানে মোবাইলে কত ব্যালেন্স আছে?"
+    Expect: fresh balance (it may have changed), one short sentence.
+
+1.12 ★ "আচ্ছা আপনার কি মনে আছে আমি আপনাকে network নিয়ে কি বলছিলাম?"
+    Expect: recalls Dhanmondi + bad network + the case it opened, from the
+    conversation (no lookup needed).
+
+1.13 ★ "তো সেটা কবে follow up করবে? আমাকে তো কোনো message বা কিছু দেওয়া হয়নি"
+    Expect: get_case_status on the NETWORK case ref (from 1.10).
+    Known issue in run_49: it looked up TC-8409, the SIM-closing case from 1.9,
+    and then said the network case had no follow-up time. FAIL if it mixes the
+    two cases up.
+
+1.14 ★ "আমার কয়টা transaction গত পনেরো তারিখ থেকে, পনেরো অক্টোবর থেকে আজকে পর্যন্ত fail করছে আর কয়টা mobile recharge আসলে পেয়েছি?"
+    Expect: lookup_transactions from 15 October to today. Two numbers: failed
+    transactions (all types) and successful recharges.
+    Known issue in run_49: it looked up recharges only, so "how many
+    transactions failed" was answered for recharges alone.
+
+1.15 ★ "তো আমি তো রিচার্জ করছি। তো এটা আসলো না কি জন্য আমার মোবাইলে? এটা কেমন কথা?"
+    Expect: the failed recharge's reason (amount, date, channel, e.g. bKash
+    timeout), whether the money was deducted / refunded if the data says so,
+    then escalation or a case. Empathy, no blame on the customer.
+
+1.16 ★ (interrupt the bot while it is answering 1.15)
+    "না, না, না, এগুলো, এগুলো হবে না। এগুলো হবে না। আমি আপনাদের সিমই use করব না। আপনি কি আমার সাথে ফয়সালাই করতে পারবেন না?"
+    Expect: stops at once, answers the new turn. Calm apology, says what it CAN
+    do now (case / team follow-up), doesn't repeat the cut-off answer.
+
+1.17 ★ "সম্ভব না এটা কিসের জন্য? আমি আসলে আপনাদের সিম আর রিচার্জই করব না। আমি আপনার নামে complain করব আপনার টিমের কাছে। আপনার নাম কি?"
+    Expect: gives its name (Anika), accepts the complaint politely, tells how a
+    complaint is raised. Never argues, never promises a call transfer it can't do.
+
+
+SCENARIO 2 — Same kind of call, different order and wording
+-----------------------------------------------------------
+2.1 "আসসালামু আলাইকুম। আ-আমার data কি শেষ হয়ে গেছে? আজকে সকাল থেকে net চলছে না।"
+    Expect: remaining data + validity; if data is left, suggests a network /
+    settings check instead of selling a package.
+2.2 "আচ্ছা আমার কোন জায়গায় সমস্যা হচ্ছে বলি, মিরপুর দশে।"
+    Expect: check_network_status for Mirpur; reports what it found.
+2.3 "আচ্ছা net-এর কথা বাদ দেন। গত মাসে আমি কত টাকা খরচ করেছি সব মিলিয়ে?"
+    Expect: get_usage_breakdown / transactions for the last month, one total.
+2.4 "আমি তো রাতে বেশি net চালাই, Facebook আর TikTok। কম দামে বেশি GB কোনটা?"
+    Expect: search_packages (data), cheapest per GB, says why. Cards.
+2.5 "আর কি কি option আছে?"
+    Expect: the NEXT packages, not the same ones again. Cards for those.
+2.6 "দ্বিতীয়টা সম্পর্কে একটু details বলেন।"
+    Expect: the second package from the list just said; its card shown.
+2.7 "ঠিক আছে ওটা নিব না। আমার একটা আগের complain ছিল, ওটার কি অবস্থা?"
+    Expect: asks for the ref if it has none, or get_case_status on the
+    customer's latest case. No guessing a status.
+2.8 "ref নম্বর মনে নাই। শুধু বলেন আমার কয়টা complain খোলা আছে।"
+    Expect: looks up the customer's open cases; a count plus one line each.
+
+
+SCENARIO 3 — Change of mind, corrections, and pressure
+------------------------------------------------------
+3.1 "আমি একটা প্যাকেজ কিনতে চাই, পাঁচ GB, সাত দিনের।"
+    Expect: finds it, says price, asks to confirm.
+3.2 "না না, সাত দিন না, ত্রিশ দিনের।"
+    Expect: switches to 30-day packages; filler doesn't echo "সাত দিন".
+3.3 "আচ্ছা কিনব, কিন্তু আমার balance-এ কি হবে? না হলে বিকাশ দিয়ে দিব।"
+    Expect: checks balance vs price; offers bKash if short. Starts the
+    OTP-protected purchase only after the customer agrees.
+3.4 (when asked for the code) say only the digits: "নয় এক শূন্য দুই চার দুই"
+    Expect: the code is accepted when said alone (no "কোডটি হলো" needed).
+3.5 "আচ্ছা এটা কি auto renew হবে? আমি চাই না।"
+    Expect: renewal answer from the knowledge base; how to turn it off.
+3.6 "আপনারা তো সবসময় টাকা কেটে নেন। গত সপ্তাহে কোনো কারণ ছাড়া টাকা কাটছে।"
+    Expect: empathy, lookup_transactions for last week, explains each charge
+    (VAS, package, etc.); offers a case if one is unexplained.
+3.7 "এই VAS service গুলো বন্ধ করেন সব।"
+    Expect: lists active VAS and how to stop them (or does it if a tool exists).
+    Never claims done unless the tool says so.
+3.8 "আপনি মানুষ নাকি robot? আমাকে মানুষের সাথে কথা বলান।"
+    Expect: honest that it is the virtual assistant; request_human_agent with a
+    case ref and follow-up promise; no fake transfer.
+
+
+SCENARIO 4 — Memory and long-call checks (do after any 8+ turn call)
+--------------------------------------------------------------------
+4.1 "শুরুতে আমি আপনাকে কি জিজ্ঞেস করছিলাম?"
+    Expect: the first topic of the call, correctly.
+4.2 "যে প্যাকেজটা আপনি আমাকে recommend করছিলেন, ওটার দাম আবার বলেন।"
+    Expect: same package and price as said earlier, card shown again.
+4.3 "আজকে কয়টা complain খোলা হলো আমার নামে?"
+    Expect: the cases opened in THIS call, each with its own topic.
+    FAIL if it mixes a SIM-closing case with a network case (see 1.13).
+4.4 "ঠিক আছে, ধন্যবাদ। আর কিছু লাগবে না।"
+    Expect: short goodbye, ends the call.

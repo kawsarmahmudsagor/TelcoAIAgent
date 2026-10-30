@@ -132,41 +132,27 @@ Return JSON only: {"text": "..."}"""
 
 # For quick_filler_llm: the small model writes every filler line. Rules only, no
 # example lines, so the lines don't drift toward a few fixed ones.
-_CARE_FILLER_SYSTEM = f"""You are a mobile operator's customer care agent on a phone call.
-The customer just said something that needs a lookup or an account action. Another assistant
-will give the real answer in a moment. You say the one short line a good care agent says
-first, so the customer isn't left in silence. The line is spoken aloud.
+_CARE_FILLER_SYSTEM = f"""You are a mobile operator's care agent on a phone call. The customer's
+request needs a lookup or an account action; another assistant gives the real answer next.
+Say the one short spoken line a good care agent says first.
 
-How a good care agent sounds:
-- They react to what this customer just said, not with a stock phrase.
-- They show they understood the request: name what they will check, in the customer's own
-  terms (their area, the package size or validity, the amount they said, their balance).
-- A complaint or a problem gets a little empathy first, then what they will look into.
-- A pick from a list, a correction or a follow-up gets a calm acknowledgement of it.
-- A recharge, purchase or other action gets a calm "I'll take care of it" kind of line,
-  never a claim that it is done.
-- Warm and natural, never robotic, never over-apologetic, never pushy.
-- One sentence, or two very short ones, at most {CARE_FILLER_MAX_WORDS} words.
-- Vary how lines open and end; never repeat or echo the shape of a line already said.
+- React to what this customer said, naming what you'll check in their own terms (area,
+  package size or validity, amount, balance). No stock phrases.
+- Problem or complaint: a little empathy, then what you'll look into. Pick, correction or
+  follow-up: a calm acknowledgement. Action (recharge, purchase): "I'll take care of it",
+  never that it's done.
+- Warm, natural, not robotic, over-apologetic or pushy. One sentence or two very short,
+  max {CARE_FILLER_MAX_WORDS} words. Don't echo the shape of lines already said.
 
-Language:
-- Use the language of the customer's newest message.
-- For Bangla or Banglish, write modern spoken Bangla in Bengali script, polite with আপনি.
-- Use the English words people say in Bangla: চেক, প্যাকেজ, ব্যালেন্স, রিচার্জ, অফার,
-  নেটওয়ার্ক, কমপ্লেইন, সরি, প্লিজ, ওকে.
-- Say "প্যাকেজ", never "প্যাক"; say "দাম", not "প্রাইস"; say "বুঝতে পেরেছি", not "বুঝতে পারছি".
-- No literary or bookish words (মিলিয়ে, ঘেঁটে, খুলছি, অনুগ্রহপূর্বক) and no casual slang.
-- Never a vague "বিষয়টা" or "ব্যাপারটা": name what you check, or leave it out.
-- The operator's name is written "telco", never "telco.".
+Language: match the customer's newest message. Bangla/Banglish: modern spoken Bangla,
+Bengali script, আপনি. Use চেক, প্যাকেজ, ব্যালেন্স, রিচার্জ, অফার, নেটওয়ার্ক, কমপ্লেইন, সরি,
+প্লিজ, ওকে. Say প্যাকেজ not প্যাক, দাম not প্রাইস, বুঝতে পেরেছি not বুঝতে পারছি, স্লো not ধীর.
+No bookish words (মিলিয়ে, ঘেঁটে, খুলছি, অনুগ্রহপূর্বক), no slang, no vague বিষয়টা/ব্যাপারটা.
+The operator is "telco", never "telco.".
 
-Safety:
-- Never state a price, number, balance, validity, availability, policy or result.
-- Only echo numbers or amounts the customer said.
-- Never say a recharge, payment, purchase, activation, complaint or message is done,
-  started or successful.
-- Never answer the question itself; the other assistant does that.
-- Never promise an outcome or say a person is joining.
-- No greeting, no question, no emoji.
+Never: state a price, number, balance, validity, availability, policy or result; echo a
+number the customer didn't say; say anything is done, started or successful; answer the
+question; promise an outcome or a person joining; greet, ask, or use emoji.
 
 Return JSON only: {{"text": "..."}}"""
 
@@ -324,9 +310,9 @@ _GENERIC_EN = (*_CHECKING_EN, *_UNDERSTANDING_EN)
 # word, and দেখছি is in one shape at most.
 _ECHO_BN: dict[str, tuple[str, ...]] = {
     "search": (
-        "জি, {x} খুঁজে আপনাকে জানাচ্ছি।",
-        "আচ্ছা, {x} খুঁজে আপনাকে তথ্য দিচ্ছি",
-        "ঠিক আছে, {x} খুঁজে আপনাকে দেখাচ্ছি।",
+        "জি, আমি {x} চেক করছি।",
+        "আচ্ছা, {x} চেক করছি।",
+        "এক সেকেন্ড, {x} খুঁজছি।",
         "একটু সময় দিন, {x} খুঁজছি।",
     ),
     "lookup": (
@@ -338,7 +324,7 @@ _ECHO_BN: dict[str, tuple[str, ...]] = {
     ),
     "status": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "ঠিক আছে, {x_of} স্ট্যাটাসটা যাচাই করছি",
+        "এক সেকেন্ড, {x_of} স্ট্যাটাসটা যাচাই করছি",
         "আচ্ছা, {x_of} আপডেটটা দেখে আপনাকে জানাচ্ছি।",
         "একটু সময় দিন, {x_of} স্ট্যাটাস চেক করছি।",
     ),
@@ -408,17 +394,17 @@ _TOPIC_X: dict[str, tuple[str, str, str]] = {
 _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
     "data": ("আপনার জন্য কী কী ডাটা প্যাকেজ আছে, দেখে জানাচ্ছি।",),
     "voice": ("কোন কোন মিনিট প্যাকেজ আছে, দেখে আপনাকে বলছি।",),
-    "bundle": ("ডাটা আর মিনিট একসাথে কী আছে, খুঁজে জানাচ্ছি।",),
+    "bundle": ("জি, ডাটা আর মিনিট একসাথে কী আছে, আমি চেক করছি।",),
     "sms": ("কোন কোন এসএমএস প্যাকেজ আছে, চেক করে বলছি।",),
-    "pack": ("আপনার জন্য কোন প্যাকেজগুলো আছে, খুঁজে জানাচ্ছি।",),
+    "pack": ("জি, আপনার জন্য কোন প্যাকেজগুলো আছে, আমি চেক করছি।",),
     "balance": ("একটু সময় দিন, ব্যালেন্সটা দেখে আপনাকে বলছি।",),
     "usage": ("কতটুকু ইউজ হয়েছে, চেক করে আপনাকে জানাচ্ছি।",),
     "recharge": ("রিচার্জটা ঠিকমতো হয়েছে কি না, দেখে জানাচ্ছি।",),
     "offer": ("আপনার নম্বরে কী কী অফার আছে, দেখে বলছি।",),
     "points": ("কত পয়েন্ট জমেছে, চেক করে আপনাকে জানাচ্ছি।",),
-    "transactions": ("কীসে কেটেছে, খুঁজে আপনাকে বলছি।",),
+    "transactions": ("জি, কীসে কেটেছে, আমি চেক করছি।",),
     "network": ("আপনার এলাকায় নেটওয়ার্ক কেমন, দেখে জানাচ্ছি।",),
-    "care": ("ঠিক আছে, আপনার কাছের কাস্টমার কেয়ার খুঁজছি।",),
+    "care": ("এক সেকেন্ড, আপনার কাছের কাস্টমার কেয়ার খুঁজছি।",),
     "complaint": ("সরি, সমস্যাটা চেক করে আপনাকে জানাচ্ছি।", "বুঝতে পেরেছি, কী করা যায় দেখে বলছি।"),
     "policy": ("আচ্ছা, এটার নিয়মটা দেখে আপনাকে জানাচ্ছি।",),
 }
@@ -526,7 +512,7 @@ _POINTS_EARN_EN = (
 _POINTS_REDEEM_BN = (
     "আচ্ছা, পয়েন্ট রিডিমের অপশনগুলো দেখছি।",
     "জি, পয়েন্ট দিয়ে কী কী নিতে পারবেন, দেখে বলছি।",
-    "ঠিক আছে, পয়েন্ট কীভাবে ব্যবহার করবেন দেখছি",
+    "এক সেকেন্ড, পয়েন্ট কীভাবে ব্যবহার করবেন দেখছি",
     "একটু সময় দিন, রিওয়ার্ডগুলো দেখে আপনাকে বলছি।",
 )
 _POINTS_REDEEM_EN = (
@@ -597,7 +583,7 @@ _MORE_BN = (
     "জি, আরও কিছু অপশন দেখে আপনাকে জানাচ্ছি।",
     "আচ্ছা, অন্য বিকল্পগুলোও একটু দেখে বলছি।",
     "আচ্ছা, আর কী কী অপশন আছে, একটু দেখে নিই।",
-    "ঠিক আছে, আরও কিছু বিকল্প খুঁজে আপনাকে জানাচ্ছি।",
+    "এক সেকেন্ড, আরও কিছু বিকল্প চেক করছি।",
     "আচ্ছা, এই অপশনগুলো ছাড়াও আর কী আছে, দেখছি।",
 )
 _MORE_EN = (
@@ -1313,6 +1299,18 @@ _NEEDS_TOOL_RE = re.compile(
     r"\b(?:koto|keno|kivabe|kete|takar)\b",
     re.I,
 )
+
+
+def early_filler(text: str, userdata: object, config: ResolvedAgentConfig) -> bool:
+    """Whether a model-written line (quick_filler_llm) can start on the final
+    transcript, before Jev answers: the words alone route the turn to a filler
+    (route). The line is spoken only if Jev's answer routes it there too.
+    Template lines are instant, so they never start early."""
+    if not (config.quick_reply_enabled and config.quick_filler and config.quick_filler_llm):
+        return False
+    if getattr(userdata, "pending_action", None) or getattr(userdata, "pending_case", None):
+        return False
+    return not broad_package_ask(text) and bool(_NEEDS_TOOL_RE.search(text))
 
 
 def route(

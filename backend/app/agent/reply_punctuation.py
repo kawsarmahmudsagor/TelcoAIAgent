@@ -8,7 +8,8 @@ pack codes and references (D8-7D, TC-2048), and a dash between two digits is a
 range (২–৩), kept as a hyphen.
 
 The agent always says "package" (প্যাকেজ), never "pack" (প্যাক): the prompt
-says so, but a tool's text or a KB passage can still lead the model to it.
+says so, but a tool's text or a KB passage can still lead the model to it. A
+slow connection is "স্লো", the word people say, not the bookish ধীর.
 """
 
 import re
@@ -28,6 +29,10 @@ _PACK_BN_RE = re.compile("প্যাক(?!েজ|েট|িং)")
 _PACK_EN_RE = re.compile(r"\b(pack)(s?)\b", re.IGNORECASE)
 
 
+# ধীর, ধীরে, ধীরগতি(র/তে): স্লো. "ধীরে ধীরে" (gradually) stays.
+_SLOW_BN_RE = re.compile(r"(?<!ধীরে )ধীর(?!ে\s*ধীরে)(?:\s*গতি(?:র|তে)?|ে)?")
+
+
 def _package(m: re.Match[str]) -> str:
     word, plural = m.group(1), m.group(2)
     if word.isupper():
@@ -39,6 +44,7 @@ def clean_reply_text(text: str) -> str:
     text = _RANGE_RE.sub("-", text)
     text = _PACK_BN_RE.sub("প্যাকেজ", text)
     text = _PACK_EN_RE.sub(_package, text)
+    text = _SLOW_BN_RE.sub("স্লো", text)
     return _BREAK_RE.sub(", ", text)
 
 
@@ -46,7 +52,9 @@ _TAIL_RE = re.compile(r"[\s—–;]*\Z")
 # The start of a "pack" whose end is still to come: "প্যাক" may yet be
 # প্যাকেজ, "pack" may yet be "package".
 _PARTIAL_PACK_RE = re.compile(
-    r"(?:(?<![A-Za-z])p(?:a(?:c(?:k(?:s)?)?)?)?|প(?:্(?:য(?:া(?:ক(?:ে|ি)?)?)?)?)?)\Z",
+    r"(?:(?<![A-Za-z])p(?:a(?:c(?:k(?:s)?)?)?)?|প(?:্(?:য(?:া(?:ক(?:ে|ি)?)?)?)?)?"
+    # and a ধীর whose end ("ে", "গতি", "ধীরে ধীরে") is still to come
+    r"|ধ(?:ী(?:র(?:ে)?)?)?)\Z",
     re.IGNORECASE,
 )
 

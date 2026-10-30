@@ -268,7 +268,7 @@ def test_a_filler_ready_before_the_reply_is_spoken_first():
 
 def test_a_filler_after_the_reply_started_is_dropped():
     async def go():
-        g = _gate(prefetcher=None, compose_s=0.3)
+        g = _gate(prefetcher=None, compose_s=0.3, quick_filler_llm=False)
         message = _msg()
         assert await _turn(g, message) is True
         pending = g.gate.pending_filler
@@ -278,6 +278,37 @@ def test_a_filler_after_the_reply_started_is_dropped():
         assert g.gate.pending_filler is None and g.gate.filler_segment() is False
         await asyncio.sleep(0)
         assert pending.task.cancelled()
+
+    asyncio.run(go())
+
+
+def test_a_late_model_written_filler_finishes_unsaid_and_logs_by_how_much():
+    async def go():
+        g = _gate(prefetcher=None, compose_s=0.3)
+        events: list[str] = []
+        g.quick.on_event = events.append
+        message = _msg()
+        assert await _turn(g, message) is True
+        pending = g.gate.pending_filler
+        out = await _collect(g.gate.with_filler(_stream((0.05, "answer")), message.id))
+        assert out == ["answer"]
+        await pending.task
+        await asyncio.sleep(0)  # the done callback
+        assert g.stored == [] and g.quick.said == []
+        assert any(e.startswith("filler: lost by ") and "line not said" in e for e in events)
+
+    asyncio.run(go())
+
+
+def test_a_model_written_filler_in_time_logs_a_win():
+    async def go():
+        g = _gate(prefetcher=None, compose_s=0.05)
+        events: list[str] = []
+        g.quick.on_event = events.append
+        message = _msg()
+        assert await _turn(g, message) is True
+        await _collect(g.gate.with_filler(_stream((0.3, "answer")), message.id))
+        assert any(e.startswith("filler: won, line ready ") for e in events)
 
     asyncio.run(go())
 
@@ -709,3 +740,57 @@ def test_llm_node_puts_the_filler_before_the_main_reply(monkeypatch):
 
     out = asyncio.run(go())
     assert out[0] == _LINE and isinstance(out[1], FlushSentinel) and out[2] == "main answer"
+
+
+# ---- a model-written filler started on the final transcript (early_filler) ----
+
+_TOOL_TEXT = "আমার ব্যালেন্স কত আছে?"
+
+
+def test_a_model_written_filler_starts_before_jev_and_serves_the_turn():
+    async def go():
+        g = _gate(Judgement(0.9, "none", 0.9), prefetcher=None, compose_s=0.05)
+        events: list[str] = []
+        g.quick.on_event = events.append
+        message = _msg(_TOOL_TEXT)
+        assert await _turn(g, message) is True
+        # One line, started before Jev answered (so without Jev's topic), reused by the turn.
+        assert g.composed == [_TOOL_TEXT] and g.topics == [None]
+        assert "filler: started on the final transcript, before Jev" in events
+        assert g.gate.pending_filler is not None
+
+    asyncio.run(go())
+
+
+def test_an_early_filler_is_dropped_when_jev_routes_none():
+    async def go():
+        g = _gate(Judgement(0.1, "none", 0.9), prefetcher=None, compose_s=0.2)
+        events: list[str] = []
+        g.quick.on_event = events.append
+        _heard(g.gate, _TOOL_TEXT)
+        await asyncio.sleep(0.05)
+        assert g.composed == [_TOOL_TEXT]
+        assert "filler: started before Jev, dropped (Jev routes no filler)" in events
+        assert g.gate._fillers == {}
+
+    asyncio.run(go())
+
+
+def test_a_template_filler_never_starts_before_jev():
+    async def go():
+        g = _gate(Judgement(0.1, "none", 0.9), prefetcher=None, quick_filler_llm=False)
+        _heard(g.gate, _TOOL_TEXT)
+        await asyncio.sleep(0.05)
+        assert g.composed == []
+
+    asyncio.run(go())
+
+
+def test_no_early_filler_for_words_that_need_no_tool():
+    async def go():
+        g = _gate(Judgement(0.1, "none", 0.9), prefetcher=None)
+        _heard(g.gate, "আচ্ছা ঠিক আছে, ধন্যবাদ")
+        await asyncio.sleep(0.05)
+        assert g.composed == []
+
+    asyncio.run(go())

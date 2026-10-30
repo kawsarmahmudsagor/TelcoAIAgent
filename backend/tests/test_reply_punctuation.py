@@ -70,3 +70,20 @@ def test_chat_chunks_are_cleaned_and_a_trailing_dash_dropped():
         "Sure",
         ", one moment",
     ]
+
+
+def test_slow_is_slow_not_dhir():
+    # The user's word: "স্লো" for a slow connection, not the bookish ধীর.
+    assert clean_reply_text("চাইলে ধীর বা বন্ধ নেটের সমস্যায় একটা কেস খুলে দিতে পারি।") == (
+        "চাইলে স্লো বা বন্ধ নেটের সমস্যায় একটা কেস খুলে দিতে পারি।"
+    )
+    assert clean_reply_text("নেট ধীরে চলছে, ধীরগতির নেটওয়ার্ক, ধীর গতিতে") == (
+        "নেট স্লো চলছে, স্লো নেটওয়ার্ক, স্লো"
+    )
+    # "Gradually" keeps its words.
+    assert clean_reply_text("ধীরে ধীরে ঠিক হয়ে যাবে") == "ধীরে ধীরে ঠিক হয়ে যাবে"
+
+
+def test_a_dhir_split_across_chunks_is_still_slow():
+    assert "".join(_clean(["নেট ধী", "র চলছে"])) == "নেট স্লো চলছে"
+    assert "".join(_clean(["নেট ধীরে", " ধীরে ঠিক হবে"])) == "নেট ধীরে ধীরে ঠিক হবে"

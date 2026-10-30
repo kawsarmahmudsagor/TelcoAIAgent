@@ -747,9 +747,10 @@ def _build_session(
             audio_cache=audio_cache.get_audio_cache(),
             on_event=timing.quick if timing is not None else None,
         )
-    # The shortlist cards wait for the main model's first words, so they don't
-    # appear while a filler line plays.
-    userdata.defer_cards = quick is not None
+    # Cards wait for the main model's reply (app.agent.cards), so they don't
+    # appear while a filler line plays, and a package card can follow what the
+    # reply names.
+    userdata.defer_cards = True
     # Quick replies route on Jev's lookup answer, so they ask for it too.
     routed = _router_enabled(settings, config) or quick is not None
     # Fillers pick their lines by what the turn is about: Jev says so in the same request.

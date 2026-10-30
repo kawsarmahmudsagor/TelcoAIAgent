@@ -153,6 +153,10 @@ class Settings(BaseSettings):
     # safety for a hung connection: a filler is spoken whenever it is ready before
     # the reply's first words, however long that takes, and dropped after.
     filler_timeout_ms: int = Field(10000, ge=100, le=30000)
+    # With template fillers (quick_filler_llm off), the reply waits this long
+    # (a random length in the range) after the line, even when it is ready.
+    filler_pause_min_ms: int = Field(1000, ge=0, le=5000)
+    filler_pause_max_ms: int = Field(1500, ge=0, le=5000)
     # A filler takes Jev's word for what the turn is about when Jev is at least
     # this sure; else the topic comes from the customer's words (quick_reply._TOPIC_RES).
     filler_topic_min_p: float = Field(0.7, ge=0.0, le=1.0)

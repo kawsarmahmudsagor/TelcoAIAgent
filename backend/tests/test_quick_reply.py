@@ -9,6 +9,7 @@ import unicodedata
 from collections import Counter
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -878,7 +879,7 @@ def test_asking_for_more_detail_is_not_asking_for_more_options(utterance):
 
 @pytest.mark.parametrize("words", ["আর কি কি options available আছে?", "হ্যাঁ, আর কী কী প্যাকেজ আছে?"])
 def test_what_else_is_there_with_words_between_is_more_options(words):
-    lines = set(_fillers(words, "packages", n=50, avoid=["জি, ডাটা প্যাকেজগুলো খুঁজে আপনাকে জানাচ্ছি।"]))
+    lines = set(_fillers(words, "packages", n=50, avoid=["জি, আমি ডাটা প্যাকেজগুলো চেক করছি।"]))
     assert lines <= set(quick_reply._MORE_BN), lines
 
 
@@ -894,7 +895,7 @@ def test_aro_spelt_with_o_kar_is_more_options():
         (
             "সাত দিনের তিন জিবির ডাটা প্যাকেজ আছে?",
             "packages",
-            "জি, সাত দিনের তিন জিবির ডাটা প্যাকেজগুলো খুঁজে আপনাকে জানাচ্ছি।",
+            "জি, আমি সাত দিনের তিন জিবির ডাটা প্যাকেজগুলো চেক করছি।",
         ),
     ],
 )
@@ -967,3 +968,17 @@ def test_runtime_compose_follows_the_switch(llm_on):
         assert asked[0]["messages"][0]["content"] == quick_reply._CARE_FILLER_SYSTEM
     else:
         assert asked == []  # a template line, no model call
+
+
+def test_early_filler_only_on_the_model_written_path():
+    config = resolve(None, Settings(_env_file=None))
+    config.quick_reply_enabled = True
+    userdata = SimpleNamespace()
+    assert quick_reply.early_filler("আমার ব্যালেন্স কত?", userdata, config)
+    assert not quick_reply.early_filler("ধন্যবাদ", userdata, config)
+    config.quick_filler_llm = False
+    assert not quick_reply.early_filler("আমার ব্যালেন্স কত?", userdata, config)
+    config.quick_filler_llm = True
+    assert not quick_reply.early_filler(
+        "আমার ব্যালেন্স কত?", SimpleNamespace(pending_action=object()), config
+    )

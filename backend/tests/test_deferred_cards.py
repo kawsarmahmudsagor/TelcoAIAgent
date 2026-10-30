@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from livekit.agents import llm
 
 from app.agent.gated_agent import GatedAgent
-from app.agent.cards import flush_pending_card, send_card
+from app.agent.cards import flush_pending_card, reply_speaking, send_card
 from app.agent.userdata import SessionUserdata
 
 _TOPIC = "telco.test"
@@ -93,13 +93,30 @@ def test_the_latest_card_replaces_a_held_one():
     asyncio.run(go())
 
 
-def test_cards_come_with_the_first_words_of_the_main_reply():
+def test_cards_come_when_the_reply_starts_speaking():
+    # Not with the reply's text (a filler line and its pause may still be
+    # playing): when its own speech starts.
     async def go():
         userdata = _userdata(defer=True)
         await send_card(userdata, _TOPIC, _CARDS)
-        # a tool-call step has no words: nothing yet; the words bring the cards
-        seen = await _run(userdata, _chunk(tool_call=True), _chunk(""), _chunk("এই"), _chunk(" যে"))
-        assert seen == [0, 0, 1, 1]
+        seen = await _run(userdata, _chunk(""), _chunk("এই"), _chunk(" যে"))
+        assert seen == [0, 0, 0] and _sent(userdata) == []
+        await reply_speaking(userdata)
+        assert len(_sent(userdata)) == 1
+        await reply_speaking(userdata)  # a later segment: nothing more
+        assert len(_sent(userdata)) == 1
+
+    asyncio.run(go())
+
+
+def test_a_reply_already_speaking_gets_its_cards_when_its_text_ends():
+    async def go():
+        userdata = _userdata(defer=True)
+        await send_card(userdata, _TOPIC, _CARDS)
+        agent = SimpleNamespace(session=SimpleNamespace(userdata=userdata))
+        async for _ in GatedAgent._cards_with_speech(agent, _stream(_chunk("এই"))):
+            await reply_speaking(userdata)  # speech started before the text ended
+            assert _sent(userdata) == []
         assert len(_sent(userdata)) == 1
 
     asyncio.run(go())

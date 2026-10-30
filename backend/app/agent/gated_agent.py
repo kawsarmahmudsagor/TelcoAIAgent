@@ -31,6 +31,7 @@ transcripts entirely: no barge-in, no queued answer, no turn accepted.
 import asyncio
 import json
 import logging
+import random
 import re
 import time
 from collections import deque
@@ -55,7 +56,9 @@ from app.agent import (
     turn_judge,
     voice_level,
 )
+from app.agent.audio_cache import normalize_text
 from app.agent.prefetch import Prefetcher
+from app.agent.tools import packages as package_tools
 from app.agent.quick_reply import QuickReplyRuntime
 from app.agent.turn_gate import GateState, Thresholds, Verdict
 from app.agent.turn_judge import BotState, Exchange, Judgement
@@ -591,6 +594,9 @@ class TurnGateController:
                 judged = self._judge_cached(text, "listening")
                 if self.quick is not None and self.quick.filler:
                     self._cancel_fillers()
+                    if quick_reply.early_filler(text, self.session.userdata, self.quick.config):
+                        self._quick_event("filler: started on the final transcript, before Jev")
+                        self._filler_task(text, None)
                     judged.add_done_callback(lambda task, text=text: self._on_judged(text, task))
                 if self.prefetcher is not None:
                     self.prefetcher.start(text, _recent_exchanges(self.session))
@@ -707,6 +713,7 @@ class TurnGateController:
         await self._publish_user_turn(text)
         self._gate_reply(text)
         await self._after_hook()
+        _start_turn(_userdata(self), text)
         self._route_barge_in(text, judgement)
         self.session.generate_reply(user_input=text, input_modality="audio")
         _log("barge_in_reply", text, p=p, stop=stop)
@@ -743,6 +750,7 @@ class TurnGateController:
             # The turn being answered goes first: its reply is scheduled when its
             # hook returns.
             await self._after_hook()
+            _start_turn(_userdata(self), text)
             self.session.generate_reply(user_input=text, input_modality="audio")
             self._note("answer queued after the current reply")
             _log("queued_reply", text, p=p)
@@ -767,9 +775,8 @@ class TurnGateController:
         text = spoken_digits_in_text(turn_gate.clean_transcript(new_message.text_content or ""))
         if text != new_message.text_content:
             new_message.content = [text]
-        if (userdata := _userdata(self)) is not None:
-            # The package cards show only what this turn asks about.
-            userdata.turn_text = text
+        # The package cards show only what this turn asks about.
+        _start_turn(_userdata(self), text)
         if turn_gate.matches_handled(text, self._answered.text, now - self._answered.at):
             _log("deduped", text)
             raise StopResponse()
@@ -1005,8 +1012,10 @@ class TurnGateController:
     def _filler_spoken(self, message_id: str, text: str, line: str, waited: float) -> None:
         assert self.quick is not None
         self.quick.said.append(line)
-        after = self.clock() - self._final_at if self._final_at is not None else None
+        after = self._since_final()
         _log("filler", text, filler=line, ms=waited * 1000)
+        if self.quick.config.quick_filler_llm and after is not None:
+            self._quick_event(f"filler: won, line ready {after:.2f} s after the final transcript")
         if self.on_filler is not None:
             self.on_filler(line, after, waited)
         if self.on_filler_store is not None:
@@ -1063,8 +1072,7 @@ class TurnGateController:
                 except StopAsyncIteration:
                     return
                 if pending is not None and _has_speech(chunk):
-                    pending.task.cancel()
-                    _log("filler_dropped", pending.text)
+                    self._filler_lost(pending)
                     pending, self.pending_filler = None, None
                 yield chunk
         finally:
@@ -1087,14 +1095,19 @@ class TurnGateController:
             return
         judgement = task.result()
         if judgement.p is not None and judgement.p < self.config.thresholds.drop_p:
+            self._drop_early_filler(text)
             return
         route = quick_reply.route(
             judgement, self.session.userdata, self.quick.config, self.quick.settings, text=text
         )
         if route == "filler":
             self._filler_task(text, judgement)
+        else:
+            self._drop_early_filler(text)
 
-    def _filler_task(self, text: str, judgement: Judgement) -> asyncio.Task[str | None]:
+    def _filler_task(self, text: str, judgement: Judgement | None) -> asyncio.Task[str | None]:
+        """judgement: None for a line started before Jev answers (early_filler),
+        which then serves the turn without Jev's lookup and topic."""
         assert self.quick is not None
         key = turn_gate.normalize(text)
         task = self._fillers.get(key)
@@ -1102,7 +1115,7 @@ class TurnGateController:
             task = asyncio.ensure_future(
                 self.quick.compose(
                     text,
-                    judgement.lookup,
+                    judgement.lookup if judgement is not None else None,
                     _recent_exchanges(self.session),
                     topic=quick_reply.judged_topic(judgement, self.quick.settings),
                 )
@@ -1110,11 +1123,60 @@ class TurnGateController:
             self._fillers[key] = task
         return task
 
+    def _drop_early_filler(self, text: str) -> None:
+        """A line started before Jev (early_filler) for a turn Jev doesn't route
+        to a filler: never spoken."""
+        task = self._fillers.pop(turn_gate.normalize(text), None)
+        if task is not None:
+            task.cancel()
+            self._quick_event("filler: started before Jev, dropped (Jev routes no filler)")
+
+    def _quick_event(self, text: str) -> None:
+        if self.quick is not None and self.quick.on_event is not None:
+            self.quick.on_event(text)
+
+    def _since_final(self) -> float | None:
+        return self.clock() - self._final_at if self._final_at is not None else None
+
+    def _filler_lost(self, pending: _PendingFiller) -> None:
+        """The reply's first words came before the line. A template line is
+        cancelled; a model-written one is left to finish, unspoken, so the run
+        log shows by how much it lost."""
+        _log("filler_dropped", pending.text)
+        if self.quick is None or not self.quick.config.quick_filler_llm:
+            pending.task.cancel()
+            return
+        final_at, reply_at = self._final_at, self.clock()
+        since = (
+            f"{reply_at - final_at:.2f} s after the final transcript"
+            if final_at is not None
+            else "first"
+        )
+
+        def done(task: asyncio.Task[str | None]) -> None:
+            if task.cancelled():
+                self._quick_event(f"filler: lost, reply's first words {since}; line never finished")
+            elif _filler_line(task) is not None:
+                late = (self.clock() - reply_at) * 1000
+                self._quick_event(
+                    f"filler: lost by {late:.0f} ms, reply's first words {since}; line not said"
+                )
+            else:
+                self._quick_event(f"filler: lost, reply's first words {since}; no line came")
+
+        pending.task.add_done_callback(done)
+
     def _cancel_fillers(self) -> None:
         for task in self._fillers.values():
             task.cancel()
         self._fillers.clear()
         self.pending_filler = None
+
+    def filler_speaking(self) -> bool:
+        """Whether the speech now playing is the filler line said on its own
+        (_play_filler), not the reply."""
+        handle = self._filler_handle
+        return handle is not None and self.session.current_speech is handle
 
     def _filler_playing(self) -> bool:
         handle = self._filler_handle
@@ -1242,6 +1304,53 @@ def _filler_line(task: asyncio.Task[str | None]) -> str | None:
     return task.result()
 
 
+def _filler_pause(quick: QuickReplyRuntime | None, text: str) -> float:
+    """Seconds of silence after `text`: 1 to 1.5 s (the settings) when it is
+    the template filler line just said, so the reply seems checked before it
+    comes; none after a model-written line or anything else."""
+    if quick is None or quick.config.quick_filler_llm or not quick.said:
+        return 0.0
+    if normalize_text(text) != normalize_text(quick.said[-1]):
+        return 0.0
+    low, high = quick.settings.filler_pause_min_ms, quick.settings.filler_pause_max_ms
+    pause = random.uniform(min(low, high), max(low, high)) / 1000
+    if quick.on_event is not None:
+        quick.on_event(f"filler: {pause:.2f} s pause before the reply")
+    return pause
+
+
+def _silence(seconds: float, sample_rate: int, num_channels: int) -> list[rtc.AudioFrame]:
+    """`seconds` of 16-bit silence in 100 ms frames."""
+    frames = []
+    left = int(seconds * sample_rate)
+    while left > 0:
+        n = min(left, sample_rate // 10)
+        frames.append(rtc.AudioFrame(bytes(n * num_channels * 2), sample_rate, num_channels, n))
+        left -= n
+    return frames
+
+
+def _start_turn(userdata, text: str) -> None:
+    """A new customer turn: the next package cards are about it, and none has
+    been sent for it yet. Every path a turn is answered on starts one: the gate's
+    own replies (barge-ins, queued answers) skip on_user_turn_completed."""
+    if userdata is not None:
+        userdata.turn_text = text
+        userdata.turn_card_codes = set()
+        # A card held for a reply that was cut off before it spoke is stale.
+        userdata.pending_card = None
+
+
+async def _reply_cards(userdata, text: str) -> None:
+    """The package card for a finished reply; never fails the reply."""
+    if userdata is None:
+        return
+    try:
+        await package_tools.publish_reply_cards(userdata, text)
+    except Exception:
+        logger.exception("could not send the reply's package cards")
+
+
 def _has_speech(chunk: Any) -> bool:
     """Whether a reply-stream item carries words for the TTS (not a tool call)."""
     if isinstance(chunk, str):
@@ -1316,6 +1425,8 @@ class GatedAgent(Agent):
             if quick.on_event is not None:
                 quick.on_event(f"fast answer: asking {model}")
             said: list[str] = []
+            if (userdata := _userdata(self)) is not None:
+                cards.new_reply(userdata)
             try:
                 async for chunk in quick_reply.stream_fast(
                     fast_llm,
@@ -1340,6 +1451,9 @@ class GatedAgent(Agent):
                     quick.on_event(f'fast answer: {model} said "{"".join(said).strip()}"')
                 if gate.on_fast is not None:
                     gate.on_fast(False)
+                if userdata is not None:
+                    await _reply_cards(userdata, "".join(said))
+                    await cards.cards_ready(userdata)
                 return
         async for chunk in self._cards_with_speech(
             Agent.default.llm_node(
@@ -1352,23 +1466,40 @@ class GatedAgent(Agent):
         """The main model's stream, with a pending card put on the
         customer's screen as its first words come (the reply starts being
         transcribed and spoken), not while a filler line or the lookup is still
-        going (see userdata.defer_cards). A step that ends without words and
-        without a tool call is the last one: the cards go then."""
+        going (see userdata.defer_cards). The card is picked once the reply's
+        words are all in: the reply may name other packages, whose card then
+        goes in place of a search card (_reply_cards). It is shown when the
+        reply's own speech starts (transcription_node), after any filler line
+        and its pause; a step that ends without words and without a tool call is
+        the last one, and its cards go at once.
+
+        Nothing here waits for the speech: the last segment's TTS needs this
+        stream to end first."""
         userdata = _userdata(self)
+        if userdata is not None:
+            cards.new_reply(userdata)
         tool_call = False
+        said: list[str] = []
         try:
             async for chunk in stream:
-                if userdata is not None and userdata.pending_card is not None:
-                    if _has_speech(chunk):
-                        await cards.flush_pending_card(userdata)
-                if isinstance(chunk, llm.ChatChunk) and chunk.delta is not None and chunk.delta.tool_calls:
-                    tool_call = True
+                if isinstance(chunk, str):
+                    said.append(chunk)
+                elif isinstance(chunk, llm.ChatChunk) and chunk.delta is not None:
+                    if chunk.delta.tool_calls:
+                        tool_call = True
+                    if chunk.delta.content:
+                        said.append(chunk.delta.content)
                 yield chunk
         except Exception as exc:
             logger.exception("main model stream failed: %s; saying a fallback line", exc)
             yield STREAM_FAILED_LINE
             return
-        if userdata is not None and not tool_call and userdata.pending_card is not None:
+        if tool_call or userdata is None:
+            return
+        await _reply_cards(userdata, "".join(said))
+        if "".join(said).strip():
+            await cards.cards_ready(userdata)
+        else:
             await cards.flush_pending_card(userdata)
 
     def _forward_metrics(self, fast_llm: llm.LLM) -> None:
@@ -1441,12 +1572,40 @@ class GatedAgent(Agent):
                 pass
             raise StopResponse()
 
+    async def tts_node(
+        self, text: AsyncIterable[str], model_settings
+    ) -> AsyncIterable[rtc.AudioFrame]:
+        """The library's TTS, with a pause after a template filler line: each
+        filler and each reply segment is its own call, and the segments play in
+        turn, so the silence holds the reply back even when it is ready."""
+        heard: list[str] = []
+
+        async def tapped() -> AsyncIterable[str]:
+            async for chunk in text:
+                heard.append(str(chunk))
+                yield chunk
+
+        last = None
+        async for frame in Agent.default.tts_node(self, tapped(), model_settings):
+            last = frame
+            yield frame
+        pause = _filler_pause(self._gate.quick, "".join(heard))
+        if pause and last is not None:
+            for frame in _silence(pause, last.sample_rate, last.num_channels):
+                yield frame
+
     async def transcription_node(
         self, text: AsyncIterable[str | Any], model_settings
     ) -> AsyncIterable[str | Any]:
         # Items pass through unchanged: TimedString timing drives transcript sync.
         self._gate.bot_reply_started()
-        if self._gate.filler_segment():
+        filler_segment = self._gate.filler_segment()
+        if not filler_segment and not self._gate.filler_speaking():
+            # The library calls this as each segment starts playing: the reply
+            # is now heard, so its held card goes.
+            if (userdata := _userdata(self)) is not None:
+                await cards.reply_speaking(userdata)
+        if filler_segment:
             # The filler line the gate put in front of the reply: heard, so the
             # echo check knows it, but not part of what the agent said in the
             # chat context (the transcript stores it, see on_filler_store).

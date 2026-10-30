@@ -11,6 +11,7 @@ from livekit import rtc
 if TYPE_CHECKING:
     from app.agent.actions import CaseDraft, PendingAction
     from app.agent.voice_mode import VoiceMode
+    from app.bss.types import PackageView
 
 
 class Channel(str, Enum):
@@ -35,6 +36,15 @@ class SessionUserdata:
     # in a row, and the customer's latest turn, which narrows the next set.
     shown_packages: str = ""
     turn_text: str = ""
+    # Codes of the packages on cards sent this turn: the reply's own cards
+    # (app.agent.tools.packages.publish_reply_cards) skip what they show.
+    turn_card_codes: set[str] = field(default_factory=set)
+    # The held card goes once both are true (app.agent.cards): the reply's text
+    # is in (the package card is decided) and its own speech has started.
+    cards_ready: bool = False
+    reply_speaking: bool = False
+    # The active catalogue, loaded the first time a reply names a price.
+    catalogue: "list[PackageView] | None" = None
     # The customer is closing the topic with this turn (the turn judge, or
     # app.agent.closing_offer.acknowledges): the reply offers more help.
     wrap_up: bool = False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from decimal import Decimal
 
@@ -103,8 +104,55 @@ async def _publish_cards(userdata: SessionUserdata, title: str, found: list[Pack
     payload = json.dumps({"title": title, "packages": [_card(p) for p in shown]})
     if payload == userdata.shown_packages:
         return
-    userdata.shown_packages = payload
     await cards.send_card(userdata, PACKAGES, payload)
+
+
+# Where a reply's sentences end; each one names at most a package or two.
+_SENTENCE_END_RE = re.compile(r"[।.!?\n]+(?:\s|$)")
+
+
+def reply_packages(catalogue: list[PackageView], text: str) -> list[PackageView]:
+    """The packages a reply talks about, in its order: per sentence, the ones
+    whose price and at least one more of their amounts it names ("২৯ টাকায় ১
+    জিবি, মেয়াদ ১ দিন"). A price alone is a charge or a confirm, not a package."""
+    found: list[PackageView] = []
+    for sentence in _SENTENCE_END_RE.split(text):
+        amounts = named_amounts(sentence)
+        prices = {amount for field, amount in amounts if field == "price"}
+        if not prices:
+            continue
+        fits = [
+            (score, p)
+            for p in catalogue
+            if float(p.price) in prices and (score := _matches(p, amounts, set())) >= 2
+        ]
+        best = max((score for score, _ in fits), default=0)
+        found += [p for score, p in fits if score == best and p not in found]
+    return found
+
+
+async def publish_reply_cards(userdata: SessionUserdata, text: str) -> None:
+    """The turn's one package card, once the reply's words are all in: the
+    packages the reply talks about (a follow-up answered from the conversation,
+    a barge-in the gate answers itself, the next ones after those shown), in
+    place of a held search card; the search card when the reply names none.
+    Deferred, the card is held for the reply's speech (app.agent.cards)."""
+    shown: list[PackageView] = []
+    if any(field == "price" for field, _ in named_amounts(text)):
+        if userdata.catalogue is None:
+            userdata.catalogue = await run_db(lambda db: packages.search(db))
+        shown = reply_packages(userdata.catalogue, text)[:_CARDS]
+    if not shown or {p.code for p in shown} <= userdata.turn_card_codes:
+        return  # a held search card goes as it is
+    if cards.held_packages(userdata):
+        userdata.pending_card = None
+    payload = json.dumps({"title": "Packages", "packages": [_card(p) for p in shown]})
+    if payload == userdata.shown_packages:
+        return
+    if userdata.defer_cards:
+        userdata.pending_card = (PACKAGES, payload)
+    else:
+        await cards.send_now(userdata, PACKAGES, payload)
 
 
 def describe_package(p: PackageView) -> str:
