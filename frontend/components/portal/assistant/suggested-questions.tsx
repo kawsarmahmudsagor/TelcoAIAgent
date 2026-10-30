@@ -27,6 +27,23 @@ export const GUEST_QUESTIONS: SuggestedQuestion[] = [
   { text: 'ঢাকায় কি নেটওয়ার্কে কোনো সমস্যা হচ্ছে?', lang: 'bn' },
 ];
 
+/** The same in English, for a chat whose customer picked English. */
+export const POPULAR_QUESTIONS_EN: SuggestedQuestion[] = [
+  { text: 'What’s my balance?', lang: 'en' },
+  { text: 'How much data do I have left?', lang: 'en' },
+  { text: 'Which package suits me best?', lang: 'en' },
+  { text: 'Why was money deducted from my balance?', lang: 'en' },
+  { text: 'I want to make a complaint', lang: 'en' },
+];
+
+export const GUEST_QUESTIONS_EN: SuggestedQuestion[] = [
+  { text: 'What monthly data packages do you have?', lang: 'en' },
+  { text: 'Any internet package under 300 taka?', lang: 'en' },
+  { text: 'How do I get a new SIM?', lang: 'en' },
+  { text: 'Where is the nearest care centre?', lang: 'en' },
+  { text: 'Is there a network problem in Dhaka?', lang: 'en' },
+];
+
 /** The reference's "Popular questions" list: full-width rows with a brand arrow. */
 export function PopularQuestionList({ onAsk }: { onAsk(text: string): void }) {
   return (

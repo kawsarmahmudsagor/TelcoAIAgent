@@ -26,7 +26,9 @@ import { PackageCards, buyMessage } from '@/components/portal/assistant/cards/pa
 import { ConversationHistory } from '@/components/portal/assistant/conversation-history';
 import {
   GUEST_QUESTIONS,
+  GUEST_QUESTIONS_EN,
   POPULAR_QUESTIONS,
+  POPULAR_QUESTIONS_EN,
   QuestionChips,
 } from '@/components/portal/assistant/suggested-questions';
 import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
@@ -77,6 +79,7 @@ export function AssistantChatHeader({
     setHistoryOpen,
     toggleMic,
     voiceMode,
+    replyLanguage,
   } = useAssistant();
   const { muted, toggleMuted } = useCallAudio();
 
@@ -97,6 +100,12 @@ export function AssistantChatHeader({
         <Title className="truncate text-[13px] font-bold">Telco AI Assistant</Title>
         <p className="text-muted-foreground truncate text-[11px]" aria-live="polite">
           <span className="text-success font-semibold">● Online</span> · {status}
+          {replyLanguage && (
+            <>
+              {' · '}
+              <span lang={replyLanguage}>{replyLanguage === 'en' ? 'English' : 'বাংলা'}</span>
+            </>
+          )}
         </p>
       </div>
       <StartAudioButton label="Allow audio" size="sm" />
@@ -226,10 +235,52 @@ function QueuedRow({ text }: { text: string }) {
   );
 }
 
+/**
+ * Opens each new chat: the customer picks the language every reply will be in (a start made
+ * before the pick waits for it).
+ */
+function LanguagePicker({ compact }: { compact: boolean }) {
+  const { chooseReplyLanguage } = useAssistant();
+  return (
+    <div className="h-full overflow-y-auto">
+      <div
+        className={cn(
+          'flex min-h-full flex-col items-center justify-center gap-4 text-center',
+          compact ? 'p-4' : 'p-5'
+        )}
+      >
+        <BotAvatar />
+        <h3 className="text-[13px] font-bold">
+          Choose a language / <span lang="bn">ভাষা বেছে নিন</span>
+        </h3>
+        <div className="flex w-full max-w-[280px] flex-col gap-2.5">
+          {(
+            [
+              ['en', 'English'],
+              ['bn', 'বাংলা'],
+            ] as const
+          ).map(([language, label]) => (
+            <button
+              key={language}
+              type="button"
+              lang={language}
+              onClick={() => chooseReplyLanguage(language)}
+              className="border-line bg-surface text-foreground hover:border-brand focus-visible:ring-ring/60 min-h-11 rounded-[10px] border px-4 text-[13px] font-bold outline-none focus-visible:ring-[3px] motion-safe:transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ compact }: { compact: boolean }) {
   // Null for a guest on the home page.
   const me = useOptionalPortalMe();
-  const { connecting, isConnected, sendText, toggleMic, voiceMode } = useAssistant();
+  const { connecting, isConnected, sendText, toggleMic, voiceMode, replyLanguage } = useAssistant();
+  const english = replyLanguage === 'en';
 
   if (connecting || isConnected) {
     return (
@@ -250,7 +301,13 @@ function EmptyState({ compact }: { compact: boolean }) {
         <div className="flex max-w-[86%] items-end gap-2">
           <BotAvatar size="sm" />
           <div className="bg-surface border-line rounded-[14px_14px_14px_4px] border px-3.5 py-3 text-[13px] leading-[1.6]">
-            {me ? (
+            {english ? (
+              <p lang="en">
+                {me
+                  ? `Assalamu alaikum, ${me.first_name}! I’m telco’s assistant. I can help you check your balance and usage, find a package or recharge.`
+                  : 'Assalamu alaikum! I’m telco’s assistant. I can help you find a package, check the network in your area, or answer questions about SIMs, stores and our policies. Log in to see your balance or buy a package.'}
+              </p>
+            ) : me ? (
               <p lang="bn">
                 আসসালামু আলাইকুম, {me.first_name}! আমি telco-এর অ্যাসিস্ট্যান্ট। ব্যালেন্স চেক,
                 ইউসেজের হিসাব, প্যাকেজ খোঁজা বা রিচার্জ, সবকিছুতেই হেল্প করতে পারি।
@@ -262,12 +319,20 @@ function EmptyState({ compact }: { compact: boolean }) {
                 নিজের ব্যালেন্স দেখতে বা প্যাকেজ কিনতে লগইন করুন।
               </p>
             )}
-            <p lang="bn" className="mt-2">
-              কীভাবে হেল্প করতে পারি?
+            <p lang={english ? 'en' : 'bn'} className="mt-2">
+              {english ? 'How can I help?' : 'কীভাবে হেল্প করতে পারি?'}
             </p>
             <QuestionChips
               onAsk={sendText}
-              questions={me ? POPULAR_QUESTIONS : GUEST_QUESTIONS}
+              questions={
+                english
+                  ? me
+                    ? POPULAR_QUESTIONS_EN
+                    : GUEST_QUESTIONS_EN
+                  : me
+                    ? POPULAR_QUESTIONS
+                    : GUEST_QUESTIONS
+              }
               className="mt-2.5"
             />
           </div>
@@ -289,7 +354,16 @@ function EmptyState({ compact }: { compact: boolean }) {
   );
 }
 
-function Composer({ initialText, inputId }: { initialText?: string; inputId: string }) {
+function Composer({
+  initialText,
+  inputId,
+  locked = false,
+}: {
+  initialText?: string;
+  inputId: string;
+  /** The language picker is showing: nothing can be sent until the pick. */
+  locked?: boolean;
+}) {
   const { sendText, toggleMic, micEnabled, isConnected, connecting, voiceMode, end } =
     useAssistant();
   const [text, setText] = useState(initialText ?? '');
@@ -304,7 +378,7 @@ function Composer({ initialText, inputId }: { initialText?: string; inputId: str
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (!text.trim()) return;
+        if (locked || !text.trim()) return;
         sendText(text);
         setText('');
       }}
@@ -314,7 +388,7 @@ function Composer({ initialText, inputId }: { initialText?: string; inputId: str
         <button
           type="button"
           onClick={toggleMic}
-          disabled={connecting}
+          disabled={connecting || locked}
           aria-label={micLabel}
           title={micLabel}
           aria-pressed={isConnected ? micEnabled : undefined}
@@ -358,12 +432,15 @@ function Composer({ initialText, inputId }: { initialText?: string; inputId: str
         value={text}
         onChange={(e) => setText(e.target.value)}
         autoComplete="off"
-        placeholder="Ask anything… / বাংলায় লিখুন"
-        className="border-line bg-surface2 text-foreground placeholder:text-muted-foreground focus-visible:border-brand focus-visible:ring-ring/30 min-w-0 flex-1 rounded-[10px] border px-3 py-3 text-[13px] outline-none focus-visible:ring-[3px]"
+        disabled={locked}
+        placeholder={
+          locked ? 'Choose a language first / আগে ভাষা বেছে নিন' : 'Ask anything… / বাংলায় লিখুন'
+        }
+        className="border-line bg-surface2 text-foreground placeholder:text-muted-foreground focus-visible:border-brand focus-visible:ring-ring/30 min-w-0 flex-1 rounded-[10px] border px-3 py-3 text-[13px] outline-none focus-visible:ring-[3px] disabled:opacity-55"
       />
       <button
         type="submit"
-        disabled={!text.trim()}
+        disabled={locked || !text.trim()}
         aria-label="Send message"
         className="bg-brand focus-visible:ring-ring/60 grid w-[43px] shrink-0 place-items-center rounded-[10px] text-white outline-none focus-visible:ring-[3px] disabled:opacity-55 [&_svg]:size-[18px]"
       >
@@ -391,7 +468,17 @@ export function AssistantConversation({
   compact?: boolean;
   inputId: string;
 }) {
-  const { messages, cards, confirm, agentState, queued, sendText, historyOpen } = useAssistant();
+  const {
+    messages,
+    cards,
+    confirm,
+    agentState,
+    queued,
+    sendText,
+    historyOpen,
+    replyLanguage,
+    languagePending,
+  } = useAssistant();
 
   const placed = useMemo<Placed[]>(() => {
     const items: Placed[] = cards.map((card) => ({
@@ -425,6 +512,9 @@ export function AssistantConversation({
     ) : undefined;
 
   const empty = messages.length === 0 && placed.length === 0 && queued.length === 0;
+  // A new chat opens on the picker; so does a start made before the pick (a chip from the
+  // page's list, a notification, the call button) or in a chat from before the pick.
+  const picking = replyLanguage === null && (empty || languagePending);
   const trailing =
     placement.unplaced.length > 0 || queued.length > 0 ? (
       <div className="flex flex-col gap-3.5">
@@ -440,6 +530,8 @@ export function AssistantConversation({
       <div className="bg-chat-canvas min-h-0 flex-1">
         {historyOpen ? (
           <ConversationHistory compact={compact} />
+        ) : picking ? (
+          <LanguagePicker compact={compact} />
         ) : empty ? (
           <EmptyState compact={compact} />
         ) : (
@@ -460,7 +552,7 @@ export function AssistantConversation({
         )}
       </div>
       <div className="border-line border-t">
-        <Composer initialText={initialText} inputId={inputId} />
+        <Composer initialText={initialText} inputId={inputId} locked={picking && !historyOpen} />
         <p className="text-muted-foreground bg-surface phone:px-3 px-3.5 pb-3 text-[10px]">
           Never share your OTP or payment PIN in chat.
         </p>
