@@ -33,13 +33,55 @@ function MessageScroller({
   );
 }
 
+// The primitive's scrollEdgeThreshold default.
+const END_THRESHOLD = 8;
+
 function MessageScrollerViewport({
   className,
+  onWheel,
+  onTouchEnd,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
+  const { scrollToEnd } = useMessageScroller();
+  const timerRef = React.useRef<number | null>(null);
+  React.useEffect(
+    () => () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    },
+    []
+  );
+
+  // Any wheel, touch move or scroll key inside the viewport stops auto-follow, and only a
+  // real vertical scroll event turns it back on. A gesture that never scrolls the viewport
+  // -- swiping a horizontal card carousel, or wheeling down when already at the bottom --
+  // left it off for good, so later messages landed below the fold. If the view didn't move
+  // and still sits at the bottom, pin it again.
+  const repinIfStill = (el: HTMLElement) => {
+    const before = el.scrollTop;
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight <= END_THRESHOLD;
+      if (el.isConnected && el.scrollTop === before && atEnd) scrollToEnd();
+    }, 150);
+  };
+
   return (
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
+      onWheel={(e) => {
+        repinIfStill(e.currentTarget);
+        onWheel?.(e);
+      }}
+      onTouchEnd={(e) => {
+        repinIfStill(e.currentTarget);
+        onTouchEnd?.(e);
+      }}
+      onKeyDown={(e) => {
+        repinIfStill(e.currentTarget);
+        onKeyDown?.(e);
+      }}
       className={cn(
         // Hide the thumb while auto-scrolling by colouring it transparent, not
         // with scrollbar-width:none -- that also drops the stable gutter, so the
