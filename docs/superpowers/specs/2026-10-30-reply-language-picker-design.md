@@ -79,16 +79,20 @@ A helper `fixed_language(userdata) -> "en" | "bn" | None` is the single read poi
 2. **Text-start and closing notes** (`persona.py`, `entrypoint.py`, `closing_offer.py`): the
    "in the language of the customer's latest message" wording becomes "in English/Bangla" when
    set.
-3. **Fillers** (`quick_reply.py`): template choice, the fast LLM filler and the care filler use
-   the pick instead of the utterance's script. Echo templates that repeat the customer's words
-   are skipped when the utterance's script differs from the pick, so an English filler never
-   carries Bangla words. `avoid()` filters by the pick.
-4. **Idle check-in and goodbye** (`idle_checkin.py`): `_reply_language` returns the pick when
+3. **Per-turn reminder** (`closing_offer.with_reminder`, which already puts a note last in the
+   main model's context because the model barely heeds earlier notes): when set, every turn's
+   last note says to reply in the picked language, merged with the wrap-up/backstop reminder
+   when one is due.
+4. **Fillers** (`quick_reply.py`): template choice, the fast LLM filler and the care filler use
+   the pick instead of the utterance's script. Echo templates already have Bangla and English
+   forms of the entity; as a guard, a template line whose script differs from the pick is
+   never chosen, so an English filler never carries Bangla words. `avoid()` filters by the pick.
+5. **Idle check-in and goodbye** (`idle_checkin.py`): `_reply_language` returns the pick when
    set.
-5. **Other-language line** (`gated_agent.py`): add a Bangla version of `OTHER_LANGUAGE_LINE`
+6. **Other-language line** (`gated_agent.py`): add a Bangla version of `OTHER_LANGUAGE_LINE`
    and say the one matching the pick (English line when unset, as today). The prompt's
    exact-line rule follows the same pick.
-6. **Number speech** (`speech_numbers.py`): when set, the pick is passed in and used instead of
+7. **Number speech** (`speech_numbers.py`): when set, the pick is passed in and used instead of
    guessing from the reply text.
 
 STT, the turn gate's language checks and the dashboard STT language setting are unchanged.
@@ -105,7 +109,8 @@ STT, the turn gate's language checks and the dashboard STT language setting are 
 
 - Unit tests:
   - prompt with `en`, `bn` and `None`; the block sits before `CHANNEL_TEXT_NOTE`
-  - fillers: template language, echo skip on script mismatch, LLM filler language
+  - fillers: template language, script guard, LLM filler language
+  - per-turn reminder present when set, merged with wrap-up; absent when unset
   - idle check-in and goodbye lines follow the pick
   - other-language line per pick
   - number speech with a fixed language
