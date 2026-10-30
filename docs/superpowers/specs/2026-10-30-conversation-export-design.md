@@ -76,11 +76,17 @@ Three units, each testable alone.
 - Title: "telco chat transcript" / "telco চ্যাট ট্রান্সক্রিপ্ট".
 - Header block: started/ended date and time (Asia/Dhaka), channel, customer
   name and number when the conversation has a subscriber. Bangla export uses
-  Bangla month names and Bangla digits in the header dates. When any message
-  was translated, a short italic note says the text was machine-translated.
-- One paragraph per message: bold coloured label (`Assistant:` / `User:` or
-  `সহকারী:` / `গ্রাহক:`), small grey time, then the text. Message bodies keep
-  their digits as written.
+  Bangla month names and Bangla digits in the header dates. No
+  machine-translation note (the user asked for none).
+- Messages laid out like the chat window: each is a shaded bubble about 70%
+  of the text width — agent on the left (grey `F1F3F5`), customer on the right
+  (green `E3F2E8`, label right-aligned, text left-aligned). A bubble is a
+  label paragraph (bold coloured `Assistant:` / `User:` or `সহকারী:` /
+  `গ্রাহক:` plus small grey time, kept with the next paragraph) and a text
+  paragraph sharing indent, fill and a fill-coloured padding border. An
+  unshaded gap paragraph separates bubbles, since Word merges adjacent
+  paragraphs with identical borders. Message bodies keep their digits as
+  written.
 - Every run sets the complex-script font (`w:cs`) to Nirmala UI and marks
   Bangla runs as complex script, so Word shapes Bangla correctly. Bold and
   size are set on the complex-script properties too (`bCs`, `szCs`).

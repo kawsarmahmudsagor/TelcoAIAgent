@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
+from docx.shared import Inches
 from sqlalchemy import text
 
 from app.agent.quick_models import reasoning_for
@@ -466,20 +468,73 @@ def test_render_bangla_bold_and_size_apply_to_complex_script():
     assert title.find(qn("w:szCs")).get(qn("w:val")) == "36"  # 18 pt, in half-points
 
 
-def test_render_marks_machine_translation():
-    assert "machine-translated" in _text(render_docx(_header(translated=True), _LINES, "en"))
-    assert "machine-translated" not in _text(render_docx(_header(), _LINES, "en"))
-    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" in _text(render_docx(_header(translated=True), _LINES, "bn"))
-
-
-def test_export_flags_translation_only_when_text_changed(stored, fake_translate):
+def test_export_has_no_machine_translation_note(stored, fake_translate):
+    # The user asked for no such note in the document.
     db = SessionLocal()
     try:
         conversation = conversation_repo.get(db, stored(texts=(("user", "hello"),)))
-        _, changed = conversation_export.export_conversation(db, conversation, "bn")
-        conversation = conversation_repo.get(db, stored(texts=(("user", "আমি ভালো"),)))
-        _, same = conversation_export.export_conversation(db, conversation, "bn")
+        _, data = conversation_export.export_conversation(db, conversation, "bn")
     finally:
         db.close()
-    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" in _text(changed)
-    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" not in _text(same)
+    body = _text(data)
+    assert "HELLO" in body
+    assert "অনুবাদ" not in body and "machine-translated" not in body
+
+
+def _message_paragraphs(data: bytes, label: str):
+    """The (label, text) paragraph pair of the first message with `label`."""
+    paragraphs = Document(io.BytesIO(data)).paragraphs
+    i = next(n for n, p in enumerate(paragraphs) if p.text.startswith(label))
+    return paragraphs[i], paragraphs[i + 1]
+
+
+def _fill(paragraph) -> str | None:
+    shd = paragraph._p.pPr.find(qn("w:shd"))
+    return None if shd is None else shd.get(qn("w:fill"))
+
+
+def test_render_messages_as_chat_bubbles():
+    data = render_docx(_header(), _LINES, "en")
+    a_label, a_text = _message_paragraphs(data, "Assistant:")
+    u_label, u_text = _message_paragraphs(data, "User:")
+    # Assistant on the left: indented from the right only.
+    for p in (a_label, a_text):
+        assert p.paragraph_format.right_indent >= Inches(1.5)
+        assert not p.paragraph_format.left_indent
+        assert _fill(p) == "F1F3F5"
+    # User on the right: indented from the left, label right-aligned, text reads left to right.
+    for p in (u_label, u_text):
+        assert p.paragraph_format.left_indent >= Inches(1.5)
+        assert not p.paragraph_format.right_indent
+        assert _fill(p) == "E3F2E8"
+    assert u_label.alignment == WD_ALIGN_PARAGRAPH.RIGHT
+    assert u_text.alignment == WD_ALIGN_PARAGRAPH.LEFT
+    assert a_text.text == "Hello! How can I help?" and u_text.text == "Call 01712345678 please"
+
+
+def test_render_bubble_has_padding_border_in_its_fill():
+    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "bn"), "সহকারী:")
+    borders = a_label._p.pPr.find(qn("w:pBdr"))
+    for side in ("top", "left", "bottom", "right"):
+        edge = borders.find(qn(f"w:{side}"))
+        assert edge.get(qn("w:color")) == "F1F3F5"
+        assert int(edge.get(qn("w:space"))) > 0
+
+
+def test_render_keeps_consecutive_bubbles_apart():
+    # Word merges adjacent paragraphs with identical borders into one box; two agent
+    # messages in a row showed as one bubble.
+    lines = [
+        ExportLine(role="assistant", text="One", at=_STARTED),
+        ExportLine(role="assistant", text="Two", at=_STARTED),
+    ]
+    paragraphs = Document(io.BytesIO(render_docx(_header(), lines, "en"))).paragraphs
+    first_text = next(i for i, p in enumerate(paragraphs) if p.text == "One")
+    between = paragraphs[first_text + 1]
+    assert between.text == "" and _fill(between) is None
+    assert paragraphs[first_text + 2].text.startswith("Assistant:")
+
+
+def test_render_label_stays_with_its_text():
+    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "en"), "Assistant:")
+    assert a_label.paragraph_format.keep_with_next is True

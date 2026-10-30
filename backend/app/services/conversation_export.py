@@ -19,7 +19,7 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor
+from docx.shared import Inches, Pt, RGBColor
 from docx.text.run import Run
 from sqlalchemy.orm import Session
 
@@ -158,6 +158,20 @@ CS_FONT = "Nirmala UI"
 _ASSISTANT_COLOUR = RGBColor(0x1F, 0x6F, 0xEB)
 _USER_COLOUR = RGBColor(0x2E, 0x7D, 0x32)
 _GREY = RGBColor(0x6B, 0x72, 0x80)
+# Chat-window layout: agent bubbles on the left, customer bubbles on the right,
+# each about 70% of the text width.
+_ASSISTANT_FILL = "F1F3F5"
+_USER_FILL = "E3F2E8"
+_BUBBLE_INSET = Inches(1.9)
+# pPr children that come after pBdr/shd in the schema (Word rejects out-of-order ones).
+_AFTER_SHD = (
+    "w:tabs", "w:suppressAutoHyphens", "w:kinsoku", "w:wordWrap", "w:overflowPunct",
+    "w:topLinePunct", "w:autoSpaceDE", "w:autoSpaceDN", "w:bidi", "w:adjustRightInd",
+    "w:snapToGrid", "w:spacing", "w:ind", "w:contextualSpacing", "w:mirrorIndents",
+    "w:suppressOverlap", "w:jc", "w:textDirection", "w:textAlignment",
+    "w:textboxTightWrap", "w:outlineLvl", "w:divId", "w:cnfStyle", "w:rPr", "w:sectPr",
+    "w:pPrChange",
+)
 
 _BN_DIGITS = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
 _BN_MONTHS = (
@@ -177,7 +191,6 @@ _COPY = {
         "number": "Number",
         "web": "Web chat",
         "phone": "Phone call",
-        "translated": "Messages not originally in English were machine-translated.",
     },
     "bn": {
         "title": "telco চ্যাট ট্রান্সক্রিপ্ট",
@@ -190,7 +203,6 @@ _COPY = {
         "number": "নম্বর",
         "web": "ওয়েব চ্যাট",
         "phone": "ফোন কল",
-        "translated": "অন্য ভাষার মেসেজগুলো স্বয়ংক্রিয়ভাবে অনুবাদ করা হয়েছে।",
     },
 }
 
@@ -210,8 +222,6 @@ class ExportHeader:
     is_phone_call: bool
     customer_name: str | None
     customer_msisdn: str | None
-    # Some message text was machine-translated: the document says so.
-    translated: bool = False
 
 
 def bangla_digits(s: str) -> str:
@@ -252,6 +262,35 @@ def _style(run: Run, *, bold: bool = False, size: float | None = None, colour=No
     return run
 
 
+def _bubble(paragraph, is_assistant: bool, fill: str, *, space_before: float):
+    """One paragraph of a message bubble. A message's label and text paragraphs share the
+    indent, fill and border, so Word draws them as one box; the border, in the fill's colour,
+    pads the text inside it."""
+    fmt = paragraph.paragraph_format
+    if is_assistant:
+        fmt.right_indent = _BUBBLE_INSET
+    else:
+        fmt.left_indent = _BUBBLE_INSET
+    fmt.space_before = Pt(space_before)
+    fmt.space_after = Pt(0)
+    p_pr = paragraph._p.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), fill)
+    p_pr.insert_element_before(shd, *_AFTER_SHD)
+    borders = OxmlElement("w:pBdr")
+    for side in ("top", "left", "bottom", "right"):
+        edge = OxmlElement(f"w:{side}")
+        edge.set(qn("w:val"), "single")
+        edge.set(qn("w:sz"), "4")
+        edge.set(qn("w:space"), "4")
+        edge.set(qn("w:color"), fill)
+        borders.append(edge)
+    p_pr.insert_element_before(borders, "w:shd")
+    return paragraph
+
+
 def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang) -> bytes:
     copy = _COPY[lang]
     doc = Document()
@@ -277,30 +316,34 @@ def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang)
         row.paragraph_format.space_after = Pt(0)
         _style(row.add_run(f"{label}: "), bold=True, size=10, colour=_GREY)
         _style(row.add_run(value), size=10, colour=_GREY)
-    if header.translated:
-        note = doc.add_paragraph()
-        note.paragraph_format.space_before = Pt(6)
-        _style(note.add_run(copy["translated"]), size=9, colour=_GREY).italic = True
     doc.add_paragraph()
 
-    for line in lines:
-        paragraph = doc.add_paragraph()
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        paragraph.paragraph_format.space_after = Pt(8)
+    for n, line in enumerate(lines):
+        if n:
+            # Unshaded gap: Word would merge two same-side bubbles into one box.
+            gap = doc.add_paragraph()
+            gap.paragraph_format.space_before = Pt(0)
+            gap.paragraph_format.space_after = Pt(0)
+            _style(gap.add_run(), size=4)
         is_assistant = line.role == "assistant"
+        fill = _ASSISTANT_FILL if is_assistant else _USER_FILL
+        label = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=6)
+        label.paragraph_format.keep_with_next = True
+        label.alignment = WD_ALIGN_PARAGRAPH.LEFT if is_assistant else WD_ALIGN_PARAGRAPH.RIGHT
         _style(
-            paragraph.add_run(copy["assistant"] if is_assistant else copy["user"]),
+            label.add_run(copy["assistant"] if is_assistant else copy["user"]),
             bold=True,
             colour=_ASSISTANT_COLOUR if is_assistant else _USER_COLOUR,
         )
         time = f"{_local(line.at):%H:%M}"
         _style(
-            paragraph.add_run(f"  {bangla_digits(time) if lang == 'bn' else time}"),
+            label.add_run(f"  {bangla_digits(time) if lang == 'bn' else time}"),
             size=9,
             colour=_GREY,
         )
-        _style(paragraph.add_run()).add_break()
-        _style(paragraph.add_run(line.text))
+        text = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=0)
+        text.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        _style(text.add_run(line.text))
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -354,7 +397,6 @@ def export_conversation(
             texts = translate(originals, lang, client=own, settings=settings)
     else:
         texts = translate(originals, lang, client=client, settings=settings)
-    header.translated = texts != originals
     for line, text in zip(lines, texts):
         line.text = text
     return filename, render_docx(header, lines, lang)
