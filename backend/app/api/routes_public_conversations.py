@@ -11,12 +11,13 @@ their own chats from other browsers. Responses carry no internal fields (room,
 client, schedule ids)."""
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_optional_subscriber
-from app.api.routes_conversations import _preview
+from app.api.routes_conversations import _preview, export_response
 from app.repositories import conversation_repo
 from app.schemas.conversation import (
     VisitorConversationDetail,
@@ -104,3 +105,24 @@ def get_visitor_conversation(
         reply_language=conversation.reply_language,
         messages=[VisitorConversationMessage.model_validate(m) for m in messages],
     )
+
+
+@router.get("/{conversation_id}/export")
+def export_visitor_conversation(
+    conversation_id: str,
+    lang: Literal["en", "bn"],
+    visitor_id: uuid.UUID = Depends(visitor_id_header),
+    subscriber_id: uuid.UUID | None = Depends(get_optional_subscriber),
+    db: Session = Depends(get_db),
+) -> Response:
+    """An ended chat of this visitor's as a .docx, in English or Bangla."""
+    try:
+        parsed = uuid.UUID(conversation_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="conversation not found") from None
+    conversation = conversation_repo.get_for_visitor(
+        db, visitor_id, parsed, subscriber_id=subscriber_id
+    )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    return export_response(db, conversation, lang, headers=_NO_STORE)

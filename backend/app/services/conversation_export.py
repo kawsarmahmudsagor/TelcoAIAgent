@@ -18,8 +18,12 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
 from docx.text.run import Run
+from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
+from app.models.conversation import Conversation, ConversationStatus
+from app.models.telco import Subscriber
+from app.repositories import conversation_repo
 
 ExportLang = Literal["en", "bn"]
 
@@ -52,6 +56,10 @@ Rules:
 
 class ExportTranslationError(Exception):
     """The LLM call failed, timed out, or returned something unusable."""
+
+
+class ConversationStillActive(Exception):
+    """Only an ended conversation is exported."""
 
 
 def needs_translation(text: str, target: ExportLang) -> bool:
@@ -256,3 +264,49 @@ def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang)
     buffer = io.BytesIO()
     doc.save(buffer)
     return buffer.getvalue()
+
+
+# --- export ---------------------------------------------------------------
+
+MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+def export_conversation(
+    db: Session,
+    conversation: Conversation,
+    lang: ExportLang,
+    *,
+    client: httpx.Client | None = None,
+    settings: Settings | None = None,
+) -> tuple[str, bytes]:
+    """(filename, .docx bytes) for an ended conversation: its customer and agent
+    messages, translated into `lang`. Raises ConversationStillActive or
+    ExportTranslationError."""
+    if conversation.status == ConversationStatus.active.value:
+        raise ConversationStillActive()
+    settings = settings or get_settings()
+    rows = [
+        m
+        for m in conversation_repo.list_visible_messages(db, conversation.id)
+        if m.text and m.text.strip()
+    ]
+    texts = [m.text for m in rows]
+    if client is None:
+        with httpx.Client(timeout=settings.export_translate_timeout_s) as own:
+            texts = translate(texts, lang, client=own, settings=settings)
+    else:
+        texts = translate(texts, lang, client=client, settings=settings)
+    subscriber = (
+        db.get(Subscriber, conversation.subscriber_id) if conversation.subscriber_id else None
+    )
+    header = ExportHeader(
+        started_at=conversation.started_at,
+        ended_at=conversation.ended_at,
+        channel=conversation.channel,
+        is_phone_call=conversation.is_phone_call,
+        customer_name=subscriber.full_name if subscriber else None,
+        customer_msisdn=subscriber.msisdn if subscriber else None,
+    )
+    lines = [ExportLine(role=m.role, text=t, at=m.created_at) for m, t in zip(rows, texts)]
+    filename = f"telco-chat-{_local(conversation.started_at):%Y-%m-%d-%H%M}-{lang}.docx"
+    return filename, render_docx(header, lines, lang)

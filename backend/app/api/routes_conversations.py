@@ -8,6 +8,8 @@ from app.api.deps import get_current_admin, get_db
 from app.models.conversation import ConversationStatus
 from app.models.telco import Subscriber
 from app.repositories import conversation_repo
+from app.services import conversation_export
+from app.services.conversation_export import ConversationStillActive, ExportTranslationError
 from app.schemas.conversation import (
     BulkDeleteRequest,
     BulkDeleteResult,
@@ -80,6 +82,35 @@ def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)) 
         subscriber_name=subscriber.full_name if subscriber else None,
         messages=[ConversationMessageOut.model_validate(message) for message in messages],
     )
+
+
+def export_response(
+    db: Session, conversation, lang, headers: dict[str, str] | None = None
+) -> Response:
+    """The conversation as a .docx download; 409 while live, 502 when translation fails."""
+    try:
+        filename, content = conversation_export.export_conversation(db, conversation, lang)
+    except ConversationStillActive:
+        raise HTTPException(status.HTTP_409_CONFLICT, "conversation is still active") from None
+    except ExportTranslationError:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "translation failed") from None
+    return Response(
+        content,
+        media_type=conversation_export.MEDIA_TYPE,
+        headers={**(headers or {}), "Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{conversation_id}/export")
+def export_conversation(
+    conversation_id: uuid.UUID,
+    lang: Literal["en", "bn"],
+    db: Session = Depends(get_db),
+) -> Response:
+    conversation = conversation_repo.get(db, conversation_id)
+    if conversation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+    return export_response(db, conversation, lang)
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)

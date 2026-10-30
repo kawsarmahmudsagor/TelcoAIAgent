@@ -1,13 +1,19 @@
 import io
 import json
+import re
+import uuid
 from datetime import datetime, timezone
 
 import httpx
 import pytest
 from docx import Document
 from docx.oxml.ns import qn
+from sqlalchemy import text
 
 from app.config import get_settings
+from app.db.session import SessionLocal
+from app.repositories import conversation_repo
+from app.services import conversation_export
 from app.services.conversation_export import (
     ExportHeader,
     ExportLine,
@@ -188,3 +194,172 @@ def test_render_sets_cs_font():
 
 def test_bangla_digits():
     assert bangla_digits("2026-10-30 14:32") == "২০২৬-১০-৩০ ১৪:৩২"
+
+
+# --- export + routes -------------------------------------------------------
+
+EXPORT_ROOM_PREFIX = "pytest-export-"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+@pytest.fixture
+def stored():
+    """Factory for stored conversations, deleted afterwards."""
+    yield _store
+    db = SessionLocal()
+    try:
+        db.execute(
+            text("delete from conversations where room_name like :p"),
+            {"p": EXPORT_ROOM_PREFIX + "%"},
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _store(
+    visitor_id: uuid.UUID | None = None,
+    *,
+    ended: bool = True,
+    is_phone_call: bool = False,
+    texts: tuple[tuple[str, str | None], ...] = (
+        ("assistant", "Hello!"),
+        ("user", "amar balance koto"),
+    ),
+) -> uuid.UUID:
+    db = SessionLocal()
+    try:
+        conversation = conversation_repo.create(
+            db,
+            channel="inbound_chat",
+            room_name=f"{EXPORT_ROOM_PREFIX}{uuid.uuid4().hex[:8]}",
+            is_phone_call=is_phone_call,
+            visitor_id=visitor_id,
+        )
+        now = datetime.now(timezone.utc)
+        for seq, (role, body) in enumerate(texts, start=1):
+            conversation_repo.add_message(
+                db, conversation.id, seq=seq, role=role, text=body, created_at=now
+            )
+        conversation_repo.add_message(
+            db,
+            conversation.id,
+            seq=len(texts) + 1,
+            role="tool",
+            text="balance 500",
+            tool_name="get_balance",
+            tool_args={},
+            created_at=now,
+        )
+        if ended:
+            conversation_repo.end(db, conversation.id)
+        return conversation.id
+    finally:
+        db.close()
+
+
+@pytest.fixture
+def fake_translate(monkeypatch):
+    """translate() replaced: records its input, upper-cases what it would send."""
+    calls: list[list[str]] = []
+
+    def fake(texts, target, *, client, settings):
+        calls.append(list(texts))
+        return [t.upper() if needs_translation(t, target) else t for t in texts]
+
+    monkeypatch.setattr(conversation_export, "translate", fake)
+    return calls
+
+
+def test_export_skips_empty_messages(stored, fake_translate):
+    conversation_id = stored(texts=(("assistant", "Hi"), ("user", None), ("user", "   ")))
+    db = SessionLocal()
+    try:
+        conversation = conversation_repo.get(db, conversation_id)
+        name, data = conversation_export.export_conversation(db, conversation, "bn")
+    finally:
+        db.close()
+    assert fake_translate == [["Hi"]]
+    body = _text(data)
+    assert "HI" in body and "balance 500" not in body
+    assert name.endswith("-bn.docx")
+
+
+def test_admin_export_ok(api, stored, fake_translate):
+    conversation_id = stored()
+    res = api.get(f"/api/conversations/{conversation_id}/export", params={"lang": "bn"})
+    assert res.status_code == 200
+    assert res.headers["content-type"] == DOCX_TYPE
+    assert re.search(
+        r'filename="telco-chat-\d{4}-\d{2}-\d{2}-\d{4}-bn\.docx"',
+        res.headers["content-disposition"],
+    )
+    body = _text(res.content)
+    assert "AMAR BALANCE KOTO" in body and "balance 500" not in body
+
+
+def test_admin_export_requires_admin(anon_api, stored):
+    conversation_id = stored()
+    res = anon_api.get(f"/api/conversations/{conversation_id}/export", params={"lang": "en"})
+    assert res.status_code == 401
+
+
+def test_admin_export_active_409(api, stored, fake_translate):
+    conversation_id = stored(ended=False)
+    res = api.get(f"/api/conversations/{conversation_id}/export", params={"lang": "en"})
+    assert res.status_code == 409
+
+
+def test_admin_export_translation_502(api, stored, monkeypatch):
+    def fail(*args, **kwargs):
+        raise ExportTranslationError("down")
+
+    monkeypatch.setattr(conversation_export, "translate", fail)
+    conversation_id = stored()
+    res = api.get(f"/api/conversations/{conversation_id}/export", params={"lang": "en"})
+    assert res.status_code == 502
+    assert res.json() == {"detail": "translation failed"}
+
+
+def test_admin_export_bad_lang_422(api, stored):
+    conversation_id = stored()
+    res = api.get(f"/api/conversations/{conversation_id}/export", params={"lang": "fr"})
+    assert res.status_code == 422
+
+
+def test_admin_export_missing_404(api):
+    res = api.get(f"/api/conversations/{uuid.uuid4()}/export", params={"lang": "en"})
+    assert res.status_code == 404
+
+
+def _visitor_get(client, conversation_id, visitor_id, lang="en"):
+    return client.get(
+        f"/api/public/conversations/{conversation_id}/export",
+        params={"lang": lang},
+        headers={"X-Visitor-Id": str(visitor_id)},
+    )
+
+
+def test_visitor_export_ok(anon_api, stored, fake_translate):
+    visitor = uuid.uuid4()
+    res = _visitor_get(anon_api, stored(visitor), visitor)
+    assert res.status_code == 200
+    assert res.headers["content-type"] == DOCX_TYPE
+    assert res.headers["cache-control"] == "no-store"
+
+
+def test_visitor_export_other_visitor_404(anon_api, stored, fake_translate):
+    res = _visitor_get(anon_api, stored(uuid.uuid4()), uuid.uuid4())
+    assert res.status_code == 404
+
+
+def test_visitor_export_phone_call_404(anon_api, stored, fake_translate):
+    visitor = uuid.uuid4()
+    res = _visitor_get(anon_api, stored(visitor, is_phone_call=True), visitor)
+    assert res.status_code == 404
+
+
+def test_visitor_export_active_409(anon_api, stored, fake_translate):
+    visitor = uuid.uuid4()
+    res = _visitor_get(anon_api, stored(visitor, ended=False), visitor)
+    assert res.status_code == 409
