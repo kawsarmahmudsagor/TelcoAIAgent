@@ -155,8 +155,8 @@ def _parse_reply(content: str, expected: set[int]) -> dict[int, str]:
 # --- .docx ---------------------------------------------------------------
 
 CS_FONT = "Nirmala UI"
-_ASSISTANT_COLOUR = RGBColor(0x1F, 0x6F, 0xEB)
-_USER_COLOUR = RGBColor(0x2E, 0x7D, 0x32)
+_ASSISTANT_COLOUR = RGBColor(0x2E, 0x7D, 0x32)
+_USER_COLOUR = RGBColor(0x1F, 0x6F, 0xEB)
 _GREY = RGBColor(0x6B, 0x72, 0x80)
 # Chat-window layout: agent bubbles on the left, customer bubbles on the right,
 # each about 70% of the text width.

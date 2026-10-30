@@ -81,7 +81,7 @@ Three units, each testable alone.
 - Messages laid out like the chat window: each is a shaded bubble about 70%
   of the text width — agent on the left (green `E3F2E8`), customer on the right
   (grey `F1F3F5`, label right-aligned, text left-aligned). A bubble is a
-  label paragraph (bold coloured `Assistant:` / `User:` or `সহকারী:` /
+  label paragraph (bold `Assistant:` in green `2E7D32` / `User:` in blue `1F6FEB`, or `সহকারী:` /
   `গ্রাহক:` plus small grey time, kept with the next paragraph) and a text
   paragraph sharing indent, fill and a fill-coloured padding border. An
   unshaded gap paragraph separates bubbles, since Word merges adjacent

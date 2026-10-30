@@ -538,3 +538,11 @@ def test_render_keeps_consecutive_bubbles_apart():
 def test_render_label_stays_with_its_text():
     a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "en"), "Assistant:")
     assert a_label.paragraph_format.keep_with_next is True
+
+
+def test_render_label_colours():
+    data = render_docx(_header(), _LINES, "en")
+    a_label, _ = _message_paragraphs(data, "Assistant:")
+    u_label, _ = _message_paragraphs(data, "User:")
+    assert str(a_label.runs[0].font.color.rgb) == "2E7D32"
+    assert str(u_label.runs[0].font.color.rgb) == "1F6FEB"
