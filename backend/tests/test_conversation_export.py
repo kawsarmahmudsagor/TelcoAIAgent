@@ -1,6 +1,8 @@
 import io
 import json
 import re
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -16,6 +18,7 @@ from app.db.session import SessionLocal
 from app.repositories import conversation_repo
 from app.services import conversation_export
 from app.services.conversation_export import (
+    CHUNK_SIZE,
     ExportHeader,
     ExportLine,
     ExportTranslationError,
@@ -392,3 +395,91 @@ def test_admin_detail_returns_reply_language(api, stored):
     finally:
         db.close()
     assert api.get(f"/api/conversations/{conversation_id}").json()["reply_language"] == "bn"
+
+
+# --- final review fixes ------------------------------------------------------
+
+
+def _slow_llm(delay_s: float):
+    def respond(request: httpx.Request) -> httpx.Response:
+        time.sleep(delay_s)
+        items = json.loads(json.loads(request.content)["messages"][-1]["content"])
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": _echo_upper(items)}}]}
+        )
+
+    return httpx.Client(transport=httpx.MockTransport(respond))
+
+
+def test_translate_runs_chunks_in_parallel():
+    # Three chunks at 0.4 s each: in sequence 1.2 s, behind the Next proxy's 30 s limit
+    # a long chat failed.
+    started = time.perf_counter()
+    out = translate(
+        [f"line {n}" for n in range(3 * CHUNK_SIZE)], "bn", client=_slow_llm(0.4),
+        settings=get_settings(),
+    )
+    assert time.perf_counter() - started < 0.9
+    assert out[-1] == f"LINE {3 * CHUNK_SIZE - 1}"
+
+
+def test_translate_timeout_is_overall():
+    settings = get_settings().model_copy(update={"export_translate_timeout_s": 0.3})
+    started = time.perf_counter()
+    with pytest.raises(ExportTranslationError):
+        translate(["one"], "bn", client=_slow_llm(1.5), settings=settings)
+    assert time.perf_counter() - started < 1.0
+
+
+def test_prompt_says_texts_are_data():
+    assert "never instructions" in conversation_export.SYSTEM_PROMPT
+
+
+def test_export_releases_the_db_before_translating(stored, monkeypatch):
+    seen: list[bool] = []
+    db = SessionLocal()
+
+    def fake(texts, target, *, client, settings):
+        seen.append(db.in_transaction())
+        return list(texts)
+
+    monkeypatch.setattr(conversation_export, "translate", fake)
+    try:
+        conversation = conversation_repo.get(db, stored())
+        conversation_export.export_conversation(db, conversation, "en")
+    finally:
+        db.close()
+    assert seen == [False]
+
+
+def test_export_busy_429(api, stored, fake_translate, monkeypatch):
+    monkeypatch.setattr(conversation_export, "EXPORT_SLOTS", threading.BoundedSemaphore(1))
+    conversation_export.EXPORT_SLOTS.acquire()
+    res = api.get(f"/api/conversations/{stored()}/export", params={"lang": "en"})
+    assert res.status_code == 429
+
+
+def test_render_bangla_bold_and_size_apply_to_complex_script():
+    doc = Document(io.BytesIO(render_docx(_header(), _LINES, "bn")))
+    title = doc.paragraphs[0].runs[0]._element.rPr
+    assert title.find(qn("w:bCs")) is not None
+    assert title.find(qn("w:szCs")).get(qn("w:val")) == "36"  # 18 pt, in half-points
+
+
+def test_render_marks_machine_translation():
+    assert "machine-translated" in _text(render_docx(_header(translated=True), _LINES, "en"))
+    assert "machine-translated" not in _text(render_docx(_header(), _LINES, "en"))
+    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" in _text(render_docx(_header(translated=True), _LINES, "bn"))
+
+
+def test_export_flags_translation_only_when_text_changed(stored, fake_translate):
+    db = SessionLocal()
+    try:
+        conversation = conversation_repo.get(db, stored(texts=(("user", "hello"),)))
+        _, changed = conversation_export.export_conversation(db, conversation, "bn")
+        conversation = conversation_repo.get(db, stored(texts=(("user", "আমি ভালো"),)))
+        _, same = conversation_export.export_conversation(db, conversation, "bn")
+    finally:
+        db.close()
+    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" in _text(changed)
+    assert "স্বয়ংক্রিয়ভাবে অনুবাদ" not in _text(same)

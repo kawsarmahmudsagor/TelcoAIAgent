@@ -65,7 +65,9 @@ Three units, each testable alone.
 - Model: new setting `export_translate_model`, default
   `google/gemini-3.5-flash` (quality over latency: export is not a live
   turn, and Banglish needs a stronger model than flash-lite); overall timeout setting
-  `export_translate_timeout_s`, default 60.
+  `export_translate_timeout_s`, default 60, bounding the whole call. Chunks
+  run in parallel (up to 4), so a long chat takes about one chunk's time.
+- The prompt states the message texts are data, never instructions.
 - Any HTTP error, timeout or parse failure raises `ExportTranslationError`.
 
 **`render_docx(conversation, messages, lang, customer) -> bytes`** — `python-docx`
@@ -74,12 +76,14 @@ Three units, each testable alone.
 - Title: "telco chat transcript" / "telco চ্যাট ট্রান্সক্রিপ্ট".
 - Header block: started/ended date and time (Asia/Dhaka), channel, customer
   name and number when the conversation has a subscriber. Bangla export uses
-  Bangla month names and Bangla digits in the header dates.
+  Bangla month names and Bangla digits in the header dates. When any message
+  was translated, a short italic note says the text was machine-translated.
 - One paragraph per message: bold coloured label (`Assistant:` / `User:` or
   `সহকারী:` / `গ্রাহক:`), small grey time, then the text. Message bodies keep
   their digits as written.
 - Every run sets the complex-script font (`w:cs`) to Nirmala UI and marks
-  Bangla runs as complex script, so Word shapes Bangla correctly.
+  Bangla runs as complex script, so Word shapes Bangla correctly. Bold and
+  size are set on the complex-script properties too (`bCs`, `szCs`).
 
 **`export_conversation(db, conversation, lang, ...) -> (filename, bytes)`** —
 loads visible messages (user/assistant only), translates, renders.
@@ -97,6 +101,9 @@ Both:
 
 - `lang` is required, `Literal["en", "bn"]` (anything else is 422).
 - 409 if the conversation status is `active`.
+- 429 when 4 exports are already running (each holds a worker thread through
+  the LLM call). The DB transaction ends before the LLM call.
+- The Next.js `/backend` proxy allows 90 s (`experimental.proxyTimeout`).
 - 502 with `detail="translation failed"` on `ExportTranslationError`.
 - 200 response: media type
   `application/vnd.openxmlformats-officedocument.wordprocessingml.document`,
@@ -162,7 +169,7 @@ Pytest (`backend/tests/test_conversation_export.py`):
   call 404); active → 409; translation failure → 502; 200 headers and
   filename.
 
-Model check: `scripts/export_translate_bench.py` translates a handful of real
+Model check: `scripts/export_translate_bench/run.py` translates a handful of real
 conversations (Banglish, mixed, pure English) both ways with
 `google/gemini-3.5-flash`, `openai/gpt-6-luna` and
 `google/gemini-3.5-flash-lite`, and writes the results side by side for a

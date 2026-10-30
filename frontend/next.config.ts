@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [...localIPv4Addresses(), '*.trycloudflare.com'],
   // Hide the "N" dev-tools badge Next.js floats over the page in dev mode.
   devIndicators: false,
+  experimental: {
+    // `/backend` requests may run past the 30 s default: a conversation export
+    // translates the chat first (EXPORT_TRANSLATE_TIMEOUT_S, 60 s at most).
+    proxyTimeout: 90_000,
+  },
   async redirects() {
     return [
       // Voice settings moved into the Chatbot page's "Model & voice" tab.

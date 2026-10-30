@@ -87,13 +87,18 @@ def get_conversation(conversation_id: uuid.UUID, db: Session = Depends(get_db)) 
 def export_response(
     db: Session, conversation, lang, headers: dict[str, str] | None = None
 ) -> Response:
-    """The conversation as a .docx download; 409 while live, 502 when translation fails."""
+    """The conversation as a .docx download; 409 while live, 429 while too many exports are
+    running, 502 when translation fails."""
+    if not conversation_export.EXPORT_SLOTS.acquire(blocking=False):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many exports, try again")
     try:
         filename, content = conversation_export.export_conversation(db, conversation, lang)
     except ConversationStillActive:
         raise HTTPException(status.HTTP_409_CONFLICT, "conversation is still active") from None
     except ExportTranslationError:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "translation failed") from None
+    finally:
+        conversation_export.EXPORT_SLOTS.release()
     return Response(
         content,
         media_type=conversation_export.MEDIA_TYPE,

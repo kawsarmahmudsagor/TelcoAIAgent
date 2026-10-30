@@ -75,6 +75,10 @@ export function ExportConversationDialog({
         setError('This chat is still in progress');
         return;
       }
+      if (res.status === 429) {
+        setError('Too many exports right now, try again in a moment');
+        return;
+      }
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       await downloadResponse(res);
       onOpenChange(false);
