@@ -163,9 +163,10 @@ export function useVisibleMessages(messages: ReceivedMessage[]): ReceivedMessage
 }
 
 /**
- * Whether the agent's first message (the greeting) has finished. The agent
- * takes no input until then -- typed text sent earlier is dropped -- and sets
- * the greeting_done attribute when it's over. Fallbacks, should that never
+ * Whether the agent has opened the session to input. The agent takes no input
+ * until then -- typed text sent earlier is dropped -- and sets the
+ * greeting_done attribute as its greeting starts (the greeting is
+ * interruptible). Fallbacks, should that never
  * arrive: the agent's first speaking -> listening transition, or
  * GREETING_FALLBACK_MS after connecting. Resets when the room disconnects.
  */

@@ -99,13 +99,14 @@ async def _await_greeting(
     room: rtc.Room | None,
     on_done: Callable[[], None] | None = None,
 ) -> None:
+    # The greeting is interruptible like any other reply, so input opens as it
+    # starts; on_done (the idle timer) still waits for it to end.
+    await _mark_greeting_done(session, agent, userdata, room)
     try:
         await _log_if_failed(handle)
     except Exception:
         logger.exception("greeting playout failed")
     finally:
-        # Even after a failed greeting, or the session would never take input.
-        await _mark_greeting_done(session, agent, userdata, room)
         if on_done is not None:
             on_done()
 
@@ -128,12 +129,11 @@ async def _mark_greeting_done(
     userdata: SessionUserdata,
     room: rtc.Room | None,
 ) -> None:
-    """Opens the session to the customer once the greeting has played out.
-    Until then typed text is dropped (gated_agent._text_input_cb) and the turn
-    gate ignores transcripts; the library already skips voice turns that end
-    during uninterruptible speech."""
+    """Opens the session to the customer as the greeting starts (or at once,
+    with no greeting). Until then typed text is dropped
+    (gated_agent._text_input_cb) and the turn gate ignores transcripts."""
     try:
-        # Speech heard during the greeting must not leak into the next turn.
+        # Speech heard before the session opened must not leak into the next turn.
         session.clear_user_turn()
     except RuntimeError:
         pass  # the session closed during the greeting
@@ -808,12 +808,10 @@ def _greet(
     room: rtc.Room | None = None,
     on_done: Callable[[], None] | None = None,
 ) -> None:
-    """Speaks the first message. Nothing interrupts it -- not voice (someone
-    picking up a phone says "Hello?" right away, and without this the agent
-    re-introduces itself), not the turn gate, not typed text -- and the session
-    takes no input until it has played out (_mark_greeting_done). `room` is the
-    browser room to flag the end of the greeting on; None for a phone call.
-    `on_done` runs once input has reopened.
+    """Speaks the first message. It is interruptible like any other reply: the
+    session opens to voice and typed text as it starts (_mark_greeting_done).
+    `room` is the browser room to flag that on; None for a phone call.
+    `on_done` runs once the greeting has played out.
 
     A session opened from a notification (userdata.nudge_text) greets through
     the LLM with greeting_nudge; otherwise the default inbound greeting is a
@@ -844,7 +842,7 @@ def _greet(
         else:
             lines = SPOKEN_GREETINGS_INBOUND if userdata.customer_name else SPOKEN_GREETINGS_GUEST
         instructions = None
-        handle = session.say(random.choice(lines).format(**values), allow_interruptions=False)
+        handle = session.say(random.choice(lines).format(**values))
     else:
         instructions = render_template("greeting_inbound", config.greeting_inbound, values)
     if instructions is not None:
@@ -852,9 +850,7 @@ def _greet(
         salam = SALAM_INSTRUCTION_EN if lang == "en" else SALAM_INSTRUCTION
         if lang:
             salam = f"{salam}\nSpeak {reply_language.name(lang)} only, whatever language the lines above name."
-        handle = session.generate_reply(
-            instructions=f"{instructions}\n{salam}", allow_interruptions=False
-        )
+        handle = session.generate_reply(instructions=f"{instructions}\n{salam}")
     # generate_reply()'s SpeechHandle silently swallows failures unless awaited and
     # checked (per its own docstring) -- log any greeting failure instead of losing it.
     asyncio.ensure_future(_await_greeting(handle, session, agent, userdata, room, on_done))

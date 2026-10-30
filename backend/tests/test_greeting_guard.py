@@ -1,7 +1,8 @@
-"""The first message (the greeting) can't be interrupted: until it has played out
-the session ignores the customer's voice (turn gate) and typed text, and
-afterwards nothing heard during it leaks into the first real turn. The
-AgentSession and room are fakes; the judge is a stub."""
+"""The first message (the greeting) is interruptible like any other reply: the
+session opens to the customer's voice (turn gate) and typed text as soon as the
+greeting starts. Before that the session ignores both, and nothing heard before
+it opened leaks into the first real turn. The AgentSession and room are fakes;
+the judge is a stub."""
 
 import asyncio
 import contextlib
@@ -207,12 +208,22 @@ def test_filler_typed_text_skips_the_judge():
 
 
 class FakeHandle:
-    def __init__(self, *, raises: Exception | None = None, error: Exception | None = None):
+    def __init__(
+        self,
+        *,
+        raises: Exception | None = None,
+        error: Exception | None = None,
+        played: asyncio.Event | None = None,
+    ):
         self._raises = raises
         self._error = error
+        # When given, the greeting plays until this is set.
+        self._played = played
 
     async def wait_for_playout(self):
         await asyncio.sleep(0)
+        if self._played is not None:
+            await self._played.wait()
         if self._raises is not None:
             raise self._raises
 
@@ -277,6 +288,7 @@ async def _greet(
     nudge_text=None,
     text_start=False,
     reply_language=None,
+    on_done=None,
 ):
     session = GreetSession(handle, closed=closed)
     agent = GreetAgent()
@@ -289,21 +301,49 @@ async def _greet(
         reply_language=reply_language,
     )
     config = config or agent_config_service.resolve(None)
-    entrypoint._greet(session, agent, userdata, config, room=room)
+    entrypoint._greet(session, agent, userdata, config, room=room, on_done=on_done)
     for _ in range(10):
         await asyncio.sleep(0)
     return session, agent, userdata
 
 
-def test_greeting_is_uninterruptible_and_unlocks_the_session():
+def _interruptible(reply: dict) -> bool:
+    # Left unset, the greeting is as interruptible as any other reply.
+    return reply.get("allow_interruptions", True) is not False
+
+
+def test_greeting_is_interruptible_and_unlocks_the_session():
     async def go():
         room = AttributeRoom()
         session, agent, userdata = await _greet(FakeHandle(), room=room)
-        assert [r["allow_interruptions"] for r in session.replies] == [False]
+        assert [_interruptible(r) for r in session.replies] == [True]
         assert userdata.greeting_done
         assert session.cleared == 1
         assert agent.greeting_done_calls == 1
         assert room.attributes == {"greeting_done": "1"}
+
+    asyncio.run(go())
+
+
+def test_the_session_opens_while_the_greeting_is_still_playing():
+    async def go():
+        played = asyncio.Event()
+        done: list[bool] = []
+        room = AttributeRoom()
+        session, agent, userdata = await _greet(
+            FakeHandle(played=played), room=room, on_done=lambda: done.append(True)
+        )
+        # Voice, typed text and Send are open mid-greeting.
+        assert userdata.greeting_done
+        assert agent.greeting_done_calls == 1
+        assert room.attributes == {"greeting_done": "1"}
+        # on_done (the idle timer) still waits for the greeting to end.
+        assert done == []
+        played.set()
+        for _ in range(10):
+            await asyncio.sleep(0)
+        assert done == [True]
+        assert agent.greeting_done_calls == 1
 
     asyncio.run(go())
 
@@ -367,7 +407,7 @@ def test_a_failed_greeting_still_unlocks_the_session():
 def test_phone_call_greeting_unlocks_without_a_room_and_survives_a_closed_session():
     async def go():
         session, agent, userdata = await _greet(FakeHandle(), closed=True)
-        assert session.replies[0]["allow_interruptions"] is False
+        assert _interruptible(session.replies[0])
         assert userdata.greeting_done
         assert agent.greeting_done_calls == 1
 
@@ -428,7 +468,7 @@ def test_greeting_uses_nudge_when_present():
         session, _, _ = await _greet(FakeHandle(), customer_name="Samiha", nudge_text=nudge)
         (reply,) = session.replies
         assert reply["kind"] == "generate_reply"
-        assert reply["allow_interruptions"] is False
+        assert _interruptible(reply)
         assert nudge in reply["instructions"]
         assert "Samiha" in reply["instructions"]
         assert reply["instructions"].endswith(SALAM_INSTRUCTION)
