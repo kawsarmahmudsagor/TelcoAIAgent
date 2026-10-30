@@ -160,8 +160,8 @@ _USER_COLOUR = RGBColor(0x2E, 0x7D, 0x32)
 _GREY = RGBColor(0x6B, 0x72, 0x80)
 # Chat-window layout: agent bubbles on the left, customer bubbles on the right,
 # each about 70% of the text width.
-_ASSISTANT_FILL = "F1F3F5"
-_USER_FILL = "E3F2E8"
+_ASSISTANT_FILL = "E3F2E8"
+_USER_FILL = "F1F3F5"
 _BUBBLE_INSET = Inches(1.9)
 # pPr children that come after pBdr/shd in the schema (Word rejects out-of-order ones).
 _AFTER_SHD = (
@@ -327,23 +327,23 @@ def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang)
             _style(gap.add_run(), size=4)
         is_assistant = line.role == "assistant"
         fill = _ASSISTANT_FILL if is_assistant else _USER_FILL
-        label = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=6)
-        label.paragraph_format.keep_with_next = True
-        label.alignment = WD_ALIGN_PARAGRAPH.LEFT if is_assistant else WD_ALIGN_PARAGRAPH.RIGHT
+        heading = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=6)
+        heading.paragraph_format.keep_with_next = True
+        heading.alignment = WD_ALIGN_PARAGRAPH.LEFT if is_assistant else WD_ALIGN_PARAGRAPH.RIGHT
         _style(
-            label.add_run(copy["assistant"] if is_assistant else copy["user"]),
+            heading.add_run(copy["assistant"] if is_assistant else copy["user"]),
             bold=True,
             colour=_ASSISTANT_COLOUR if is_assistant else _USER_COLOUR,
         )
         time = f"{_local(line.at):%H:%M}"
         _style(
-            label.add_run(f"  {bangla_digits(time) if lang == 'bn' else time}"),
+            heading.add_run(f"  {bangla_digits(time) if lang == 'bn' else time}"),
             size=9,
             colour=_GREY,
         )
-        text = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=0)
-        text.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        _style(text.add_run(line.text))
+        body = _bubble(doc.add_paragraph(), is_assistant, fill, space_before=0)
+        body.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        _style(body.add_run(line.text))
 
     buffer = io.BytesIO()
     doc.save(buffer)

@@ -79,8 +79,8 @@ Three units, each testable alone.
   Bangla month names and Bangla digits in the header dates. No
   machine-translation note (the user asked for none).
 - Messages laid out like the chat window: each is a shaded bubble about 70%
-  of the text width — agent on the left (grey `F1F3F5`), customer on the right
-  (green `E3F2E8`, label right-aligned, text left-aligned). A bubble is a
+  of the text width — agent on the left (green `E3F2E8`), customer on the right
+  (grey `F1F3F5`, label right-aligned, text left-aligned). A bubble is a
   label paragraph (bold coloured `Assistant:` / `User:` or `সহকারী:` /
   `গ্রাহক:` plus small grey time, kept with the next paragraph) and a text
   paragraph sharing indent, fill and a fill-coloured padding border. An

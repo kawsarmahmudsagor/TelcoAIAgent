@@ -501,12 +501,12 @@ def test_render_messages_as_chat_bubbles():
     for p in (a_label, a_text):
         assert p.paragraph_format.right_indent >= Inches(1.5)
         assert not p.paragraph_format.left_indent
-        assert _fill(p) == "F1F3F5"
+        assert _fill(p) == "E3F2E8"
     # User on the right: indented from the left, label right-aligned, text reads left to right.
     for p in (u_label, u_text):
         assert p.paragraph_format.left_indent >= Inches(1.5)
         assert not p.paragraph_format.right_indent
-        assert _fill(p) == "E3F2E8"
+        assert _fill(p) == "F1F3F5"
     assert u_label.alignment == WD_ALIGN_PARAGRAPH.RIGHT
     assert u_text.alignment == WD_ALIGN_PARAGRAPH.LEFT
     assert a_text.text == "Hello! How can I help?" and u_text.text == "Call 01712345678 please"
@@ -517,7 +517,7 @@ def test_render_bubble_has_padding_border_in_its_fill():
     borders = a_label._p.pPr.find(qn("w:pBdr"))
     for side in ("top", "left", "bottom", "right"):
         edge = borders.find(qn(f"w:{side}"))
-        assert edge.get(qn("w:color")) == "F1F3F5"
+        assert edge.get(qn("w:color")) == "E3F2E8"
         assert int(edge.get(qn("w:space"))) > 0
 
 
