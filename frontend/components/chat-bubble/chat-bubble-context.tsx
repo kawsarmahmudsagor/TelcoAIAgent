@@ -167,8 +167,22 @@ export function ChatBubbleProvider({
         setIsOpen(true);
         setLanguagePending(true);
         return new Promise<boolean>((resolve) => {
-          languageWaitRef.current?.resolve(false);
-          languageWaitRef.current = { options, resolve };
+          // A second start before the pick (another chip, then the call button) joins the
+          // first: cancelling it would drop the text the first one queued.
+          const waiting = languageWaitRef.current;
+          languageWaitRef.current = waiting
+            ? {
+                options: {
+                  voice: waiting.options.voice || options.voice,
+                  openPanel: waiting.options.openPanel || options.openPanel,
+                  textStart: Boolean(waiting.options.textStart || options.textStart),
+                },
+                resolve: (ok) => {
+                  waiting.resolve(ok);
+                  resolve(ok);
+                },
+              }
+            : { options, resolve };
         });
       }
       if (typed !== textStart) {
