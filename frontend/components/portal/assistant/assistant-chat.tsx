@@ -4,6 +4,7 @@ import { type ReactNode, useMemo, useState } from 'react';
 import {
   ArrowUpIcon,
   AsteriskIcon,
+  DownloadIcon,
   HistoryIcon,
   Loader2Icon,
   MicIcon,
@@ -19,6 +20,8 @@ import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcrip
 import { StartAudioButton } from '@/components/agents-ui/start-audio-button';
 import { useCallAudio } from '@/components/app/call/call-audio-provider';
 import { statusLabel } from '@/components/app/call/status';
+import { useChatBubble } from '@/components/chat-bubble/chat-bubble-context';
+import { ExportConversationDialog } from '@/components/customer/export-conversation-dialog';
 import { useAssistant } from '@/components/portal/assistant/assistant-provider';
 import { CaseCard } from '@/components/portal/assistant/cards/case-card';
 import { ConfirmCard } from '@/components/portal/assistant/cards/confirm-card';
@@ -32,6 +35,7 @@ import {
   QuestionChips,
 } from '@/components/portal/assistant/suggested-questions';
 import { useOptionalPortalMe } from '@/components/portal/portal-me-context';
+import { exportVisitorConversation } from '@/lib/public-conversations';
 import { cn } from '@/lib/shadcn/utils';
 import { placeAfterTurn } from '@/lib/telco-topics';
 
@@ -57,8 +61,9 @@ export function BotAvatar({ size = 'md', className }: { size?: 'sm' | 'md'; clas
 
 /**
  * The chat panel's header: the assistant's name, its live status, the chat history toggle, and
- * the speaker toggle while connected, and a call button that starts a voice conversation (as
- * "Talk instead of typing" does) while the mic is off. `actions` go on the right (e.g. the
+ * the speaker toggle while connected, a call button that starts a voice conversation (as
+ * "Talk instead of typing" does) while the mic is off, and an export button for the ended chat
+ * on screen (disabled while one is live). `actions` go on the right (e.g. the
  * bubble's buttons).
  */
 export function AssistantChatHeader({
@@ -80,8 +85,12 @@ export function AssistantChatHeader({
     toggleMic,
     voiceMode,
     replyLanguage,
+    exportableId,
   } = useAssistant();
   const { muted, toggleMuted } = useCallAudio();
+  const { visitorId } = useChatBubble();
+  const [exportOpen, setExportOpen] = useState(false);
+  const canExport = Boolean(exportableId && visitorId);
 
   let status = 'Usually replies instantly';
   if (connecting) status = 'Connecting…';
@@ -115,6 +124,13 @@ export function AssistantChatHeader({
         </HeaderButton>
       )}
       <HeaderButton
+        label={canExport ? 'Export chat' : 'Export chat (once the chat has ended)'}
+        onClick={() => setExportOpen(true)}
+        disabled={!canExport}
+      >
+        <DownloadIcon aria-hidden="true" />
+      </HeaderButton>
+      <HeaderButton
         label={historyOpen ? 'Back to the chat' : 'Chat history'}
         onClick={() => setHistoryOpen(!historyOpen)}
         pressed={historyOpen}
@@ -131,6 +147,14 @@ export function AssistantChatHeader({
         </HeaderButton>
       )}
       {actions}
+      {exportableId && visitorId && (
+        <ExportConversationDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          defaultLanguage={replyLanguage}
+          fetchExport={(lang) => exportVisitorConversation(visitorId, exportableId, lang)}
+        />
+      )}
     </div>
   );
 }
@@ -140,11 +164,13 @@ export function HeaderButton({
   label,
   onClick,
   pressed,
+  disabled,
   children,
 }: {
   label: string;
   onClick(): void;
   pressed?: boolean;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -154,7 +180,8 @@ export function HeaderButton({
       aria-label={label}
       title={label}
       aria-pressed={pressed}
-      className="text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] motion-safe:transition-colors [&_svg]:size-4"
+      disabled={disabled}
+      className="text-muted-foreground hover:bg-surface2 focus-visible:ring-ring/60 grid size-9 shrink-0 place-items-center rounded-[10px] outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-40 motion-safe:transition-colors [&_svg]:size-4"
     >
       {children}
     </button>

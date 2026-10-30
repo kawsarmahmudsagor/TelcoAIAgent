@@ -79,6 +79,12 @@ export interface AssistantContextValue {
   /** The earlier chat being carried on (its id), if any. */
   resumedId: string | null;
   /**
+   * The ended conversation on screen, for export: the chat carried on, else the guest session
+   * that ended last (with several ended guest sessions on screen, only the last one). Null while
+   * a session is up or on its way.
+   */
+  exportableId: string | null;
+  /**
    * Loads an earlier chat from the history and carries it on: a live session is ended first,
    * and the next one reopens that conversation. Resolves false when it couldn't be loaded.
    */
@@ -183,6 +189,8 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
   );
   // A guest's ended sessions: kept on screen until a new chat (or a reload), never carried on.
   const [earlier, setEarlier] = useState<ReceivedMessage[]>([]);
+  // The conversation id of the guest session that ended last (its chat is in `earlier`).
+  const [guestEndedId, setGuestEndedId] = useState<string | null>(null);
   const earlierRef = useRef(earlier);
   earlierRef.current = earlier;
   const messages = useMemo(() => {
@@ -299,6 +307,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       setQueued([]);
       hideCurrentLive();
       setEarlier([]);
+      setGuestEndedId(null);
       setResumed({ id, messages: toReceivedMessages(detail) });
       // It goes on in its own language; a chat from before the pick asks for one.
       resetReplyLanguage(detail.reply_language ?? null);
@@ -313,6 +322,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       setQueued([]);
       hideCurrentLive();
       setEarlier([]);
+      setGuestEndedId(null);
       setResumed(null);
       resetReplyLanguage(null);
       setHistoryOpen(false);
@@ -326,6 +336,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       setQueued([]);
       hideCurrentLive();
       setEarlier([]);
+      setGuestEndedId(null);
       setResumed(null);
       setHistoryOpen(false);
       if (wasLive) void startSession({ voice, openPanel: false });
@@ -346,6 +357,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     shownForRef.current = subscriberId;
     if (before === null || before === subscriberId) return;
     setEarlier([]);
+    setGuestEndedId(null);
     setResumed(null);
     resetReplyLanguage(null);
   }, [subscriberId, setResumed, resetReplyLanguage]);
@@ -374,8 +386,10 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       if (mine !== null && conversationId) {
         setResumed({ id: conversationId, messages: [...earlierRef.current, ...said] });
         setEarlier([]);
+        setGuestEndedId(null);
       } else {
         setEarlier((prev) => [...prev, ...said]);
+        setGuestEndedId(conversationId);
       }
     };
     room.on(RoomEvent.Disconnected, keep);
@@ -384,12 +398,17 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     };
   }, [room, resumedId, setResumed, hideCurrentLive, accountRef, conversationIdRef]);
 
+  const connecting =
+    !isConnected && (autoConnecting || connectionState === ConnectionState.Connecting);
+  const exportableId = isConnected || connecting ? null : (resumedId ?? guestEndedId);
+
   const value = useMemo<AssistantContextValue>(
     () => ({
       messages,
       historyOpen,
       setHistoryOpen,
       resumedId,
+      exportableId,
       openConversation,
       newChat,
       startOverForLogin,
@@ -397,8 +416,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       confirm,
       agentState,
       isConnected,
-      connecting:
-        !isConnected && (autoConnecting || connectionState === ConnectionState.Connecting),
+      connecting,
       ready,
       queued,
       sendText,
@@ -414,6 +432,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       messages,
       historyOpen,
       resumedId,
+      exportableId,
       openConversation,
       newChat,
       startOverForLogin,
@@ -421,8 +440,7 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       confirm,
       agentState,
       isConnected,
-      autoConnecting,
-      connectionState,
+      connecting,
       ready,
       queued,
       sendText,
