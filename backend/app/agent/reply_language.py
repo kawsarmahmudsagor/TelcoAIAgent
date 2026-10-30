@@ -35,6 +35,21 @@ def name(lang: ReplyLanguage) -> str:
     return _NAMES[lang]
 
 
+def prompt_block(lang: ReplyLanguage) -> str:
+    """The system prompt's language rule for a picked language."""
+    script = " Write Bangla in Bengali script, never in English letters." if lang == "bn" else ""
+    language = name(lang)
+    return (
+        f"REPLY LANGUAGE — the customer chose {language} for this chat. Reply only in "
+        f"{language}, in every reply, whatever language the customer writes or speaks in "
+        f"(English, Bangla or Banglish), including their very first message, and whatever "
+        f"language a tool or the knowledge base returns.{script} Greet in {language}. This "
+        f"overrides the LANGUAGE rules above and any note that says to use the language of the "
+        f"customer's message. For speech you cannot make out, or another language, say exactly "
+        f'"{OTHER_LANGUAGE_LINES[lang]}" and nothing else.\n'
+    )
+
+
 def in_language(lang: ReplyLanguage | None, default: str) -> str:
     """"in English" / "in Bangla (Bengali script)", or `default` when unset."""
     return f"in {name(lang)}" if lang else default

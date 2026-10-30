@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.agent import voice_mode
+from app.agent import reply_language, voice_mode
 from app.agent.prompt_defaults import KNOWLEDGE_SCOPE_DEFAULT, KNOWLEDGE_SCOPE_RAG
 from app.agent.snapshot import GUEST_SNAPSHOT
 from app.agent.tools._datetime import agency_tz
@@ -11,8 +11,7 @@ from app.services.agent_config_service import ResolvedAgentConfig, render_templa
 # A session opened by a typed message has no greeting (entrypoint._greet), so
 # the first reply mustn't make up for it.
 _TEXT_START_NOTE = """TYPED START: the customer opened this chat by typing a message, and you haven't greeted them.
-Answer that message directly: don't greet, don't say Salam and don't introduce yourself. Reply in
-the language of their message.
+Answer that message directly: don't greet, don't say Salam and don't introduce yourself. Reply {language}.
 """
 
 _INBOUND_TASK = (
@@ -28,8 +27,7 @@ _BROWSER_END_NOTE = """ENDING THE VOICE CHAT: when the customer seems to be wrap
 now, no more help needed, ঠিক আছে ধন্যবাদ, আর কিছু লাগবে না), don't end yet: ask
 whether they need anything else. When they then say no, or when they say goodbye outright (bye,
 আল্লাহ হাফেজ, আসি তাহলে, রাখি তাহলে), say goodbye in one or two short sentences that fit what
-happened (thank them and say you're here if they need anything else), in the language of their
-latest message, and call end_call in that same reply, after the goodbye. Their mic turns off once
+happened (thank them and say you're here if they need anything else), {language}, and call end_call in that same reply, after the goodbye. Their mic turns off once
 the goodbye has played; the chat stays open, so never say the call or chat is over. If a thanks
 comes with a question, or they clearly want to go on, just carry on and don't call end_call.
 """
@@ -76,9 +74,17 @@ def build_system_prompt(
     # The session's account snapshot (app.agent.snapshot), never editable.
     snapshot = userdata.snapshot_text or GUEST_SNAPSHOT
     task = _INBOUND_TASK
+    lang = reply_language.fixed(userdata)
     if userdata.text_start and not userdata.nudge_text:
-        task = f"{task}\n{_TEXT_START_NOTE}"
-    prompt = f"{identity}\n{snapshot}\n\n{task}\n{_BROWSER_END_NOTE}"
+        typed = reply_language.in_language(lang, "in the language of their message")
+        task = f"{task}\n{_TEXT_START_NOTE.format(language=typed)}"
+    end_note = _BROWSER_END_NOTE.format(
+        language=reply_language.in_language(lang, "in the language of their\nlatest message")
+    )
+    prompt = f"{identity}\n{snapshot}\n\n{task}\n{end_note}"
+    # After every editable part, so it outranks their LANGUAGE rules.
+    if lang:
+        prompt = f"{prompt}\n{reply_language.prompt_block(lang)}"
     # Last, so the snapshot block above stays replaceable in place.
     if note := voice_mode.channel_note(voice_mode.mode_for(userdata, config)):
         prompt = f"{prompt}\n\n{note}"

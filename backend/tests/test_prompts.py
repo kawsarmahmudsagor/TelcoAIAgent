@@ -246,3 +246,51 @@ def test_bangla_is_said_not_translated_and_a_broad_package_ask_is_narrowed_first
     assert "never translate" in flat and "not lines to reuse" in flat
     assert "they'd like to hear more" not in flat
     assert "what kind they're after" in flat and "recommend_packages" in flat
+
+
+def test_prompt_fixed_english():
+    from app.agent.prompt_defaults import CHANNEL_TEXT_NOTE
+
+    config = agent_config_service.resolve(None)
+    config = __import__("dataclasses").replace(config, voice_replies_enabled=False)
+    userdata = SessionUserdata(channel=Channel.inbound_chat, room=None, reply_language="en")
+    prompt = build_system_prompt(userdata, config)
+    assert "REPLY LANGUAGE" in prompt and "Reply only in English" in prompt
+    assert prompt.endswith(CHANNEL_TEXT_NOTE)
+    assert prompt.index("REPLY LANGUAGE") > prompt.index("ENDING THE VOICE CHAT")
+
+
+def test_prompt_fixed_bangla_says_bengali_script():
+    config = agent_config_service.resolve(None)
+    userdata = SessionUserdata(channel=Channel.inbound_chat, room=None, reply_language="bn")
+    prompt = build_system_prompt(userdata, config)
+    assert "Reply only in Bangla (Bengali script)" in prompt
+    assert "never in English letters" in prompt.split("REPLY LANGUAGE")[1]
+    assert "দুঃখিত, বুঝতে পারিনি।" in prompt
+
+
+def test_prompt_unset_unchanged():
+    config = agent_config_service.resolve(None)
+    prompt = build_system_prompt(SessionUserdata(channel=Channel.inbound_chat, room=None), config)
+    assert "REPLY LANGUAGE" not in prompt
+    assert "in the language of their\nlatest message" in prompt
+
+
+def test_text_start_and_end_notes_follow_pick():
+    config = agent_config_service.resolve(None)
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat, room=None, text_start=True, reply_language="en"
+    )
+    prompt = build_system_prompt(userdata, config)
+    typed = prompt.split("TYPED START")[1].split("ENDING THE VOICE CHAT")[0]
+    assert "in English" in typed and "language of their message" not in typed
+    ending = prompt.split("ENDING THE VOICE CHAT")[1].split("REPLY LANGUAGE")[0]
+    assert "in English" in ending and "language of their" not in ending
+
+
+def test_goodbye_texts_follow_pick():
+    assert "In Bangla" in entrypoint.browser_end_goodbye("bn")
+    assert "latest message" not in entrypoint.browser_end_goodbye("bn")
+    assert "In English" in entrypoint.end_call_goodbye("en")
+    assert "In the language of the customer's latest message" in entrypoint.end_call_goodbye(None)
+    assert "latest message" in entrypoint.browser_end_goodbye(None)

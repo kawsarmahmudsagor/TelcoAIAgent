@@ -249,6 +249,9 @@ SALAM = "আসসালামু আলাইকুম"
 # Appended to a greeting that goes through the LLM, so a dashboard greeting
 # still opens with the Salam.
 SALAM_INSTRUCTION = f"Open with \"{SALAM}\"."
+# The same for a chat whose customer picked English (app.agent.reply_language).
+SALAM_EN = "Assalamu alaikum"
+SALAM_INSTRUCTION_EN = f"Open with \"{SALAM_EN}\"."
 
 # Greetings are instructions handed to generate_reply, not text spoken verbatim.
 # {customer_name} is the first name, or "" for a guest.
@@ -280,6 +283,17 @@ SPOKEN_GREETINGS_GUEST: tuple[str, ...] = (
     "বলুন, কীভাবে আপনাকে সাহায্য করতে পারি?",
     f"{SALAM}! আমি {{agent_name}}, {{operator_name}} থেকে বলছি। "
     "বলুন, কীভাবে আপনাকে সাহায্য করতে পারি?",
+)
+# English, for a chat whose customer picked English.
+SPOKEN_GREETINGS_INBOUND_EN: tuple[str, ...] = (
+    f"{SALAM_EN}, {{customer_name}}! I'm {{agent_name}} from {{operator_name}}. "
+    "How can I help you today?",
+    f"{SALAM_EN}, {{customer_name}}! This is {{agent_name}} from {{operator_name}}. "
+    "How can I help you today?",
+)
+SPOKEN_GREETINGS_GUEST_EN: tuple[str, ...] = (
+    f"{SALAM_EN}! I'm {{agent_name}} from {{operator_name}}. How can I help you today?",
+    f"{SALAM_EN}! This is {{agent_name}} from {{operator_name}}. How can I help you today?",
 )
 # Handed to generate_reply once a guest logs in during the conversation
 # (app.agent.account_link); the ACCOUNT SNAPSHOT is the customer's by then.

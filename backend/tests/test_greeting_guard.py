@@ -276,6 +276,7 @@ async def _greet(
     customer_name=None,
     nudge_text=None,
     text_start=False,
+    reply_language=None,
 ):
     session = GreetSession(handle, closed=closed)
     agent = GreetAgent()
@@ -285,6 +286,7 @@ async def _greet(
         customer_name=customer_name,
         nudge_text=nudge_text,
         text_start=text_start,
+        reply_language=reply_language,
     )
     config = config or agent_config_service.resolve(None)
     entrypoint._greet(session, agent, userdata, config, room=room)
@@ -466,3 +468,31 @@ def test_a_customised_greeting_still_goes_through_the_llm():
 def test_every_canned_greeting_opens_with_the_salam():
     for line in (*SPOKEN_GREETINGS_INBOUND, *SPOKEN_GREETINGS_GUEST):
         assert line.startswith(SALAM)
+
+
+def test_english_pick_gets_an_english_canned_greeting(monkeypatch):
+    from app.agent.prompt_defaults import SPOKEN_GREETINGS_GUEST_EN, SPOKEN_GREETINGS_INBOUND_EN
+
+    pools = _pick_last(monkeypatch)
+
+    async def go():
+        session, _, _ = await _greet(FakeHandle(), reply_language="en")
+        assert pools == [SPOKEN_GREETINGS_GUEST_EN]
+        session, _, _ = await _greet(FakeHandle(), customer_name="Samiha", reply_language="en")
+        (reply,) = session.replies
+        assert reply["text"] == SPOKEN_GREETINGS_INBOUND_EN[-1].format(**_values("Samiha"))
+        assert reply["text"].startswith("Assalamu alaikum")
+
+    asyncio.run(go())
+
+
+def test_english_pick_turns_an_llm_greeting_english():
+    async def go():
+        session, _, _ = await _greet(
+            FakeHandle(), customer_name="Samiha", nudge_text="low balance", reply_language="en"
+        )
+        (reply,) = session.replies
+        assert 'Open with "Assalamu alaikum".' in reply["instructions"]
+        assert "Speak English only" in reply["instructions"]
+
+    asyncio.run(go())

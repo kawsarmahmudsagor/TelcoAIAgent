@@ -220,3 +220,21 @@ def test_upgrade_survives_apply_failure(bss_world, monkeypatch):
         assert session.replies == [LOGIN_FOLLOWUP]
 
     asyncio.run(go())
+
+
+def test_upgrade_keeps_the_reply_language_block(bss_world):
+    from app.agent.persona import build_system_prompt
+
+    sub = bss_world.subscriber(full_name="Rafi Ahmed", main_balance=Decimal("100"))
+    guest = SessionUserdata(channel=Channel.inbound_chat, room=None, reply_language="en")
+    prompt = build_system_prompt(guest, agent_config_service.resolve(None))
+    assert "REPLY LANGUAGE" in prompt
+
+    async def go():
+        link, _room, _session, agent, userdata = _link(prompt=prompt)
+        userdata.reply_language = "en"
+        assert await link.link(sub.id) is True
+        assert "REPLY LANGUAGE" in agent.instructions
+        assert "Reply only in English" in agent.instructions
+
+    asyncio.run(go())

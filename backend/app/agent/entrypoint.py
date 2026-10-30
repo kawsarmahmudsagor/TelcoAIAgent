@@ -43,6 +43,7 @@ from app.agent import (
     openrouter_audio,
     prefetch,
     quick_reply,
+    reply_language,
     run_log,
     sentence_tokenizer,
     session_context,
@@ -54,9 +55,13 @@ from app.agent.persona import build_system_prompt
 from app.agent.prompt_defaults import (
     DEFAULT_GREETING_NUDGE,
     SALAM_INSTRUCTION,
+    SALAM_INSTRUCTION_EN,
     SPOKEN_GREETINGS_GUEST,
+    SPOKEN_GREETINGS_GUEST_EN,
     SPOKEN_GREETINGS_INBOUND,
+    SPOKEN_GREETINGS_INBOUND_EN,
 )
+from app.agent.reply_language import ReplyLanguage
 from app.agent.snapshot import load_session_context
 from app.agent.speech_numbers import speak_numbers_as_words
 from app.agent.speech_words import respell_words_for_speech
@@ -451,19 +456,25 @@ _BROWSER_END_CALL_DESCRIPTION = (
 
 # end_call's result when no goodbye came before it: the goodbye is the reply to
 # it, and the call ends once that has played. Kept fitting the conversation, not
-# a fixed line.
-_END_CALL_GOODBYE = (
-    "The call ends after your next words. In the language of the customer's latest message, "
-    "say goodbye in one or two short sentences that fit what happened: thank them and invite "
-    "them back anytime. If you already said goodbye just now, say nothing more."
-)
+# a fixed line. In the picked reply language, if there is one.
+def end_call_goodbye(lang: ReplyLanguage | None) -> str:
+    language = reply_language.in_language(lang, "in the language of the customer's latest message")
+    return (
+        f"The call ends after your next words. {language[0].upper()}{language[1:]}, say goodbye "
+        "in one or two short sentences that fit what happened: thank them and invite them back "
+        "anytime. If you already said goodbye just now, say nothing more."
+    )
+
+
 # The same for a browser session, where only the mic turns off and the chat stays open.
-_BROWSER_END_GOODBYE = (
-    "The customer's mic turns off after your next words; the chat stays open. In the language "
-    "of the customer's latest message, say goodbye in one or two short sentences that fit what "
-    "happened: thank them and say you're here if they need anything else. If you already said "
-    "goodbye just now, say nothing more."
-)
+def browser_end_goodbye(lang: ReplyLanguage | None) -> str:
+    language = reply_language.in_language(lang, "in the language of the customer's latest message")
+    return (
+        "The customer's mic turns off after your next words; the chat stays open. "
+        f"{language[0].upper()}{language[1:]}, say goodbye in one or two short sentences that fit "
+        "what happened: thank them and say you're here if they need anything else. If you "
+        "already said goodbye just now, say nothing more."
+    )
 
 
 def _idle_checkin(
@@ -528,7 +539,7 @@ def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None
         tools.append(
             EndCallTool(
                 delete_room=True,
-                end_instructions=_END_CALL_GOODBYE,
+                end_instructions=end_call_goodbye(reply_language.fixed(userdata)),
                 extra_description=_END_CALL_DESCRIPTION,
             )
         )
@@ -537,7 +548,7 @@ def _session_tools(userdata: SessionUserdata, config: ResolvedAgentConfig | None
         # turns the mic off and the chat stays open (see browser_end_call).
         tools.append(
             browser_end_call.BrowserEndCall(
-                goodbye_instructions=_BROWSER_END_GOODBYE,
+                goodbye_instructions=browser_end_goodbye(reply_language.fixed(userdata)),
                 extra_description=_BROWSER_END_CALL_DESCRIPTION,
             ).tool
         )
@@ -818,6 +829,7 @@ def _greet(
         "operator_name": config.operator_name,
         "customer_name": userdata.customer_name or "",
     }
+    lang = reply_language.fixed(userdata)
     if userdata.nudge_text:
         instructions = render_template(
             "greeting_nudge",
@@ -826,15 +838,21 @@ def _greet(
         )
     elif config.greeting_inbound is None:
         # Still the default: speak a canned line, no LLM round trip.
-        lines = SPOKEN_GREETINGS_INBOUND if userdata.customer_name else SPOKEN_GREETINGS_GUEST
+        if lang == "en":
+            lines = SPOKEN_GREETINGS_INBOUND_EN if userdata.customer_name else SPOKEN_GREETINGS_GUEST_EN
+        else:
+            lines = SPOKEN_GREETINGS_INBOUND if userdata.customer_name else SPOKEN_GREETINGS_GUEST
         instructions = None
         handle = session.say(random.choice(lines).format(**values), allow_interruptions=False)
     else:
         instructions = render_template("greeting_inbound", config.greeting_inbound, values)
     if instructions is not None:
-        # An LLM greeting still opens with the Salam.
+        # An LLM greeting still opens with the Salam, in the picked language if any.
+        salam = SALAM_INSTRUCTION_EN if lang == "en" else SALAM_INSTRUCTION
+        if lang:
+            salam = f"{salam}\nSpeak {reply_language.name(lang)} only, whatever language the lines above name."
         handle = session.generate_reply(
-            instructions=f"{instructions}\n{SALAM_INSTRUCTION}", allow_interruptions=False
+            instructions=f"{instructions}\n{salam}", allow_interruptions=False
         )
     # generate_reply()'s SpeechHandle silently swallows failures unless awaited and
     # checked (per its own docstring) -- log any greeting failure instead of losing it.
