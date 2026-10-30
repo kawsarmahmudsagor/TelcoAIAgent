@@ -1169,3 +1169,17 @@ def test_other_language_line_follows_the_pick():
         assert ("say", OTHER_LANGUAGE_LINES["bn"], False) in session.calls
 
     asyncio.run(go())
+
+
+def test_fallback_lines_follow_the_pick():
+    from app.agent import gated_agent
+
+    english = SimpleNamespace(reply_language="en")
+    assert gated_agent.unclear_turn_line(english) == gated_agent.UNCLEAR_TURN_LINES["en"]
+    assert gated_agent.stream_failed_line(english) == gated_agent.STREAM_FAILED_LINES["en"]
+    for line in (gated_agent.unclear_turn_line(english), gated_agent.stream_failed_line(english)):
+        assert turn_gate.classify_script(line) == "en", line
+    # No pick (phone calls, older chats): today's Bangla lines.
+    for userdata in (None, SimpleNamespace(reply_language=None)):
+        assert gated_agent.unclear_turn_line(userdata) == gated_agent.UNCLEAR_TURN_LINE
+        assert gated_agent.stream_failed_line(userdata) == gated_agent.STREAM_FAILED_LINE

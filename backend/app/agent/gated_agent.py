@@ -80,9 +80,26 @@ IGNORED_TEXT_TOPIC = "ignored-text"
 
 OTHER_LANGUAGE_LINE = OTHER_LANGUAGE_LINES["en"]
 # Said when a turn the gate dropped still reads like a question to the agent.
-UNCLEAR_TURN_LINE = "সরি, ঠিক বুঝতে পারিনি। আরেকবার বলবেন?"
+UNCLEAR_TURN_LINES = {
+    "bn": "সরি, ঠিক বুঝতে পারিনি। আরেকবার বলবেন?",
+    "en": "Sorry, I didn't quite catch that. Could you say it again?",
+}
 # Said when the turn's processing or the main model's reply fails.
-STREAM_FAILED_LINE = "সরি, একটু সমস্যা হচ্ছে। আরেকবার বলবেন, প্লিজ?"
+STREAM_FAILED_LINES = {
+    "bn": "সরি, একটু সমস্যা হচ্ছে। আরেকবার বলবেন, প্লিজ?",
+    "en": "Sorry, something went wrong. Could you say that again, please?",
+}
+# With no picked reply language (phone calls, older chats) both are Bangla.
+UNCLEAR_TURN_LINE = UNCLEAR_TURN_LINES["bn"]
+STREAM_FAILED_LINE = STREAM_FAILED_LINES["bn"]
+
+
+def unclear_turn_line(userdata: object) -> str:
+    return UNCLEAR_TURN_LINES[reply_language.fixed(userdata) or "bn"]
+
+
+def stream_failed_line(userdata: object) -> str:
+    return STREAM_FAILED_LINES[reply_language.fixed(userdata) or "bn"]
 
 # A dropped turn that still reads like a question to the agent gets "please say
 # that again" instead of silence. Bengali vowel signs aren't word characters, so
@@ -866,7 +883,10 @@ class TurnGateController:
                 if _has_question_or_address(text):
                     logger.info("Turn was dropped by gate but contains question/address; asking clarification: %s", text)
                     try:
-                        self.session.say(UNCLEAR_TURN_LINE, add_to_chat_ctx=True)
+                        self.session.say(
+                            unclear_turn_line(getattr(self.session, "userdata", None)),
+                            add_to_chat_ctx=True,
+                        )
                     except Exception:
                         pass
         raise StopResponse()
@@ -1495,7 +1515,7 @@ class GatedAgent(Agent):
                 yield chunk
         except Exception as exc:
             logger.exception("main model stream failed: %s; saying a fallback line", exc)
-            yield STREAM_FAILED_LINE
+            yield stream_failed_line(userdata)
             return
         if tool_call or userdata is None:
             return
@@ -1570,7 +1590,7 @@ class GatedAgent(Agent):
         except Exception as exc:
             logger.exception("Unexpected error in GatedAgent.on_user_turn_completed: %s", exc)
             try:
-                self.session.say(STREAM_FAILED_LINE, add_to_chat_ctx=True)
+                self.session.say(stream_failed_line(_userdata(self)), add_to_chat_ctx=True)
             except Exception:
                 pass
             raise StopResponse()
