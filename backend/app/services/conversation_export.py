@@ -20,6 +20,7 @@ from docx.shared import Pt, RGBColor
 from docx.text.run import Run
 from sqlalchemy.orm import Session
 
+from app.agent.quick_models import reasoning_for
 from app.config import Settings, get_settings
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.telco import Subscriber
@@ -45,12 +46,14 @@ Rules:
 - Translate every part that is not in the target language. Leave parts already in it unchanged.
 - Banglish is Bangla written in Latin letters, and counts as Bangla: "amar balance koto?" is
   "আমার ব্যালেন্স কত?" in Bangla and "What is my balance?" in English.
-- Bangla output: modern spoken Bangla, polite and natural, keeping common English loanwords
-  (balance, recharge, SIM, internet). Not too casual.
+- Bangla output: modern spoken Bangla, polite and natural, not too casual. Common English
+  loanwords stay as loanwords but are written in Bengali script: ব্যালেন্স, রিচার্জ, ইন্টারনেট,
+  প্যাকেজ, টাকা. Only "telco", SIM, GB/MB and codes stay in Latin letters.
+- English output uses digits 0-9, also for numbers written in Bengali digits (১২০ is 120).
 - The brand is "telco": always lowercase, never with a dot after it.
 - Always "package" in English and "প্যাকেজ" in Bangla, never "pack".
-- Keep exactly as written: numbers, phone numbers, USSD codes such as *121#, URLs, amounts and
-  currency, and package names.
+- Keep the value of every number, phone number, amount and date unchanged, and keep USSD codes
+  such as *121#, URLs and package names exactly as written.
 """
 
 
@@ -94,8 +97,9 @@ def _translate_chunk(
             headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
             json={
                 "model": settings.export_translate_model,
-                "temperature": 0,
-                "reasoning": {"effort": "none"},
+                # Some models can't turn reasoning off (Gemini 3.5: "Reasoning is
+                # mandatory"); the shared per-model setting, minimal by default.
+                "reasoning": reasoning_for(settings.export_translate_model),
                 "messages": [
                     {
                         "role": "system",

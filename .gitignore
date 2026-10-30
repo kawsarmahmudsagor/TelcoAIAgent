@@ -20,3 +20,4 @@ frontend/tsconfig.tsbuildinfo
 # Misc
 logs/
 .DS_Store
+scripts/export_translate_bench/report.md

@@ -10,6 +10,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from sqlalchemy import text
 
+from app.agent.quick_models import reasoning_for
 from app.config import get_settings
 from app.db.session import SessionLocal
 from app.repositories import conversation_repo
@@ -128,9 +129,15 @@ def test_translate_prompt_rules():
     translate(["hi"], "bn", client=client, settings=get_settings())
     body = requests[0]
     system = body["messages"][0]["content"]
-    for rule in ("Banglish", "telco", "প্যাকেজ", "*121#"):
+    # The bench showed loanwords left in Latin letters ("আমার balance কত?") and
+    # Bangla digits kept in English output ("১২০ taka").
+    for rule in ("Banglish", "telco", "প্যাকেজ", "*121#", "ব্যালেন্স", "digits 0-9"):
         assert rule in system
     assert body["model"] == get_settings().export_translate_model == "google/gemini-3.5-flash"
+    # Gemini 3.5 rejects reasoning "none" ("Reasoning is mandatory"); the shared
+    # per-model setting is minimal for a model it doesn't list.
+    assert body["reasoning"] == reasoning_for(body["model"])
+    assert body["reasoning"] != {"effort": "none"}
 
 
 # 2026-10-30 08:32 UTC is 14:32 in Dhaka.
