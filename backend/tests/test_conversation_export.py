@@ -370,3 +370,9 @@ def test_visitor_export_active_409(anon_api, stored, fake_translate):
     visitor = uuid.uuid4()
     res = _visitor_get(anon_api, stored(visitor, ended=False), visitor)
     assert res.status_code == 409
+
+
+def test_cors_exposes_the_filename(api):
+    origin = get_settings().cors_origins[0]
+    res = api.get(f"/api/conversations/{uuid.uuid4()}/export?lang=en", headers={"Origin": origin})
+    assert "content-disposition" in res.headers.get("access-control-expose-headers", "").lower()

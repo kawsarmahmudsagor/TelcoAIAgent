@@ -1,5 +1,6 @@
 import type { Participant } from 'livekit-client';
 import type { ReceivedMessage } from '@livekit/components-react';
+import type { ReplyLanguage } from '@/lib/reply-language';
 import type { VisitorConversationDetail, VisitorConversationPage } from '@/lib/types';
 
 // Same-origin `/backend`, proxied to FastAPI (see lib/api-client.ts).
@@ -37,6 +38,19 @@ export function getVisitorConversation(
     `/api/public/conversations/${encodeURIComponent(conversationId)}`,
     visitorId,
     signal
+  );
+}
+
+/** An ended chat as a Word file (raw response: 409 while live, 502 when translation fails). */
+export function exportVisitorConversation(
+  visitorId: string,
+  conversationId: string,
+  lang: ReplyLanguage
+): Promise<Response> {
+  return fetch(
+    `${FASTAPI_URL}/api/public/conversations/${encodeURIComponent(conversationId)}/export?lang=${lang}`,
+    // The portal session cookie lets a signed-in customer export their chats from any browser.
+    { headers: { 'X-Visitor-Id': visitorId }, cache: 'no-store', credentials: 'include' }
   );
 }
 

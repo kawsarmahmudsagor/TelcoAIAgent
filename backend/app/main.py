@@ -28,6 +28,8 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # A cross-origin page reads the export's filename from it.
+        expose_headers=["Content-Disposition"],
     )
 
     app.include_router(routes_auth.router)

@@ -172,6 +172,11 @@ const conversations = {
     get<ConversationPage>(`/api/conversations${qs(params)}`),
   get: (id: UUID) => get<ConversationDetail>(`/api/conversations/${id}`),
   delete: (id: UUID) => del(`/api/conversations/${id}`),
+  /** The conversation as a Word file (raw response: 409 while live, 502 when translation fails). */
+  export: (id: UUID, lang: 'en' | 'bn') =>
+    fetch(`${FASTAPI_URL}/api/conversations/${id}/export${qs({ lang })}`, {
+      credentials: 'include',
+    }),
   bulkDelete: (ids: UUID[]) => post<BulkDeleteResult>('/api/conversations/bulk-delete', { ids }),
 };
 
