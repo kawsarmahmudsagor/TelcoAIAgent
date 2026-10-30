@@ -307,3 +307,14 @@ def test_stale_sweep_ends_only_idle_active_conversations():
     assert swept.status == "ended"
     assert abs((swept.ended_at - idle_since).total_seconds()) < 1
     assert _conversation(fresh_id).status == "active"
+
+
+def test_create_conversation_stores_reply_language():
+    userdata = _userdata(reply_language="en")
+
+    async def run():
+        recorder = await TranscriptRecorder.start(_FakeSession(), userdata, _room())
+        await recorder.close()
+        return recorder.conversation_id
+
+    assert _conversation(asyncio.run(run())).reply_language == "en"

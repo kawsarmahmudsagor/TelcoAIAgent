@@ -25,8 +25,10 @@ def create(
     subscriber_id: uuid.UUID | None = None,
     is_phone_call: bool = False,
     visitor_id: uuid.UUID | None = None,
+    reply_language: str | None = None,
 ) -> Conversation:
     conversation = Conversation(
+        reply_language=reply_language,
         channel=channel,
         room_name=room_name,
         subscriber_id=subscriber_id,
@@ -81,14 +83,26 @@ def end(
     db.commit()
 
 
-def reopen(db: Session, conversation_id: uuid.UUID, *, room_name: str | None) -> int:
+def reopen(
+    db: Session,
+    conversation_id: uuid.UUID,
+    *,
+    room_name: str | None,
+    reply_language: str | None = None,
+) -> int:
     """An earlier conversation the customer picked up again in a new room: active
-    again, in that room. Returns the highest message `seq` so far, for the
-    recorder to number new messages after it."""
+    again, in that room. A chat from before the language pick takes the new
+    pick; one that has a language keeps it. Returns the highest message `seq`
+    so far, for the recorder to number new messages after it."""
     db.execute(
         update(Conversation)
         .where(Conversation.id == conversation_id)
-        .values(status=ConversationStatus.active.value, ended_at=None, room_name=room_name)
+        .values(
+            status=ConversationStatus.active.value,
+            ended_at=None,
+            room_name=room_name,
+            reply_language=func.coalesce(Conversation.reply_language, reply_language),
+        )
     )
     db.commit()
     return (

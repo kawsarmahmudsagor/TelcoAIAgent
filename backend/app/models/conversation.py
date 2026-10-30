@@ -55,6 +55,10 @@ class Conversation(TimestampedBase):
     visitor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True
     )
+    # The reply language the customer picked when the chat opened ("en"/"bn",
+    # app.agent.reply_language); null for phone calls and older chats. A resumed
+    # chat keeps it.
+    reply_language: Mapped[str | None] = mapped_column(String(2), nullable=True)
     status: Mapped[str] = mapped_column(
         String(16), default=ConversationStatus.active.value, server_default="active", index=True
     )

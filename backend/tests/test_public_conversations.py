@@ -105,7 +105,7 @@ def test_lists_only_this_visitors_chats_newest_first_and_paginates(anon_api):
     item = first["items"][0]
     assert item["preview"] == "fourth"
     assert item["message_count"] == 3  # tool rows aren't counted
-    assert set(item) == {"id", "started_at", "ended_at", "status", "preview", "message_count"}
+    assert set(item) == {"id", "started_at", "ended_at", "status", "preview", "message_count", "reply_language"}
 
     rest = anon_api.get(
         "/api/public/conversations", params={"offset": 3}, headers=_headers(visitor)
@@ -299,3 +299,75 @@ def test_transcript_recorder_reopens_the_resumed_conversation():
         assert conversation.room_name == new_room
     finally:
         db.close()
+
+
+def _set_language(conversation_id: uuid.UUID, lang: str | None) -> None:
+    db = SessionLocal()
+    try:
+        db.execute(
+            text("update conversations set reply_language = :l where id = :i"),
+            {"l": lang, "i": conversation_id},
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _stored_language(conversation_id: uuid.UUID) -> str | None:
+    db = SessionLocal()
+    try:
+        return conversation_repo.get(db, conversation_id).reply_language
+    finally:
+        db.close()
+
+
+def test_history_returns_reply_language(anon_api):
+    visitor = uuid.uuid4()
+    conversation_id = _conversation(visitor)
+    _set_language(conversation_id, "bn")
+    body = anon_api.get("/api/public/conversations", headers=_headers(visitor)).json()
+    assert body["items"][0]["reply_language"] == "bn"
+    detail = anon_api.get(
+        f"/api/public/conversations/{conversation_id}", headers=_headers(visitor)
+    ).json()
+    assert detail["reply_language"] == "bn"
+
+
+def test_resume_keeps_stored_language():
+    visitor = uuid.uuid4()
+    conversation_id = _conversation(visitor)
+    _set_language(conversation_id, "bn")
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat,
+        room=None,
+        visitor_id=visitor,
+        resume_conversation_id=conversation_id,
+        reply_language="en",
+    )
+    load_resume_history(userdata)
+    assert userdata.reply_language == "bn"
+
+
+def test_resume_legacy_row_takes_pick():
+    visitor = uuid.uuid4()
+    conversation_id = _conversation(visitor)
+    userdata = SessionUserdata(
+        channel=Channel.inbound_chat,
+        room=None,
+        visitor_id=visitor,
+        resume_conversation_id=conversation_id,
+        reply_language="en",
+    )
+    load_resume_history(userdata)
+    assert userdata.reply_language == "en"
+
+    class _Session:
+        def on(self, *_):
+            pass
+
+    async def run():
+        recorder = await TranscriptRecorder.start(_Session(), userdata, _room())
+        await recorder.close()
+
+    asyncio.run(run())
+    assert _stored_language(conversation_id) == "en"

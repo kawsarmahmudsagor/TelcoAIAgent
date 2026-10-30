@@ -65,6 +65,7 @@ def list_visitor_conversations(
                 status=conversation.status,
                 preview=_preview(first_message),
                 message_count=count or 0,
+                reply_language=conversation.reply_language,
             )
             for conversation, first_message, count in rows
         ],
@@ -100,5 +101,6 @@ def get_visitor_conversation(
         started_at=conversation.started_at,
         ended_at=conversation.ended_at,
         status=conversation.status,
+        reply_language=conversation.reply_language,
         messages=[VisitorConversationMessage.model_validate(m) for m in messages],
     )

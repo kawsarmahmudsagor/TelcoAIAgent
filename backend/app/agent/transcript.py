@@ -14,6 +14,7 @@ from collections import OrderedDict, deque
 from datetime import datetime, timezone
 from typing import Any
 
+from app.agent import reply_language
 from app.agent.userdata import SessionUserdata
 from app.db.session import SessionLocal
 from app.models.conversation import MessageRole
@@ -86,6 +87,7 @@ def create_conversation(userdata: SessionUserdata, room_name: str | None) -> uui
             subscriber_id=userdata.subscriber_id,
             is_phone_call=userdata.is_phone_call,
             visitor_id=getattr(userdata, "visitor_id", None),
+            reply_language=userdata.reply_language,
         )
         return conversation.id
     finally:
@@ -112,15 +114,22 @@ def load_resume_history(userdata: SessionUserdata) -> None:
         messages = conversation_repo.list_visible_messages(db, conversation_id)
     finally:
         db.close()
+    # A resumed chat goes on in its own language, whatever was picked now.
+    if stored := reply_language.parse(conversation.reply_language):
+        userdata.reply_language = stored
     userdata.resume_history = [
         (m.role, m.text) for m in messages[-RESUME_HISTORY_MAX:] if m.text and m.text.strip()
     ]
 
 
-def _reopen_conversation(conversation_id: uuid.UUID, room_name: str | None) -> int:
+def _reopen_conversation(
+    conversation_id: uuid.UUID, room_name: str | None, reply_language: str | None
+) -> int:
     db = SessionLocal()
     try:
-        return conversation_repo.reopen(db, conversation_id, room_name=room_name)
+        return conversation_repo.reopen(
+            db, conversation_id, room_name=room_name, reply_language=reply_language
+        )
     finally:
         db.close()
 
@@ -149,7 +158,9 @@ class TranscriptRecorder:
         try:
             if userdata.resume_conversation_id is not None:
                 conversation_id = userdata.resume_conversation_id
-                last_seq = await asyncio.to_thread(_reopen_conversation, conversation_id, room_name)
+                last_seq = await asyncio.to_thread(
+                    _reopen_conversation, conversation_id, room_name, userdata.reply_language
+                )
             else:
                 conversation_id = await asyncio.to_thread(create_conversation, userdata, room_name)
         except Exception:

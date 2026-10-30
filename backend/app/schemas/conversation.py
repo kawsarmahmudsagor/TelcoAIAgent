@@ -68,6 +68,8 @@ class VisitorConversationSummary(BaseModel):
     preview: str | None
     # User + assistant messages (tool rows aren't shown to the visitor).
     message_count: int
+    # The chat's picked reply language ("en"/"bn"); null for older chats.
+    reply_language: str | None = None
 
 
 class VisitorConversationPage(BaseModel):
@@ -91,4 +93,5 @@ class VisitorConversationDetail(BaseModel):
     started_at: datetime
     ended_at: datetime | None
     status: str
+    reply_language: str | None = None
     messages: list[VisitorConversationMessage]
