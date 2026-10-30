@@ -302,9 +302,9 @@ def test_write_tools_without_subscriber_say_log_in():
             verify.run_verify_otp(ud, "123456"),
             verify.run_cancel_pending_action(ud),
             support.run_create_support_case(ud, "other", "x", confirmed=True),
-            support.run_request_human_agent(ud, "x"),
         ]:
             assert await coro == NOT_LOGGED_IN
+        assert await support.run_request_human_agent(ud, "x") == support.HANDOFF_NOT_LOGGED_IN
         assert _sent(ud) == []
 
     asyncio.run(go())
@@ -318,3 +318,11 @@ def test_no_transaction_before_confirm(bss_world):
         select(func.count()).select_from(Transaction).where(Transaction.subscriber_id == sub.id)
     )
     assert count == 0
+
+
+def test_a_guest_handoff_offers_the_hotline_and_opens_no_case(db):
+    before = db.scalar(select(func.count()).select_from(SupportCase))
+    out = asyncio.run(support.run_request_human_agent(_ud(), "Customer asked for a person."))
+    assert out == support.HANDOFF_NOT_LOGGED_IN
+    assert "hotline" in out
+    assert db.scalar(select(func.count()).select_from(SupportCase)) == before

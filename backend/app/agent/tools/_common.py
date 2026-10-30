@@ -19,8 +19,9 @@ from app.db.session import SessionLocal
 T = TypeVar("T")
 
 NOT_LOGGED_IN = (
-    "The customer is not logged in, so their account cannot be accessed. "
-    "Ask them to log in to their account first."
+    "The customer is not logged in, so their account cannot be accessed. Say warmly that this "
+    "is on their account, that the Log in button is at the top of the page and that you'll "
+    "answer straight after, then offer one thing you can do now. Not a bare \"log in first\"."
 )
 
 _GENERIC = "Something went wrong. Apologise briefly and ask the customer to try again."

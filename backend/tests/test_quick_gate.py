@@ -12,6 +12,7 @@ from livekit.agents.types import FlushSentinel
 
 from app.agent.gated_agent import GateConfig, TurnGateController, _Handled
 from app.agent.prefetch import Lookup
+from app.agent import quick_reply
 from app.agent.quick_reply import QuickReplyRuntime
 from app.agent.turn_gate import Thresholds
 from app.agent.turn_judge import Judgement
@@ -93,7 +94,7 @@ def _gate(
     composed: list[str] = []
     topics: list[str | None] = []
 
-    async def compose(text, lookup, history, topic=None):
+    async def compose(text, lookup, history, topic=None, guest=False):
         composed.append(text)
         topics.append(topic)
         if compose_s:
@@ -792,5 +793,37 @@ def test_no_early_filler_for_words_that_need_no_tool():
         _heard(g.gate, "আচ্ছা ঠিক আছে, ধন্যবাদ")
         await asyncio.sleep(0.05)
         assert g.composed == []
+
+    asyncio.run(go())
+
+
+# ---- guest replies ----
+
+
+def test_a_guest_account_ask_gets_the_fixed_line_without_a_model(monkeypatch):
+    agent, g, fast, main_calls, routed = _agent(monkeypatch, ["hello"])
+    g.session.userdata.subscriber_id = None
+    g.gate.quick.language = "bn"
+    message = _msg("আমার ব্যালেন্স কত?")
+    g.gate._route_guest(
+        message.id, message.text_content, Judgement(0.9, "none", 0.9, topic="balance", topic_p=0.9)
+    )
+    out = _reply(agent, _ctx_with(message), [end_call])
+    assert out in quick_reply._GUEST_LINES["balance"]["bn"]
+    assert main_calls == [] and fast.calls == []
+    assert g.gate.guest_for is None
+    # Only once: the next reply is the main model's.
+    assert _reply(agent, _ctx_with(message), [end_call]) == "main answer"
+
+
+def test_a_guest_turn_routes_to_the_fixed_line():
+    async def go():
+        g = _gate(Judgement(0.9, "none", 0.9, topic="balance", topic_p=0.9), prefetcher=None)
+        g.session.userdata.subscriber_id = None
+        message = _msg("আমার ব্যালেন্স কত?")
+        assert await _turn(g, message) is True
+        assert g.gate.guest_for is not None and g.gate.guest_for[0] == message.id
+        assert g.composed == [] and g.gate.fast_for is None and g.gate.pending_filler is None
+        assert _says(g.session) == []
 
     asyncio.run(go())

@@ -592,10 +592,48 @@ def test_fillers_in_a_row_never_share_an_opener_or_a_verb(utterance):
     assert len(set(said)) == len(said)
 
 
+@pytest.mark.parametrize(
+    ("line", "shape"),
+    [
+        ("জি, আমাকে একটু সময় দিন।", "wait"),
+        ("জি, বুঝতে পেরেছি। একটু সময় দিন।", "wait"),
+        ("বুঝতে পেরেছি। দেখে আপনাকে জানাচ্ছি।", "two"),
+        ("জি, অবশ্যই। চেক করে জানাচ্ছি।", "two"),
+        ("আপনার ব্যালেন্সটা দেখে আপনাকে জানাচ্ছি, এক মিনিট।", "wait_end"),
+        ("চেক করে জানাচ্ছি, একটু অপেক্ষা করুন।", "wait_end"),
+        ("জি, আপনার ব্যালেন্সটা চেক করে আপনাকে জানাচ্ছি।", "action"),
+        ("আমাকে একটু সময় দিন, ব্যালেন্সটা দেখে জানাচ্ছি।", "action"),
+    ],
+)
+def test_shape_is_read_from_the_line(line, shape):
+    assert quick_reply._shape(line) == shape
+
+
+def test_every_echo_family_mixes_shapes():
+    for family in quick_reply._ECHO_BN.values():
+        assert len({quick_reply._shape(line) for line in family}) >= 3, family
+
+
+@pytest.mark.parametrize(
+    "utterance", ["আমার ব্যালেন্স কত আছে?", "মিরপুরে নেট পাচ্ছি না", "ডাটা প্যাক আছে?"]
+)
+@pytest.mark.parametrize(
+    "last",
+    # Generic lines of each shape: a line on the same topic would make the turn
+    # a follow-up, whose short lines are all one shape.
+    ["দেখে আপনাকে বলছি, এক মিনিট।", "জি, চেক করে বলছি।", "জি, অবশ্যই। চেক করে জানাচ্ছি।"],
+)
+def test_the_next_filler_is_built_another_way(utterance, last):
+    # Not the same shape as the line before, though the words differ.
+    for seed in range(20):
+        line = quick_reply.fast_filler(utterance, "none", avoid=[last], rng=random.Random(seed))
+        assert quick_reply._shape(line) != quick_reply._shape(last), (last, line)
+
+
 def test_a_line_already_cached_is_picked_more_often(tmp_path):
     from app.agent.audio_cache import AudioCache
 
-    cached = "আচ্ছা, আপনার ব্যালেন্সটা একটু দেখছি।"
+    cached = "আচ্ছা, আপনার ব্যালেন্সটা এখনই দেখে বলছি।"
     cache = AudioCache(tmp_path)
     cache.save(cached, b"\x00\x00" * 100, 24000, 1, "voice:model")
     picks = Counter(_fillers("আমার ব্যালেন্স কত আছে?", n=2000, cache=cache))
@@ -638,13 +676,14 @@ def test_template_lines_are_safe_short_and_telco():
         assert quick_reply.is_filler_line(line)
 
 
-def test_dekhchi_is_not_the_usual_verb():
-    bangla = [line for line in _template_lines() if turn_gate.classify_script(line) == "bn"]
-    assert sum("দেখছি" in line for line in bangla) * 4 <= len(bangla)
+def test_no_line_stops_at_the_check():
+    # A bare দেখছি / দেখি / চেক করছি / খুঁজছি / "চেক করে নিই" sounds like the check is all there is
+    # (the user, 2026-10-30): lines say what comes next.
+    stalled = re.compile(r"দেখছি|দেখি[।,\s]|দেখি$|করে নিই|দেখে নিই|চেক করছি|যাচাই করছি|খুঁজছি")
+    for line in _template_lines():
+        assert not stalled.search(line), line
     for family in quick_reply._ECHO_BN.values():
-        # Two at most: the user wants bare দেখছি lines (2026-10-29).
-        assert sum("দেখছি" in shape for shape in family) <= 2
-        assert "দেখছি" not in family[0]
+        assert not any(stalled.search(shape) for shape in family), family
         assert len({quick_reply._opener(shape) for shape in family}) == len(family)
 
 
@@ -1041,3 +1080,168 @@ def test_fast_rules_follow_the_pick():
     assert "Reply in the language of the customer's latest message" not in fixed
     plain = fast_chat_ctx(original).items[0].text_content
     assert plain.endswith(FAST_RULES)
+
+
+# --- guest replies -----------------------------------------------------------------------
+
+
+@dataclass
+class _Guest:
+    subscriber_id: object | None = None
+    pending_action: object | None = None
+    pending_case: object | None = None
+
+
+def _sure(topic: str) -> Judgement:
+    return Judgement(0.9, "none", 0.9, topic=topic, topic_p=0.9)
+
+
+@pytest.mark.parametrize(
+    ("text", "topic", "expected"),
+    [
+        ("আমার ব্যালেন্স কত?", "balance", "balance"),
+        ("What's my balance?", "balance", "balance"),
+        ("আমার কত ডাটা বাকি আছে?", "usage", "usage"),
+        ("আমার এখনকার প্যাকেজ কোনটা?", "pack", "my_pack"),
+        ("which package do I have", "pack", "my_pack"),
+        ("ব্যালেন্স থেকে টাকা কাটল কেন?", "transactions", "transactions"),
+        ("রিচার্জ করেছি কিন্তু টাকা আসেনি", "recharge", "recharge"),
+        ("আমার কত পয়েন্ট আছে?", "points", "points"),
+        ("আমার জন্য কী অফার আছে?", "offer", "offer"),
+        ("আমার কেসের কী অবস্থা?", "complaint", "case"),
+        # Answered for anyone: the main model, or a search.
+        ("পয়েন্ট কীভাবে পাওয়া যায়?", "points", None),
+        ("কীভাবে রিচার্জ করব?", "recharge", None),
+        ("মান্থলি ডাটা প্যাক কী কী আছে?", "data", None),
+        # A second ask the line would drop.
+        ("ব্যালেন্স কত, আর সিলেটে নেটওয়ার্ক কেমন?", "balance", None),
+    ],
+)
+def test_guest_topic(text, topic, expected):
+    assert quick_reply.guest_topic(_sure(topic), _Guest(), _settings(), text) == expected
+
+
+def test_guest_topic_needs_a_guest_a_sure_jev_and_no_lookup():
+    s, text = _settings(), "আমার ব্যালেন্স কত?"
+    assert quick_reply.guest_topic(_sure("balance"), _Guest(subscriber_id="sub"), s, text) is None
+    assert quick_reply.guest_topic(_sure("balance"), _Userdata(), s, text) is None
+    unsure = Judgement(0.9, "none", 0.9, topic="balance", topic_p=0.4)
+    assert quick_reply.guest_topic(unsure, _Guest(), s, text) is None
+    lookup = Judgement(0.9, "knowledge_base", 0.9, topic="balance", topic_p=0.9)
+    assert quick_reply.guest_topic(lookup, _Guest(), s, text) is None
+
+
+def test_route_sends_a_guest_account_ask_to_the_fixed_line():
+    s, c = _settings(), _config()
+    j = Judgement(0.9, "none", 0.9, topic="balance", topic_p=0.9)
+    assert route(j, _Guest(), c, s, text="আমার ব্যালেন্স কত?") == "guest"
+    # A logged-in customer gets the filler, as before.
+    assert route(j, _Guest(subscriber_id="sub"), c, s, text="আমার ব্যালেন্স কত?") == "filler"
+
+
+def test_a_guest_account_ask_jev_is_unsure_of_gets_no_filler():
+    """The model-written filler as much as the template one: either would
+    promise a lookup the login guidance takes back. The small model answers
+    it instead (FAST_GUEST_RULES), or the main model when that is off."""
+    s = _settings()
+    text = "আমার ব্যালেন্স কত?"
+    unsure = Judgement(0.9, "none", 0.9, topic="balance", topic_p=0.3)
+    lookup = Judgement(0.9, "knowledge_base", 0.9)
+    for config in (_config(quick_filler_llm=True), _config(quick_filler_llm=False)):
+        config.quick_fast_answer = True
+        assert route(unsure, _Guest(), config, s, text=text) == "fast"
+        assert route(lookup, _Guest(), config, s, text=text) == "fast"
+        config.quick_fast_answer = False
+        assert route(unsure, _Guest(), config, s, text=text) is None
+    early = _config(quick_filler=True, quick_filler_llm=True)
+    assert not quick_reply.early_filler("আমার ব্যালেন্স কত?", _Guest(), early)
+    assert quick_reply.early_filler("আমার ব্যালেন্স কত?", _Guest(subscriber_id="sub"), early)
+
+
+def test_a_guest_still_gets_fillers_for_what_needs_no_login():
+    j = Judgement(0.9, "packages", 0.9, topic="data", topic_p=0.9)
+    assert route(j, _Guest(), _config(), _settings(), text="মান্থলি ডাটা প্যাক কী কী আছে?") == "filler"
+
+
+def test_guest_lines_follow_the_language_and_vary():
+    for topic, langs in quick_reply._GUEST_LINES.items():
+        assert set(langs) == {"bn", "en"}
+        for lang, lines in langs.items():
+            assert len(lines) >= 2
+            for line in lines:
+                assert "Log in" in line or "log in" in line or "লগইন" in line
+                assert turn_gate.classify_script(line) == lang
+                assert "পরে চেষ্টা" not in line and not line.startswith("আগে লগইন করুন")
+    english = quick_reply.guest_line("balance", "আমার ব্যালেন্স কত?", "en", [])
+    assert english in quick_reply._GUEST_LINES["balance"]["en"]
+    bangla = quick_reply.guest_line("balance", "আমার ব্যালেন্স কত?", None, [])
+    assert bangla in quick_reply._GUEST_LINES["balance"]["bn"]
+    first = quick_reply._GUEST_LINES["usage"]["bn"][0]
+    assert quick_reply.guest_line("usage", "ডাটা কত বাকি", "bn", [first]) != first
+
+
+def test_runtime_guest_reply_remembers_its_lines():
+    runtime = QuickReplyRuntime(_config(), _settings(), "k", httpx.AsyncClient())
+    runtime.language = "bn"
+    a = runtime.guest_reply("balance", "ব্যালেন্স কত")
+    b = runtime.guest_reply("balance", "ব্যালেন্স কত")
+    assert a != b and runtime.guest_said == [a, b]
+
+
+def test_fast_rules_carry_the_guest_rules_only_for_a_guest():
+    assert quick_reply.FAST_GUEST_RULES not in quick_reply.fast_rules()
+    guest = quick_reply.fast_rules(guest=True)
+    assert guest.endswith(quick_reply.FAST_GUEST_RULES) and "Log in button" in guest
+    picked = quick_reply.fast_rules("bn", guest=True)
+    assert "Reply only in Bangla" in picked and quick_reply.FAST_GUEST_RULES in picked
+    original = llm.ChatContext()
+    original.items.append(
+        llm.ChatMessage(id=INSTRUCTIONS_MESSAGE_ID, role="system", content=["IDENTITY"])
+    )
+    assert quick_reply.FAST_GUEST_RULES in fast_chat_ctx(original, guest=True).items[0].text_content
+    assert quick_reply.FAST_GUEST_RULES not in fast_chat_ctx(original).items[0].text_content
+
+
+@pytest.mark.parametrize("care", [True, False])
+def test_the_filler_request_tells_the_model_about_a_guest(care):
+    def user(guest):
+        payload = quick_reply.build_filler_request(
+            "m", "সিলেটে নেট স্লো", "none", [], [], None, care, None, guest
+        )
+        return payload["messages"][1]["content"]
+
+    assert quick_reply._FILLER_GUEST_NOTE in user(True)
+    assert quick_reply._FILLER_GUEST_NOTE not in user(False)
+
+
+@pytest.mark.parametrize(
+    ("text", "topic", "expected"),
+    [
+        ("মানুষের সাথে কথা বলতে চাই", None, "human"),
+        ("ধুর, নেট পাই না! কোনো মানুষের সাথে কথা বলব", "network", "human"),
+        ("I want to talk to a human", "complaint", "human"),
+        ("রিচার্জ করে দিন", "recharge", "recharge_do"),
+        ("I want to top up", None, "recharge_do"),
+        ("এই প্যাকেজটা কিনব", "pack", "buy"),
+        ("I'll buy that one", None, "buy"),
+        # By what they want: the main model searches first.
+        ("৩০০ টাকার মধ্যে ডাটা প্যাকেজ কিনব", "data", None),
+        ("সাত দিনের প্যাকেজ কিনতে চাই", "pack", None),
+        # How to, for anyone.
+        ("বিকাশ দিয়ে কীভাবে রিচার্জ করব?", "recharge", None),
+    ],
+)
+def test_guest_topic_for_actions_and_a_person(text, topic, expected):
+    j = Judgement(0.9, "none", 0.9, topic=topic, topic_p=0.9 if topic else None)
+    assert quick_reply.guest_topic(j, _Guest(), _settings(), text) == expected
+
+
+def test_the_person_line_says_sorry_and_offers_the_hotline():
+    for lang in ("bn", "en"):
+        line = quick_reply.guest_line("human", "মানুষের সাথে কথা বলব", lang, [], "01700121121")
+        assert "01700121121" in line and "{phone}" not in line
+        assert any(w in line for w in ("দুঃখিত", "সরি", "sorry"))
+        no_phone = quick_reply.guest_line("human", "talk to a human", lang, [], "")
+        assert no_phone in quick_reply._GUEST_HUMAN_NO_PHONE[lang]
+    runtime = QuickReplyRuntime(_config(operator_phone="01999"), _settings(), "k", httpx.AsyncClient())
+    assert "01999" in runtime.guest_reply("human", "talk to a human")

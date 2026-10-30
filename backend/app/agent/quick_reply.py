@@ -21,6 +21,10 @@ That one answer picks the path (route):
   (judged_topic), else the customer's words; only a turn they don't fit asks
   the small model. Either way the line states no facts: safe_filler drops one
   with numbers, money or contact details the customer didn't say.
+- "guest": a guest asks about their own account, which needs a login: a
+  fixed line (guest_line) answers at once, with no model. A guest's account
+  ask the guest route isn't sure of gets no filler: it goes "fast", where
+  FAST_GUEST_RULES has the small model give the login line itself.
 
 Anything less sure stays on the main model, as without quick replies.
 """
@@ -52,7 +56,7 @@ from app.services.agent_config_service import ResolvedAgentConfig
 logger = logging.getLogger("agent.quick_reply")
 usage_logger = logging.getLogger("agent.usage")
 
-Route = Literal["fast", "filler"]
+Route = Literal["fast", "filler", "guest"]
 
 # The small model's way of saying "the main model should answer this".
 HANDOFF = "[[MAIN]]"
@@ -92,6 +96,28 @@ Reply with exactly {HANDOFF} and nothing else when the customer:
 - asks anything you are not sure you can answer from the conversation.
 Never guess a fact. When in doubt, reply with exactly {HANDOFF}."""
 
+# Added to FAST_RULES for a guest (is_guest): their own account needs a login,
+# so the small model answers that itself instead of handing off.
+FAST_GUEST_RULES = f"""
+The customer is not logged in (a guest; see ACCOUNT SNAPSHOT). When this turn only asks about
+their own account (balance, data or minutes left, their package, transactions or deductions,
+recharges, reward points, offers, support cases), or only asks to recharge, or to buy or redeem
+something already named or shown, answer it yourself, without {HANDOFF}: say warmly that it needs
+them logged in, that the Log in button is at the top of the page and that you'll do it straight
+after, in one or two short sentences. You may offer one thing you can do now (find a package,
+check the network, SIM or care centre questions). Never a bare "আগে লগইন করুন" or "please log in
+first", and never say you are checking or looking it up. When a guest is upset or asks for a
+person, answer yourself too: a short, sincere apology first, then politely offer our hotline (the
+number in WHEN YOU DON'T HAVE A DETAIL), and that once they log in you can send our team a request
+to follow up. When the turn also asks something else, or asks for a package by what they want
+(data, price, validity), reply with exactly {HANDOFF}."""
+
+# Added to the filler request for a guest: no line may promise an account check.
+_FILLER_GUEST_NOTE = (
+    "The customer is not logged in: their own balance, usage, package, transactions, "
+    "recharges, points, offers and cases can't be checked. Never say you'll check any of those."
+)
+
 _FILLER_SYSTEM = """You write the short line a mobile operator's phone assistant says
 while the main assistant handles the customer's request. The line is spoken aloud.
 
@@ -101,7 +127,7 @@ Choose a style that fits the request and vary the sentence structure, not just i
 Styles to vary:
 - Brief acknowledgement: "জি, বুঝেছি।"
 - Understanding: "আপনার কথাটা বুঝতে পেরেছি।"
-- Checking: "আচ্ছা, একটু চেক করে নিই।"
+- Checking: "আচ্ছা, চেক করে আপনাকে জানাচ্ছি।"
 - Polite request: "একটু সময় দেবেন, প্লিজ?"
 - Empathy: "আপনার অসুবিধাটা বুঝতে পেরেছি।"
 - Neutral response to a choice or follow-up: "আচ্ছা, ওটা নিয়ে বলছি।"
@@ -179,6 +205,8 @@ class QuickReplyRuntime:
     # The customer's picked reply language (app.agent.reply_language): every
     # filler is in it. None follows the language of their message.
     language: ReplyLanguage | None = None
+    # Guest lines said so far (guest_line), so a second ask hears another.
+    guest_said: list[str] = field(default_factory=list)
     _fast_llm: llm.LLM | None = None
 
     @property
@@ -196,6 +224,15 @@ class QuickReplyRuntime:
             self._fast_llm = build_fast_llm(self.config, self.settings, self.api_key)
         return self._fast_llm
 
+    def guest_reply(self, topic: str, utterance: str) -> str:
+        line = guest_line(
+            topic, utterance, self.language, self.guest_said, self.config.operator_phone
+        )
+        self.guest_said.append(line)
+        if self.on_event is not None:
+            self.on_event(f'guest: fixed line for {topic} "{line}"')
+        return line
+
     def avoid(self, utterance: str) -> list[str]:
         """The last lines said in the utterance's script (the picked language's,
         when there is one): a line in the other language would pull the new one
@@ -210,8 +247,10 @@ class QuickReplyRuntime:
         history: list[Exchange],
         *,
         topic: str | None = None,
+        guest: bool = False,
     ) -> str | None:
-        """topic: Jev's, when it is sure (judged_topic)."""
+        """topic: Jev's, when it is sure (judged_topic). guest: the customer
+        isn't logged in, which the model-written line is told."""
         avoid = self.avoid(utterance)
         care = self.config.quick_filler_llm
         line = (
@@ -248,6 +287,7 @@ class QuickReplyRuntime:
             topic=topic,
             care=care,
             language=self.language,
+            guest=guest,
         )
         if line is not None:
             remember_filler(line)
@@ -262,7 +302,7 @@ class QuickReplyRuntime:
 #
 # Four kinds, as in the real-estate agent's fillers:
 # - generic: checking, understanding, affirming; never wrong, never specific;
-# - echo: "{x} চেক করছি" with x what the customer asked about, as their topic
+# - echo: "{x} চেক করে বলছি" with x what the customer asked about, as their topic
 #   ("আপনার ব্যালেন্সটা") or in their own words ("মিরপুর এলাকার নেটওয়ার্কটা",
 #   "সাত দিনের ডাটা প্যাকেজগুলো");
 # - topic: a few hand-written lines per topic that the echo shape can't say;
@@ -277,21 +317,20 @@ def _re(pattern: str) -> re.Pattern[str]:
 
 _CHECKING_BN = (
     "একটু সময় দেবেন, প্লিজ।",
-    "একটু অপেক্ষা করুন, চেক করছি।",
     "আচ্ছা, এক মিনিট সময় দিন।",
-    "জি, একটু দেখছি।",
-    "জি, একটু চেক করে নিই।",
+    "জি, আমাকে একটু সময় দিন।",
+    "চেক করে জানাচ্ছি, একটু অপেক্ষা করুন।",
+    "দেখে আপনাকে বলছি, এক মিনিট।",
     "জি, দেখে আপনাকে জানাচ্ছি।",
-    "দেখে আপনাকে জানাচ্ছি।",
-    "একটু দেখে আপনাকে বলছি।",
     "জি, চেক করে বলছি।",
-    "জি, আপনাকে জানাচ্ছি।",
-    "আচ্ছা, দেখে আপনাকে বলছি।",
+    "আচ্ছা, এখনই দেখে বলছি।",
+    "জি, এখনই জানিয়ে দিচ্ছি।",
+    "জি, অবশ্যই। চেক করে জানাচ্ছি।",
 )
 _UNDERSTANDING_BN = (
     "জি, বুঝতে পেরেছি। একটু সময় দিন।",
-    "বুঝতে পেরেছি, একটু সময় দিন।",
-    "বুঝতে পেরেছি, একটু সময় দিন, দেখে বলছি।",
+    "বুঝতে পেরেছি। দেখে আপনাকে জানাচ্ছি।",
+    "বুঝতে পেরেছি, দেখে বলছি, একটু সময় দিন।",
 )
 _GENERIC_BN = (*_CHECKING_BN, *_UNDERSTANDING_BN)
 
@@ -325,42 +364,46 @@ _GENERIC_EN = (*_CHECKING_EN, *_UNDERSTANDING_EN)
 # ব্যালেন্সটা", "the data packages"). Each topic takes the verbs of what is
 # really being done: packages and places are searched for, the account is
 # looked up, a status or a rule is checked. Every shape opens with its own
-# word, and দেখছি is in one shape at most.
+# word, and each says what comes next ("দেখে বলছি", "জানাচ্ছি"), never a
+# bare দেখছি that sounds like the check is all there is.
 _ECHO_BN: dict[str, tuple[str, ...]] = {
     "search": (
-        "জি, আমি {x} চেক করছি।",
-        "আচ্ছা, {x} চেক করছি।",
-        "এক সেকেন্ড, {x} খুঁজছি।",
-        "একটু সময় দিন, {x} খুঁজছি।",
+        "জি, আমি {x} চেক করে বলছি।",
+        "আচ্ছা, বুঝেছি। {x} চেক করে জানাচ্ছি।",
+        "{x} খুঁজে বলছি, এক সেকেন্ড।",
+        "একটু সময় দিন, {x} খুঁজে আপনাকে জানাচ্ছি।",
+        "এক সেকেন্ড, {x} এখনই দেখাচ্ছি।",
     ),
     "lookup": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "আচ্ছা, {x} একটু দেখছি।",
-        "ঠিক আছে, {x} যাচাই করে জানাচ্ছি আপনাকে।",
-        "এক মিনিট, {x} দেখে আপনাকে জানাচ্ছি।",
-        "একটু সময় দিন, {x} দেখছি।",
+        "আচ্ছা, {x} এখনই দেখে বলছি।",
+        "অবশ্যই। {x} যাচাই করে আপনাকে জানাচ্ছি।",
+        "{x} দেখে আপনাকে জানাচ্ছি, এক মিনিট।",
+        "আমাকে একটু সময় দিন, {x} দেখে জানাচ্ছি।",
     ),
     "status": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "এক সেকেন্ড, {x_of} স্ট্যাটাসটা যাচাই করছি",
-        "আচ্ছা, {x_of} আপডেটটা দেখে আপনাকে জানাচ্ছি।",
-        "একটু সময় দিন, {x_of} স্ট্যাটাস চেক করছি।",
+        "এক সেকেন্ড, {x_of} স্ট্যাটাসটা যাচাই করে বলছি।",
+        "আচ্ছা, {x_of} আপডেটটা দেখে জানাচ্ছি।",
+        "{x_of} স্ট্যাটাসটা চেক করে বলছি, একটু সময় দিন।",
+        "বুঝতে পেরেছি। {x} দেখে আপনাকে আপডেট দিচ্ছি।",
     ),
     # A care centre is looked for, in the area named: "মিরপুর এলাকার কেয়ার
-    # সেন্টার খুঁজছি". x_cc says it as কাস্টমার কেয়ার.
+    # সেন্টার খুঁজে বলছি". x_cc says it as কাস্টমার কেয়ার.
     "place": (
-        "ওকে, {x} খুঁজছি।",
-        "এক মিনিট, {x_cc} খুঁজছি।",
-        "আচ্ছা, {x_cc} খুঁজছি।",
-        "একটু সময় দিন, {x} খুঁজছি।",
-        "জি, {x} খুঁজে দেখছি।",
+        "ওকে, {x} খুঁজে বলছি।",
+        "এক মিনিট, {x_cc} খুঁজে আপনাকে জানাচ্ছি।",
+        "আচ্ছা, {x_cc} খুঁজে আপনাকে বলছি।",
+        "{x} খুঁজে জানাচ্ছি, একটু সময় দিন।",
+        "জি, অবশ্যই। {x} খুঁজে আপনাকে জানাচ্ছি।",
     ),
     # A complaint or a rule has no status: "সমস্যাটার স্ট্যাটাস" is wrong.
     "issue": (
         "জি, {x} চেক করে আপনাকে জানাচ্ছি।",
-        "আচ্ছা, {x} একটু দেখে আপনাকে বলছি।",
+        "আচ্ছা, বুঝতে পেরেছি। {x} দেখে আপনাকে বলছি।",
         "ঠিক আছে, {x} খোঁজ নিয়ে জানাচ্ছি।",
-        "একটু সময় দিন, {x} দেখছি।",
+        "{x} দেখে বলছি, একটু সময় দিন।",
+        "আমাকে একটু সময় দিন, {x} দেখে বলছি।",
     ),
 }
 
@@ -411,20 +454,20 @@ _TOPIC_X: dict[str, tuple[str, str, str]] = {
 
 _TOPIC_EXTRA_BN: dict[str, tuple[str, ...]] = {
     "data": ("আপনার জন্য কী কী ডাটা প্যাকেজ আছে, দেখে জানাচ্ছি।",),
-    "voice": ("কোন কোন মিনিট প্যাকেজ আছে, দেখে আপনাকে বলছি।",),
-    "bundle": ("জি, ডাটা আর মিনিট একসাথে কী আছে, আমি চেক করছি।",),
-    "sms": ("কোন কোন এসএমএস প্যাকেজ আছে, চেক করে বলছি।",),
-    "pack": ("জি, আপনার জন্য কোন প্যাকেজগুলো আছে, আমি চেক করছি।",),
-    "balance": ("একটু সময় দিন, ব্যালেন্সটা দেখে আপনাকে বলছি।",),
+    "voice": ("কোন কোন মিনিট প্যাকেজ আছে, দেখে বলছি, একটু সময় দিন।",),
+    "bundle": ("জি, ডাটা আর মিনিট একসাথে কী আছে, চেক করে বলছি।",),
+    "sms": ("কোন কোন এসএমএস প্যাকেজ আছে, চেক করে বলছি, এক মিনিট।",),
+    "pack": ("জি, আপনার জন্য কোন প্যাকেজগুলো আছে, চেক করে জানাচ্ছি।",),
+    "balance": ("জি, অবশ্যই। ব্যালেন্সটা দেখে আপনাকে বলছি।",),
     "usage": ("কতটুকু ইউজ হয়েছে, চেক করে আপনাকে জানাচ্ছি।",),
     "recharge": ("রিচার্জটা ঠিকমতো হয়েছে কি না, দেখে জানাচ্ছি।",),
-    "offer": ("আপনার নম্বরে কী কী অফার আছে, দেখে বলছি।",),
+    "offer": ("আপনার নম্বরে কী কী অফার আছে, দেখে বলছি, এক মিনিট।",),
     "points": ("কত পয়েন্ট জমেছে, চেক করে আপনাকে জানাচ্ছি।",),
-    "transactions": ("জি, কীসে কেটেছে, আমি চেক করছি।",),
+    "transactions": ("বুঝতে পেরেছি। ব্যালেন্স কেন কেটেছে, চেক করে আপনাকে বলছি।",),
     "network": ("আপনার এলাকায় নেটওয়ার্ক কেমন, দেখে জানাচ্ছি।",),
-    "care": ("এক সেকেন্ড, আপনার কাছের কাস্টমার কেয়ার খুঁজছি।",),
-    "complaint": ("সরি, সমস্যাটা চেক করে আপনাকে জানাচ্ছি।", "বুঝতে পেরেছি, কী করা যায় দেখে বলছি।"),
-    "policy": ("আচ্ছা, এটার নিয়মটা দেখে আপনাকে জানাচ্ছি।",),
+    "care": ("এক সেকেন্ড, আপনার কাছের কাস্টমার কেয়ার খুঁজে আপনাকে জানাচ্ছি।",),
+    "complaint": ("সরি, অসুবিধার জন্য। সমস্যাটা চেক করে আপনাকে জানাচ্ছি।", "বুঝতে পেরেছি, কী করা যায় দেখে বলছি।"),
+    "policy": ("আচ্ছা, নিয়মটা দেখে আপনাকে জানাচ্ছি।",),
 }
 _TOPIC_EXTRA_EN: dict[str, tuple[str, ...]] = {
     "data": ("Let's see which data packages suit you.",),
@@ -449,13 +492,12 @@ _TOPIC_EXTRA_EN: dict[str, tuple[str, ...]] = {
 # first kind whose words the customer used wins; none, the topic's default.
 _RECHARGE_STATUS_BN = (
     "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।",
-    "জি, আপনার রিচার্জটা হয়েছে কি না, চেক করছি।",
-    "আচ্ছা, রিচার্জটা ব্যালেন্সে যোগ হয়েছে কি না দেখে আপনাকে বলছি।",
-    "বুঝতে পেরেছি, রিচার্জের স্ট্যাটাসটা চেক করছি।",
-    "জি, রিচার্জের ব্যাপারটা যাচাই করছি, আমাকে একটু সময় দিন।",
-    "রিচার্জের আপডেটটা দেখে আপনাকে জানাচ্ছি।",
-    "জি, আপনার রিচার্জের তথ্যটা যাচাই করে জানাচ্ছি আপনাকে।",
-    "আচ্ছা, রিচার্জের স্ট্যাটাসটা দেখে আপনাকে আপডেট দিচ্ছি।"
+    "জি, আপনার রিচার্জটা হয়েছে কি না, চেক করে বলছি।",
+    "রিচার্জটা ব্যালেন্সে যোগ হয়েছে কি না দেখে বলছি, একটু সময় দিন।",
+    "বুঝতে পেরেছি। রিচার্জের স্ট্যাটাসটা চেক করে জানাচ্ছি।",
+    "জি, আমাকে একটু সময় দিন, রিচার্জটা যাচাই করে বলছি।",
+    "রিচার্জের আপডেটটা দেখে আপনাকে জানাচ্ছি, এক মিনিট।",
+    "সরি, অসুবিধার জন্য। রিচার্জের তথ্যটা যাচাই করে জানাচ্ছি।",
 )
 _RECHARGE_STATUS_EN = (
     "Let me check the recharge status.",
@@ -466,10 +508,9 @@ _RECHARGE_STATUS_EN = (
 )
 _RECHARGE_LIMIT_BN = (
     "জি, রিচার্জের লিমিট যাচাই করে আপনাকে জানাচ্ছি।",
-    "রিচার্জের লিমিটটা দেখে আপনাকে আপডেট দিচ্ছি।",
-    "একটু সময় দিন, রিচার্জের লিমিটটা দেখছি।",
-    "আচ্ছা, রিচার্জ লিমিট চেক করছি।",
-    "জি, রিচার্জের সীমা সংক্রান্ত তথ্য আপনাকে জানাচ্ছি।"
+    "রিচার্জের লিমিটটা দেখে আপনাকে বলছি, এক মিনিট।",
+    "আচ্ছা, রিচার্জের লিমিটটা এখনই জানিয়ে দিচ্ছি।",
+    "জি, বুঝেছি। রিচার্জ লিমিটটা চেক করে বলছি।",
 )
 _RECHARGE_LIMIT_EN = (
     "Let me check the recharge limit.",
@@ -479,11 +520,9 @@ _RECHARGE_LIMIT_EN = (
 )
 _RECHARGE_HOW_BN = (
     "আচ্ছা, কীভাবে রিচার্জ করবেন, সেটা একটু বুঝিয়ে বলছি।",
-    "জি, রিচার্জ করার পদ্ধতিটা আপনাকে বলছি।",
-    "ঠিক আছে, কীভাবে রিচার্জ করবেন, সেটা বলছি।",
+    "জি, অবশ্যই। রিচার্জ করার নিয়মটা আপনাকে বলছি।",
+    "ঠিক আছে, রিচার্জের উপায়গুলো এখনই বলছি।",
     "জি, রিচার্জ করার ধাপগুলো আপনাকে জানাচ্ছি, একটু সময় দিন।",
-    "আপনি কীভাবে রিচার্জ করতে পারবেন, সেটা বলছি।",
-    "একটু সময় দিন, রিচার্জ করার পদ্ধতিটা চেক করছি",
 )
 _RECHARGE_HOW_EN = (
     "I understand your question about recharging.",
@@ -492,11 +531,11 @@ _RECHARGE_HOW_EN = (
     "One moment while I check the recharge process.",
 )
 _RECHARGE_PERKS_BN = (
-    "বর্তমানে কী কী রিচার্জ অফার আছে, সেটা দেখে আপনাকে বলছি।",
-    "রিচার্জের সুবিধাগুলো সম্পর্কে আপনাকে জানাচ্ছি।",
-    "জি, রিচার্জে কী কী সুবিধা পাবেন, সেটা চেক করছি।",
+    "এখন কী কী রিচার্জ অফার আছে, দেখে আপনাকে বলছি।",
+    "রিচার্জের সুবিধাগুলো দেখে জানাচ্ছি, এক মিনিট।",
+    "জি, রিচার্জে কী কী সুবিধা পাবেন, চেক করে বলছি।",
     "আচ্ছা, রিচার্জের অফারগুলো একটু যাচাই করে আপনাকে জানাচ্ছি।",
-    "জি, রিচার্জের অফার দেখে আপনাকে আপডেট দিচ্ছি।",
+    "জি, অবশ্যই। রিচার্জের অফারগুলো চেক করে বলছি।",
 )
 _RECHARGE_PERKS_EN = (
     "I understand your question about recharge offers.",
@@ -516,10 +555,10 @@ _PLAIN_FITS = {"points"}
 # "reward point কিভাবে accumulate করা যায়?" asks how points are earned, not
 # how many there are; "পয়েন্ট দিয়ে কী নিতে পারি?" what they buy.
 _POINTS_EARN_BN = (
-    "ঠিক আছে, কীভাবে পয়েন্ট পাবেন, সেটা বলছি।"
-    "একটু সময় দিন, পয়েন্ট পাওয়ার উপায়গুলো দেখছি।",
-    "জি, পয়েন্ট কীভাবে জমানো যায়, সেটা দেখছি।",
-    "আচ্ছা, পয়েন্ট জমানোর নিয়মটা জানাচ্ছি।"
+    "ঠিক আছে, কীভাবে পয়েন্ট পাবেন, সেটা বলছি।",
+    "পয়েন্ট পাওয়ার উপায়গুলো দেখে বলছি, একটু সময় দিন।",
+    "জি, পয়েন্ট কীভাবে অ্যাড হয়, দেখে জানাচ্ছি।",
+    "আচ্ছা, বুঝেছি। পয়েন্ট জমানোর নিয়মটা জানাচ্ছি।",
 )
 _POINTS_EARN_EN = (
     "Let me check how you can earn points.",
@@ -528,10 +567,10 @@ _POINTS_EARN_EN = (
     "Okay, let me see how points add up.",
 )
 _POINTS_REDEEM_BN = (
-    "আচ্ছা, পয়েন্ট রিডিমের অপশনগুলো দেখছি।",
-    "জি, পয়েন্ট দিয়ে কী কী নিতে পারবেন, দেখে বলছি।",
-    "এক সেকেন্ড, পয়েন্ট কীভাবে ব্যবহার করবেন দেখছি",
     "একটু সময় দিন, রিওয়ার্ডগুলো দেখে আপনাকে বলছি।",
+    "আচ্ছা, পয়েন্ট রিডিমের অপশনগুলো আপনাকে দিচ্ছি।",
+    "জি, পয়েন্ট দিয়ে কী কী নিতে পারবেন, দেখে বলছি।",
+    "পয়েন্ট কীভাবে ব্যবহার করবেন, দেখে বলছি, এক সেকেন্ড।",
 )
 _POINTS_REDEEM_EN = (
     "Let me check what your points can get you.",
@@ -554,8 +593,8 @@ _CORRECTION_EN = (
 )
 _CHOICE_BN = (
     "ঠিক আছে, তাহলে এই প্যাকেজটার বিস্তারিত আপনাকে জানাচ্ছি।",
-    "ঠিক আছে, আপনি যেটা সিলেক্ট করেছেন, সেটা নিয়ে বলছি।",
-    "জি, এই প্যাকেজটার তথ্য দেখে আপনাকে জানাচ্ছি।",
+    "জি, বুঝেছি। ওই প্যাকেজটার বিস্তারিত বলছি।",
+    "এই প্যাকেজটার তথ্য দেখে জানাচ্ছি, এক মিনিট।",
 )
 _CHOICE_EN = (
     "All right, that one.",
@@ -565,7 +604,7 @@ _CHOICE_EN = (
 )
 
 # A follow-up on what the last filler already named: a person says "এটাও
-# দেখছি", not "তিন জিবির ডাটা প্যাকেজগুলো দেখছি" turn after turn.
+# দেখে বলছি", not "তিন জিবির ডাটা প্যাকেজগুলো দেখে বলছি" turn after turn.
 _FOLLOW_UP_BN = (
     "জি, আরও বলছি।",
     "ঠিক আছে, বিস্তারিত বলছি।",
@@ -583,10 +622,10 @@ _FOLLOW_UP_EN = (
 # ... and when it names something new on the same topic ("চার জিবির?" after
 # "তিন জিবির"): x with "also".
 _FOLLOW_UP_ECHO_BN = (
-    "জি, {x}ও একটু দেখছি।",
-    "আচ্ছা, {x}ও চেক করে বলছি।",
+    "জি, {x}ও দেখে বলছি।",
+    "আচ্ছা, {x}ও চেক করে জানাচ্ছি।",
     "ঠিক আছে, এবার {x} দেখে বলছি।",
-    "{x}ও দেখে আপনাকে জানাচ্ছি।",
+    "{x}ও দেখে জানাচ্ছি, এক সেকেন্ড।",
 )
 _FOLLOW_UP_ECHO_EN = (
     "Sure, I'll check {x} too.",
@@ -596,13 +635,13 @@ _FOLLOW_UP_ECHO_EN = (
 )
 # "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?"
 _MORE_BN = (
-    "ঠিক আছে, অপশনগুলো দেখছি।",
-    "জি, অন্য বিকল্পগুলো দেখছি।",
-    "জি, আরও কিছু অপশন দেখে আপনাকে জানাচ্ছি।",
+    "ঠিক আছে, অন্য অপশনগুলো আপনাকে দিচ্ছি।",
+    "জি, অন্য বিকল্পগুলো দেখে জানাচ্ছি।",
+    "আরও কিছু অপশন দেখে জানাচ্ছি, এক মিনিট।",
     "আচ্ছা, অন্য বিকল্পগুলোও একটু দেখে বলছি।",
-    "আচ্ছা, আর কী কী অপশন আছে, একটু দেখে নিই।",
-    "এক সেকেন্ড, আরও কিছু বিকল্প চেক করছি।",
-    "আচ্ছা, এই অপশনগুলো ছাড়াও আর কী আছে, দেখছি।",
+    "জি, অবশ্যই। আর কী কী অপশন আছে, দেখে বলছি।",
+    "এক সেকেন্ড, আরও কিছু বিকল্প চেক করে জানাচ্ছি।",
+    "এগুলো ছাড়া আর কী আছে, এখনই দেখাচ্ছি।",
 )
 _MORE_EN = (
     "Sure, let's look at more options.",
@@ -1013,7 +1052,7 @@ def _entity_x(topic: str | None, utterance: str) -> tuple[str, str, str] | None:
         if _one_package(utterance):
             if validity is None and size is None:
                 return None
-            # Looked up, not searched for: "তিন জিবির প্যাকেজটা চেক করছি".
+            # Looked up, not searched for: "তিন জিবির প্যাকেজটা চেক করে বলছি".
             return f"{v_bn}{s_bn}প্যাকেজটা", f"the {v_en}{s_en}package", "lookup"
         # Three of them make a line over FILLER_MAX_WORDS: the budget goes.
         budget = bool(_BUDGET_RE.search(utterance)) and not (validity and size)
@@ -1047,7 +1086,35 @@ def _speaks_bangla(utterance: str, history: list[Exchange] | None) -> bool:
 def _opener(line: str) -> str:
     """The line's first word ("জি", "ওকে", "Sure"): two in a row sound canned."""
     first = line.strip().split(",")[0].split()
-    return first[0] if first else ""
+    return first[0].rstrip("।.!") if first else ""
+
+
+# A line's shape (_shape): what it is built of, as the ear hears it. Lines
+# that differ in words but not in shape still sound like one line reworded.
+_TWO_SENTENCES_RE = re.compile(r"[।.!]\s+\S")
+_WAIT_END_RE = _re(
+    r"(?:এক\s*মিনিট|এক\s*সেকেন্ড|এক\s*মুহূর্ত|সময়\s*দিন|অপেক্ষা\s*করুন|প্লিজ|"
+    r"one moment|a moment|one second|please)[।.!]?\s*$"
+)
+_ACTION_WORD_RE = _re(
+    r"জানাচ্ছি|বলছি|দেখাচ্ছি|দিচ্ছি|চেক|দেখে|খুঁজ|যাচাই|খোঁজ|"
+    r"(?:check|find|look|pull|get|see|tell|show)"
+)
+
+
+def _shape(line: str) -> str:
+    """"wait" (a wait or acknowledgement only: "জি, আমাকে একটু সময় দিন।"),
+    "two" (an acknowledgement, then the action: "বুঝতে পেরেছি। ... দেখে
+    জানাচ্ছি।"), "wait_end" (the action, then a wait: "... দেখে বলছি, এক
+    মিনিট।") or "action" (an opener, then the action: "জি, ... চেক করে বলছি।")."""
+    line = unicodedata.normalize("NFC", line.strip())
+    if not _ACTION_WORD_RE.search(line):
+        return "wait"
+    if _TWO_SENTENCES_RE.search(line):
+        return "two"
+    if _WAIT_END_RE.search(line):
+        return "wait_end"
+    return "action"
 
 
 # The verbs a filler ends on; the last one in a line is its main verb ("চেক
@@ -1059,7 +1126,7 @@ _VERB_RE = _re(
     r"\b(?:check|find|look|pull|get|moment|second|see|set|process|start)"
 )
 _WAIT_WORDS = {"সেকেন্ড", "মিনিট", "সময়", "moment", "second"}
-_CLOSING_RE = _re(r"জানাচ্ছি|বলছি|দেখাচ্ছি")
+_CLOSING_RE = _re(r"জানাচ্ছি|বলছি|দেখাচ্ছি|দিচ্ছি")
 
 # "আরও কিছু options দেখান", "এগুলো ছাড়া আর কী আছে?", "আর কি কি options
 # available আছে?", "any others?"
@@ -1107,7 +1174,7 @@ def _verb(line: str) -> str:
 
 
 def _closing(line: str) -> str:
-    """"জানাচ্ছি", "বলছি" or "দেখাচ্ছি", or ""."""
+    """"জানাচ্ছি", "বলছি", "দেখাচ্ছি" or "দিচ্ছি", or ""."""
     closings = _CLOSING_RE.findall(unicodedata.normalize("NFC", line))
     return closings[-1] if closings else ""
 
@@ -1124,7 +1191,7 @@ def _tiers(
     purchase or recharge asked for, more of the same, then the topic, its
     lines in the customer's own words a tier above the plain ones. `last`:
     the filler said before; a follow-up on its topic gets a short line
-    ("এটাও দেখছি"), or the new thing it names ("চার জিবির প্যাকেজগুলোও").
+    ("এটাও দেখে বলছি"), or the new thing it names ("চার জিবির প্যাকেজগুলোও").
     `judged`: Jev's topic for the turn (judged_topic), over the words' topic.
     """
     if _CORRECTION_RE.search(utterance):
@@ -1179,7 +1246,7 @@ def _tiers(
         tiers.insert(0, _CHOICE_BN if bangla else _CHOICE_EN)
     elif topic == "pack" and not _WHICH_RE.search(utterance):
         # "কী কী প্যাকেজ আছে?" gets no filler (broad_package_ask); should one
-        # be asked for, a generic line, not "প্যাকেজগুলো খুঁজছি".
+        # be asked for, a generic line, not "প্যাকেজগুলো খুঁজে বলছি".
         return []
     return tiers
 
@@ -1218,7 +1285,8 @@ def fast_filler(
     - the best tier that still has a line not said in the last few turns
       (_tiers: the customer's own words, the topic, then generic lines);
     - within it, the lines that open and end on other words than the last
-      fillers, when there are any;
+      fillers, and are built another way than the last one (_shape), when
+      there are any;
     - weighted towards a line whose audio is already cached.
     topic: Jev's for the turn (judged_topic), else the words decide.
     language: the customer's picked reply language; else their words decide."""
@@ -1248,12 +1316,17 @@ def fast_filler(
     recent_openers = {_opener(line) for line in avoid[-3:]}
     recent_verbs = {_verb(line) for line in avoid[-2:]}
     last_closing = _closing(avoid[-1]) if avoid else ""
+    last_shape = _shape(avoid[-1]) if avoid else ""
 
     def fresh(x: str) -> bool:
         return _opener(x) not in recent_openers and _verb(x) not in recent_verbs
 
+    def new_shape(x: str) -> bool:
+        return _shape(x) != last_shape
+
     for keep in (
-        lambda x: fresh(x) and not (last_closing and _closing(x) == last_closing),
+        lambda x: fresh(x) and new_shape(x) and not (last_closing and _closing(x) == last_closing),
+        lambda x: fresh(x) and new_shape(x),
         fresh,
         lambda x: _opener(x) not in recent_openers,
     ):
@@ -1321,6 +1394,304 @@ _NEEDS_TOOL_RE = re.compile(
 )
 
 
+# ---- guest replies ----
+#
+# A guest (no subscriber_id) asking about their own account, to recharge, to
+# buy a package or for a person gets a fixed line at once: it needs a login, so a filler ("ব্যালেন্সটা দেখে বলছি") followed by
+# "please log in" would promise a lookup that never comes. Each line says
+# where to log in and that the answer comes right after; some offer what the
+# agent can do meanwhile. One asking for a person hears empathy first, then the
+# hotline, since no case can be opened for a guest. Only a turn Jev is sure about, on one topic, gets
+# one; anything else is the main model's, which follows GUEST_SNAPSHOT.
+
+# Words a guest topic needs besides Jev's topic: "কত পয়েন্ট আছে" is their own
+# points, "পয়েন্ট কীভাবে পাব" is answered for anyone.
+_OWN_PACK_RE = _re(
+    r"আমার\s*(?:এখন(?:কার)?\s*)?(?:কোন\s*)?(?:ডাটা\s*|মিনিট\s*)?(?:প্যাক|প্যাকেজ)|"
+    r"(?:চালু|অ্যাক্টিভ|এক্টিভ)\s*(?:আছে\s*)?(?:কোন\s*)?(?:প্যাক|প্যাকেজ)|"
+    r"(?:প্যাক|প্যাকেজ)\S*\s*(?:চালু|অ্যাক্টিভ|এক্টিভ)|"
+    r"\bmy\s+(?:current\s+|active\s+)?(?:data\s+|minute\s+)?(?:packs?|packages?)\b|"
+    r"\bwhich\s+(?:pack|package)s?\s+(?:do\s+)?i\s+have\b|"
+    r"\b(?:packs?|packages?)\s+(?:i\s+have|i'?m\s+on)\b"
+)
+_OWN_POINTS_RE = _re(
+    r"কত\s*(?:রিওয়ার্ড\s*)?পয়েন্ট|পয়েন্ট\S*\s*(?:কত|কয়টা)|আমার\s*(?:রিওয়ার্ড\s*)?পয়েন্ট|"
+    r"\bhow\s+many\s+(?:reward\s+)?points\b|\bmy\s+(?:reward\s+)?points\b|\bpoints?\s+balance\b"
+)
+_RECHARGE_STATUS_RE = _re(
+    r"(?:আসেনি|আসে\s*নি|আসেনাই|পাইনি|পাই\s*নি|পাই\s*নাই|যোগ\s*হয়নি|যোগ\s*হয়\s*নি|ঢোকেনি|"
+    r"আসছে\s*না|হয়নি|হয়\s*নি)|(?:শেষ|লাস্ট|আগের)\s*রিচার্জ|রিচার্জ\S*\s*(?:হিস্ট্রি|হিসাব)|"
+    r"\b(?:didn'?t|did\s+not|hasn'?t|has\s+not|never)\s+(?:arrive|come|reach|get|show)|"
+    r"\bnot\s+(?:received|credited|arrived)\b|\b(?:last|previous)\s+recharges?\b|"
+    r"\brecharge\s+history\b"
+)
+_CASE_RE = _re(r"কেস|\bcase\s*(?:status|number|update)|\bmy\s+cases?\b|\bTC-?\d+")
+# Doing a recharge (not asking how): "রিচার্জ করে দিন", "I want to top up".
+_RECHARGE_DO_RE = _re(
+    r"রিচার্জ\s*(?:টা\s*)?(?:করব|করবো|করতে\s*চাই|করতে\s*চাচ্ছি|করে\s*(?:দিন|দাও|দেন))|"
+    r"\b(?:want|like|need)\s+to\s+(?:recharge|top\s*up)\b|\b(?:recharge|top\s*up)\s+(?:my|me)\b|"
+    r"\brecharge\s+(?:korbo|korte\s+chai|kore\s+(?:den|dao|din))\b"
+)
+# Buying a package: "এটা কিনব", "প্যাকেজটা নিতে চাই", "I'll buy it".
+_BUY_RE = _re(
+    r"কিন(?:ব|বো|তে\s*চাই|তে\s*চাচ্ছি|ে\s*(?:দিন|দাও|দেন))|"
+    r"(?:প্যাক|প্যাকেজ)\S*\s*(?:টা\s*)?(?:নিব|নেব|নিবো|নেবো|নিতে\s*চাই|চালু\s*করে\s*(?:দিন|দাও|দেন))|"
+    r"\b(?:buy|purchase|activate)\b|\bsubscribe\s+to\b|\bkinbo\b|\bkinte\s+chai\b"
+)
+# Asking for a person: "মানুষের সাথে কথা বলতে চাই", "talk to a human".
+_HUMAN_RE = _re(
+    r"(?:মানুষ|এজেন্ট|প্রতিনিধি|অফিসার|কর্মকর্তা|সুপারভাইজার)\S*\s*(?:এর\s*)?(?:সাথে|সঙ্গে)|"
+    r"কোনো\s*মানুষ|আসল\s*মানুষ|(?:কারো|কারোর|কারও)\s*(?:সাথে|সঙ্গে)\s*কথা|"
+    r"\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:a\s+|an\s+|your\s+)?(?:human|person|someone|agent|"
+    r"representative|supervisor|manager)\b|\b(?:real|actual)\s+person\b|\b(?:human|live)\s+agent\b"
+)
+
+
+# "কীভাবে রিচার্জ করব?" asks how, for anyone: the knowledge base.
+_HOW_RE = _re(r"কীভাবে|কিভাবে|কেমনে|কি\s*ভাবে|how|kivabe")
+
+
+def _buy_by_spec(utterance: str) -> bool:
+    """A buy that names what it wants ("৩০০ টাকার মধ্যে ডাটা প্যাকেজ কিনব"):
+    the main model searches, then says buying needs a login."""
+    return (
+        broad_package_ask(utterance)
+        or _size(utterance) is not None
+        or _validity(utterance) is not None
+        or bool(_NUMBER_RE.search(utterance))
+    )
+
+# Guest topic: (Jev topics it follows, None among them when the words are
+# enough without Jev; the words it needs or None; the word topics (_TOPIC_RES)
+# the turn may also match, any other being a second ask, or None for any).
+# First match wins: a person first, whatever else they say.
+_PACK_JEV = frozenset({"pack", "data", "voice", "bundle", "sms", "usage"})
+_PACKS = frozenset({"pack", "data", "voice", "bundle", "sms"})
+_GUEST_TOPICS: dict[
+    str, tuple[frozenset[str | None], re.Pattern[str] | None, frozenset[str] | None]
+] = {
+    "human": (frozenset({None, *_TOPIC_X}), _HUMAN_RE, None),
+    "recharge_do": (
+        frozenset({None, "recharge", "balance"}), _RECHARGE_DO_RE, frozenset({"recharge", "balance"})
+    ),
+    "buy": (frozenset({None, "offer", *_PACK_JEV}), _BUY_RE, frozenset({"offer", "balance", *_PACKS})),
+    "balance": (frozenset({"balance"}), None, frozenset({"balance"})),
+    "usage": (frozenset({"usage"}), None, frozenset({"usage", "balance"})),
+    "my_pack": (_PACK_JEV, _OWN_PACK_RE, frozenset({"pack", "data", "voice", "bundle", "sms", "usage"})),
+    "transactions": (frozenset({"transactions"}), None, frozenset({"transactions", "balance"})),
+    "recharge": (frozenset({"recharge"}), _RECHARGE_STATUS_RE, frozenset({"recharge", "balance"})),
+    "points": (frozenset({"points"}), _OWN_POINTS_RE, frozenset({"points"})),
+    "offer": (frozenset({"offer"}), None, frozenset({"offer"})),
+    "case": (frozenset({"complaint"}), _CASE_RE, frozenset({"complaint"})),
+}
+
+_GUEST_LINES: dict[str, dict[ReplyLanguage, tuple[str, ...]]] = {
+    "balance": {
+        "bn": (
+            "ব্যালেন্সটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে লগইন করলেই সাথে সাথে বলে দিচ্ছি।",
+            "জি, ব্যালেন্স দেখতে একবার লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই জানিয়ে দিচ্ছি। ততক্ষণ চাইলে প্যাকেজ খুঁজে দিতে পারি।",
+        ),
+        "en": (
+            "Your balance is on your account, so I'll need you to log in first. Use the Log in button at the top and I'll tell you right away.",
+            "Sure, once you log in with the Log in button at the top, I'll check your balance straight away. Meanwhile, I can help you find a package.",
+        ),
+    },
+    "usage": {
+        "bn": (
+            "কতটুকু ডাটা বা মিনিট বাকি, সেটা আপনার অ্যাকাউন্টে দেখা যায়। ওপরের Log in বাটনে লগইন করলেই বলে দিচ্ছি।",
+            "জি, ইউসেজ দেখতে আগে লগইন করে নিতে হবে। লগইন হলেই হিসাবটা জানিয়ে দিচ্ছি। ততক্ষণ চাইলে নতুন প্যাকেজ খুঁজে দিতে পারি।",
+        ),
+        "en": (
+            "Your data and minutes left are on your account. Log in with the button at the top and I'll tell you right away.",
+            "Sure, I'll need you to log in first to see your usage. Once you do, I'll go through it with you. Meanwhile, I can help you find a new package.",
+        ),
+    },
+    "my_pack": {
+        "bn": (
+            "আপনার এখনকার প্যাকেজটা অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে লগইন করলেই বলে দিচ্ছি।",
+            "জি, কোন প্যাকেজ চালু আছে দেখতে একবার লগইন করে নিতে হবে। ততক্ষণ চাইলে নতুন প্যাকেজগুলো দেখাতে পারি।",
+        ),
+        "en": (
+            "Your current package is on your account, so please log in first with the button at the top. I'll tell you right after.",
+            "Sure, I'll need you to log in to see which package you're on. Meanwhile, I can show you the packages we have.",
+        ),
+    },
+    "transactions": {
+        "bn": (
+            "লেনদেনগুলো দেখতে আগে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই কোথায় কত কাটল, দেখে বলছি।",
+            "জি, কোন টাকা কীসে কাটল, সেটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। লগইন করলেই সাথে সাথে বুঝিয়ে বলছি।",
+        ),
+        "en": (
+            "Your transactions are on your account, so please log in first with the button at the top. I'll go through the charges right after.",
+            "Sure, once you log in I can see exactly what was charged and explain each one.",
+        ),
+    },
+    "recharge": {
+        "bn": (
+            "রিচার্জটা ঠিকমতো এসেছে কিনা, সেটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে লগইন করলেই চেক করে দিচ্ছি।",
+            "জি, রিচার্জের হিসাব দেখতে আগে লগইন করে নিতে হবে। লগইন হলেই সাথে সাথে দেখে দিচ্ছি।",
+        ),
+        "en": (
+            "Your recharges are on your account, so please log in first with the button at the top. I'll check it right after.",
+            "Sure, once you log in I'll look up your recharge straight away.",
+        ),
+    },
+    "points": {
+        "bn": (
+            "আপনার কত পয়েন্ট আছে, সেটা দেখতে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই বলে দিচ্ছি।",
+            "জি, পয়েন্টগুলো আপনার অ্যাকাউন্টে থাকে। লগইন করলেই কত আছে আর কীসে খরচ করা যায়, জানিয়ে দিচ্ছি।",
+        ),
+        "en": (
+            "Your points are on your account, so please log in first with the button at the top. I'll tell you right after.",
+            "Sure, once you log in I'll tell you how many points you have and what you can use them for.",
+        ),
+    },
+    "offer": {
+        "bn": (
+            "আপনার জন্য কোন অফারগুলো আছে, সেটা অ্যাকাউন্ট দেখে বলতে হয়। ওপরের Log in বাটনে লগইন করলেই জানিয়ে দিচ্ছি।",
+            "জি, অফারগুলো একেকজনের জন্য একেক রকম, তাই আগে লগইন করে নিতে হবে। ততক্ষণ চাইলে প্যাকেজগুলো দেখাতে পারি।",
+        ),
+        "en": (
+            "Offers depend on your account, so please log in first with the button at the top. I'll show you yours right after.",
+            "Sure, offers differ from one customer to the next, so I'll need you to log in first. Meanwhile, I can show you our packages.",
+        ),
+    },
+    # {phone}: the operator's hotline; with none set, "human" uses _GUEST_HUMAN_NO_PHONE.
+    "human": {
+        "bn": (
+            "আপনার অসুবিধার জন্য সত্যিই দুঃখিত। চাইলে এখনই {phone} হটলাইনে কল করে আমাদের টিমের সাথে সরাসরি কথা বলতে পারেন। আর ওপরের Log in বাটনে লগইন করলে আমি টিমের কাছে রিকোয়েস্টও পাঠিয়ে দিতে পারি।",
+            "আপনার কথা বুঝতে পেরেছি, এমন ঝামেলার জন্য সরি। আমাদের টিমের সাথে সরাসরি কথা বলতে {phone} নম্বরে কল করতে পারেন। লগইন করলে আমিও টিমের কাছে পাঠিয়ে দিতে পারি, একজন ফলো আপ করবেন।",
+        ),
+        "en": (
+            "I'm really sorry for the trouble. You can call our hotline at {phone} to speak with our team directly, or log in with the button at the top and I'll send them a request to follow up.",
+            "I understand, and I'm sorry this has been frustrating. Our team is on {phone} if you'd like to talk to them now. If you log in, I can also pass this to them for a follow-up.",
+        ),
+    },
+    "recharge_do": {
+        "bn": (
+            "রিচার্জ করতে হলে আগে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই রিচার্জটা করে দিচ্ছি।",
+            "জি, রিচার্জের জন্য আপনার অ্যাকাউন্টে লগইন থাকতে হবে। ওপরের Log in বাটনে লগইন করে নিন, তারপর সাথে সাথে করে দিচ্ছি।",
+        ),
+        "en": (
+            "To recharge, you'll need to log in first. Use the Log in button at the top and I'll do the recharge right after.",
+            "Sure, a recharge needs you to be logged in. Once you log in with the button at the top, I'll take care of it straight away.",
+        ),
+    },
+    "buy": {
+        "bn": (
+            "প্যাকেজ কিনতে হলে আগে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই প্যাকেজটা কেনার ব্যবস্থা করে দিচ্ছি।",
+            "জি, প্যাকেজ কেনার জন্য আপনার অ্যাকাউন্টে লগইন থাকতে হবে। ওপরের Log in বাটনে লগইন করে নিন, তারপর সাথে সাথে করে দিচ্ছি।",
+        ),
+        "en": (
+            "To buy a package, you'll need to log in first. Use the Log in button at the top and I'll set it up for you right after.",
+            "Sure, buying a package needs you to be logged in. Once you log in with the button at the top, I'll take care of it straight away.",
+        ),
+    },
+    "case": {
+        "bn": (
+            "আপনার কেসের খবর দেখতে আগে লগইন করে নিতে হবে। ওপরের Log in বাটনে লগইন করলেই আপডেটটা বলে দিচ্ছি।",
+            "জি, কেসগুলো আপনার অ্যাকাউন্টের সঙ্গে থাকে। লগইন করলেই সাথে সাথে দেখে বলছি।",
+        ),
+        "en": (
+            "Your cases are on your account, so please log in first with the button at the top. I'll give you the update right after.",
+            "Sure, once you log in I'll check on your case straight away.",
+        ),
+    },
+}
+
+
+def is_guest(userdata: object) -> bool:
+    """A session with no account: subscriber_id there and None."""
+    return hasattr(userdata, "subscriber_id") and getattr(userdata, "subscriber_id") is None
+
+
+_GUEST_HUMAN_NO_PHONE: dict[ReplyLanguage, tuple[str, ...]] = {
+    "bn": (
+        "আপনার অসুবিধার জন্য সত্যিই দুঃখিত। ওপরের Log in বাটনে লগইন করলেই আমাদের টিমের কাছে রিকোয়েস্ট পাঠিয়ে দিচ্ছি, একজন আপনার সাথে যোগাযোগ করবেন।",
+        "আপনার কথা বুঝতে পেরেছি, এমন ঝামেলার জন্য সরি। লগইন করলেই টিমের কাছে পাঠিয়ে দিচ্ছি, একজন ফলো আপ করবেন।",
+    ),
+    "en": (
+        "I'm really sorry for the trouble. Once you log in with the button at the top, I'll send our team a request and someone will follow up with you.",
+        "I understand, and I'm sorry this has been frustrating. If you log in, I'll pass this to our team straight away for a follow-up.",
+    ),
+}
+
+
+def _word_topics(utterance: str) -> set[str]:
+    """Every topic the words name (_TOPIC_RES), not just the first."""
+    utterance = unicodedata.normalize("NFC", utterance)
+    return {_PACK_KIND_TOPIC.get(name, name) for name, pattern in _TOPIC_RES if pattern.search(utterance)}
+
+
+def guest_topic(
+    judgement: Judgement | None, userdata: object, settings: Settings, text: str | None = None
+) -> str | None:
+    """The guest topic (_GUEST_TOPICS) of a guest's turn about their own
+    account, or None: not a guest, Jev not sure, a lookup to run, or a second
+    ask in the same turn."""
+    if judgement is None or not is_guest(userdata):
+        return None
+    if judgement.lookup != "none":
+        return None
+    judged = judged_topic(judgement, settings)
+    utterance = unicodedata.normalize("NFC", text or judgement.text or "")
+    words = _word_topics(utterance)
+    for name, (jev, needs, allowed) in _GUEST_TOPICS.items():
+        if judged not in jev or (needs is not None and not needs.search(utterance)):
+            continue
+        if name in ("recharge_do", "buy") and _HOW_RE.search(utterance):
+            return None
+        if name == "buy" and _buy_by_spec(utterance):
+            return None
+        if allowed is not None and words - allowed:
+            return None
+        return name
+    return None
+
+
+def guest_line(
+    topic: str,
+    utterance: str,
+    language: ReplyLanguage | None,
+    said: Sequence[str],
+    phone: str = "",
+) -> str:
+    """One of the topic's lines in the picked language (else the utterance's
+    script), not the one said last if there is another. phone: the hotline
+    the "human" lines offer."""
+    lang: ReplyLanguage = language or ("en" if turn_gate.classify_script(utterance) == "en" else "bn")
+    if topic == "human" and not phone.strip():
+        lines = _GUEST_HUMAN_NO_PHONE[lang]
+    else:
+        lines = tuple(line.format(phone=phone.strip()) for line in _GUEST_LINES[topic][lang])
+    fresh = [line for line in lines if line not in said[-_AVOID:]]
+    return random.choice(fresh or list(lines))
+
+
+# Word topics a guest can't be answered on without a login.
+_GUEST_ACCOUNT_WORDS = frozenset({"balance", "usage", "transactions", "offer"})
+
+
+def guest_account_ask(userdata: object, utterance: str) -> bool:
+    """Whether a guest's turn asks about their own account by its words alone.
+    It gets no filler, template or model-written: any "let me check" would
+    promise a lookup the login guidance then takes back."""
+    if not is_guest(userdata):
+        return False
+    utterance = unicodedata.normalize("NFC", utterance)
+    if _word_topics(utterance) & _GUEST_ACCOUNT_WORDS:
+        return True
+    if _HUMAN_RE.search(utterance):
+        return True
+    own = (_OWN_PACK_RE, _OWN_POINTS_RE, _RECHARGE_STATUS_RE, _CASE_RE)
+    if _HOW_RE.search(utterance):
+        # How to recharge or buy is for anyone; only their own account isn't.
+        return any(pattern.search(utterance) for pattern in own)
+    if _BUY_RE.search(utterance) and not _buy_by_spec(utterance):
+        return True
+    return any(pattern.search(utterance) for pattern in (*own, _RECHARGE_DO_RE))
+
+
 def early_filler(text: str, userdata: object, config: ResolvedAgentConfig) -> bool:
     """Whether a model-written line (quick_filler_llm) can start on the final
     transcript, before Jev answers: the words alone route the turn to a filler
@@ -1329,6 +1700,8 @@ def early_filler(text: str, userdata: object, config: ResolvedAgentConfig) -> bo
     if not (config.quick_reply_enabled and config.quick_filler and config.quick_filler_llm):
         return False
     if getattr(userdata, "pending_action", None) or getattr(userdata, "pending_case", None):
+        return False
+    if guest_account_ask(userdata, text):
         return False
     return not broad_package_ask(text) and bool(_NEEDS_TOOL_RE.search(text))
 
@@ -1361,6 +1734,12 @@ def route(
         return None
     lookup_p = judgement.lookup_p or 0.0
     turn_text = text or judgement.text or ""
+    if guest_topic(judgement, userdata, settings, turn_text) is not None:
+        return "guest"
+    if guest_account_ask(userdata, turn_text):
+        # No filler: the small model gives the login line (FAST_GUEST_RULES)
+        # or hands off to the main model, which has GUEST_SNAPSHOT.
+        return "fast" if config.quick_fast_answer else None
     if broad_package_ask(turn_text):
         # The reply is a question back ("কোন ধরনের প্যাকেজ?"), at once: a
         # "একটু সময় দিন" before it promises a lookup that never comes.
@@ -1397,12 +1776,14 @@ def end_call_tools(tools: Sequence[llm.Tool]) -> list[llm.Tool]:
     return [tool for tool in tools if isinstance(tool, llm.FunctionTool) and tool.id == "end_call"]
 
 
-def fast_rules(language: ReplyLanguage | None = None) -> str:
+def fast_rules(language: ReplyLanguage | None = None, *, guest: bool = False) -> str:
     """FAST_RULES, with the language line naming the picked language, if any:
-    the rules come last, so their "customer's latest message" would win."""
+    the rules come last, so their "customer's latest message" would win.
+    guest: with FAST_GUEST_RULES."""
+    rules = FAST_RULES + FAST_GUEST_RULES if guest else FAST_RULES
     if language is None:
-        return FAST_RULES
-    return FAST_RULES.replace(
+        return rules
+    return rules.replace(
         _FAST_LANGUAGE_LINE,
         f"Reply only in {reply_language.name(language)}, whatever language the customer used "
         "(REPLY LANGUAGE above).",
@@ -1410,14 +1791,14 @@ def fast_rules(language: ReplyLanguage | None = None) -> str:
 
 
 def fast_chat_ctx(
-    chat_ctx: llm.ChatContext, language: ReplyLanguage | None = None
+    chat_ctx: llm.ChatContext, language: ReplyLanguage | None = None, *, guest: bool = False
 ) -> llm.ChatContext:
     """The conversation for the small model: the agent's instructions plus
     FAST_RULES, without tool calls (fewer tokens, and no other model's tool
     calls for it to choke on). copy() is shallow, so the instructions message is
     replaced, never changed in place -- that would put FAST_RULES into the main
     model's prompt for the rest of the call."""
-    rules = fast_rules(language)
+    rules = fast_rules(language, guest=guest)
     ctx = chat_ctx.copy(exclude_function_call=True)
     idx = ctx.index_by_id(INSTRUCTIONS_MESSAGE_ID)
     if idx is not None and ctx.items[idx].type == "message":
@@ -1548,8 +1929,9 @@ def build_filler_request(
     topic: str | None = None,
     care: bool = False,
     language: ReplyLanguage | None = None,
+    guest: bool = False,
 ) -> dict:
-    """care: the model writes every line (_CARE_FILLER_SYSTEM), sampled so
+    """guest: the customer isn't logged in (_FILLER_GUEST_NOTE). care: the model writes every line (_CARE_FILLER_SYSTEM), sampled so
     turns alike don't get the same line; else it fills in for the templates.
     language: the customer's picked reply language, which outranks the
     system prompt's "match the customer's newest message"."""
@@ -1564,6 +1946,8 @@ def build_filler_request(
     if avoid:
         lines.append("Already said (don't repeat): " + " | ".join(avoid))
     lines.append(f"Customer's new message: {utterance}")
+    if guest:
+        lines.append(_FILLER_GUEST_NOTE)
     if language:
         lines.append(
             f"LANGUAGE: write the line in {reply_language.name(language)}, "
@@ -1599,10 +1983,13 @@ async def compose_filler(
     topic: str | None = None,
     care: bool = False,
     language: ReplyLanguage | None = None,
+    guest: bool = False,
 ) -> str | None:
     """A filler line for the turn, or None on any error, timeout or unsafe line
     (one in another language than the picked one is unsafe too)."""
-    payload = build_filler_request(model, utterance, lookup, history, avoid, topic, care, language)
+    payload = build_filler_request(
+        model, utterance, lookup, history, avoid, topic, care, language, guest
+    )
     started = time.perf_counter()
 
     def note(text: str) -> None:

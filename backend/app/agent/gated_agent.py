@@ -24,8 +24,9 @@ for topic only (it's always meant for the agent): an off-topic request isn't
 answered, doesn't interrupt the agent, and is taken off the browser's transcript
 (IGNORED_TEXT_TOPIC).
 
-Until the greeting has played out (userdata.greeting_done) the gate ignores
-transcripts entirely: no barge-in, no queued answer, no turn accepted.
+Until the session opens as the greeting starts (userdata.greeting_done) the gate
+ignores transcripts entirely: no barge-in, no queued answer, no turn accepted.
+After that the greeting is interrupted like any other reply.
 """
 
 import asyncio
@@ -436,6 +437,8 @@ class TurnGateController:
     _filler_segment: bool = False
     # The user message whose reply the small model writes (GatedAgent.llm_node).
     fast_for: str | None = None
+    # (user message key, line): the fixed guest line that is that reply.
+    guest_for: tuple[str, str] | None = None
     _judge_warmed: bool = False
 
     def __post_init__(self) -> None:
@@ -570,6 +573,7 @@ class TurnGateController:
         self._approved = _Handled()
         self._cancel_fillers()
         self.fast_for = None
+        self.guest_for = None
         if self.prefetcher is not None:
             self.prefetcher.cancel()
 
@@ -578,8 +582,7 @@ class TurnGateController:
 
     def on_user_input_transcribed(self, ev: UserInputTranscribedEvent) -> None:
         if not self._greeting_done():
-            # The greeting can't be interrupted, so nothing heard during it may
-            # barge in (interrupt(force=True) ignores allow_interruptions) or be
+            # The session isn't open yet: nothing heard may barge in or be
             # queued as an answer.
             return
 
@@ -709,6 +712,7 @@ class TurnGateController:
         self._barge_ins += 1
         self._cancel_fillers()
         self.fast_for = None
+        self.guest_for = None
         hook = self._hook
         if hook is not None and hook.prefetch is not None:
             hook.prefetch.cancel()
@@ -745,6 +749,7 @@ class TurnGateController:
         is keyed on its text (_is_reply_to)."""
         self.pending_filler = None
         self.fast_for = None
+        self.guest_for = None
         if self.quick is None or judgement is None:
             return
         path = quick_reply.route(
@@ -753,6 +758,8 @@ class TurnGateController:
         key = _text_key(text)
         if path == "fast":
             self.fast_for = key
+        elif path == "guest":
+            self._route_guest(key, text, judgement)
         elif path == "filler":
             task = self._filler_task(text, judgement)
             self.pending_filler = _PendingFiller(key, text, task, self.clock())
@@ -968,6 +975,8 @@ class TurnGateController:
                 )
             if path == "fast":
                 self.fast_for = new_message.id
+            elif path == "guest" and judgement is not None:
+                self._route_guest(new_message.id, text, judgement)
             if self.prefetcher is not None:
                 if turn_ctx is not None and judgement is not None:
                     hook.prefetch = asyncio.ensure_future(
@@ -1062,6 +1071,22 @@ class TurnGateController:
             pending = replace(pending, message_id=message_id)
         return self._filler_before(stream, pending)
 
+    def _route_guest(self, key: str, text: str, judgement: Judgement) -> None:
+        assert self.quick is not None
+        topic = quick_reply.guest_topic(
+            judgement, self.session.userdata, self.quick.settings, text
+        )
+        if topic is not None:
+            self.guest_for = (key, self.quick.guest_reply(topic, text))
+
+    def take_guest_reply(self, message_id: str | None, text: str | None) -> str | None:
+        """The fixed guest line that is the reply to this user message, once."""
+        if self.guest_for is None or not _is_reply_to(self.guest_for[0], message_id, text):
+            return None
+        line = self.guest_for[1]
+        self.guest_for = None
+        return line
+
     def is_fast_reply(self, message_id: str | None, text: str | None) -> bool:
         """Whether the reply to this user message is the one routed to the small model."""
         return self.fast_for is not None and _is_reply_to(self.fast_for, message_id, text)
@@ -1141,6 +1166,7 @@ class TurnGateController:
                     judgement.lookup if judgement is not None else None,
                     _recent_exchanges(self.session),
                     topic=quick_reply.judged_topic(judgement, self.quick.settings),
+                    guest=quick_reply.is_guest(self.session.userdata),
                 )
             )
             self._fillers[key] = task
@@ -1439,6 +1465,13 @@ class GatedAgent(Agent):
         carries over to a later reply (a barge-in, a queued answer)."""
         gate = self._gate
         quick = gate.quick
+        if (line := gate.take_guest_reply(*_last_user(chat_ctx))) is not None:
+            _log("guest_reply", line)
+            if (userdata := _userdata(self)) is not None:
+                cards.new_reply(userdata)
+                await cards.cards_ready(userdata)
+            yield line
+            return
         fast = gate.is_fast_reply(*_last_user(chat_ctx))
         if quick is not None and fast:
             gate.fast_for = None
@@ -1453,7 +1486,11 @@ class GatedAgent(Agent):
             try:
                 async for chunk in quick_reply.stream_fast(
                     fast_llm,
-                    quick_reply.fast_chat_ctx(chat_ctx, reply_language.fixed(userdata)),
+                    quick_reply.fast_chat_ctx(
+                        chat_ctx,
+                        reply_language.fixed(userdata),
+                        guest=quick_reply.is_guest(userdata),
+                    ),
                     quick_reply.end_call_tools(tools),
                     buffer_chars=quick.settings.fast_buffer_chars,
                     first_chunk_timeout_s=quick.settings.fast_timeout_ms / 1000,
@@ -1681,8 +1718,8 @@ class TurnPublishingAgent(Agent):
 
 
 async def _text_input_cb(session: AgentSession, ev: room_io.TextInputEvent) -> None:
-    # Used by every browser session, gated or not. Text sent before the greeting
-    # has played out is dropped (the browser also keeps Send disabled until then).
+    # Used by every browser session, gated or not. Text sent before the session
+    # opens (as the greeting starts) is dropped; the browser keeps Send disabled until then.
     if not session.userdata.greeting_done:
         return
     # Judged before the interrupt, so an off-topic message doesn't cut the agent off.

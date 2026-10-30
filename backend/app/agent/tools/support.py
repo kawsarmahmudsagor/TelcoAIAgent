@@ -96,7 +96,19 @@ async def run_create_support_case(
     return await run_write(userdata, call)
 
 
+# A guest's handoff: there is no account to open the case on.
+HANDOFF_NOT_LOGGED_IN = (
+    "The customer is not logged in, so no case can be opened for a person to follow up. Apologise "
+    "sincerely for the trouble, then politely offer our hotline (the number in WHEN YOU DON'T HAVE "
+    "A DETAIL), and say that once they log in with the Log in button at the top of the page you'll "
+    "send our team a request to follow up."
+)
+
+
 async def run_request_human_agent(userdata: SessionUserdata, reason: str) -> str:
+    if userdata.subscriber_id is None:
+        return HANDOFF_NOT_LOGGED_IN
+
     async def call() -> str:
         sid = userdata.subscriber_id
         first = userdata.handoff_action_id is None
