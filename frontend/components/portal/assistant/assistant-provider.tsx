@@ -35,6 +35,7 @@ import { useDebugMode } from '@/hooks/useDebug';
 import { turnOnMicrophone, useMicOnConnect } from '@/hooks/useMicOnConnect';
 import { useAgentAttribute, useGreetingDone, useVisibleMessages } from '@/lib/livekit-text-streams';
 import { getVisitorConversation, toReceivedMessages } from '@/lib/public-conversations';
+import type { ReplyLanguage } from '@/lib/reply-language';
 import { type ConfirmState, type TelcoCard, useTelcoTopics } from '@/lib/telco-topics';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
@@ -108,6 +109,11 @@ export interface AssistantContextValue {
   voiceMode: VoiceMode;
   /** Ends the session. */
   end(): void;
+  /** The language the customer picked for this chat, or null before the pick. */
+  replyLanguage: ReplyLanguage | null;
+  chooseReplyLanguage(language: ReplyLanguage): void;
+  /** A start (a send, the mic, a call, a notification) is waiting for the pick. */
+  languagePending: boolean;
 }
 
 const AssistantContext = createContext<AssistantContextValue | null>(null);
@@ -136,8 +142,18 @@ function AssistantAudio({ children }: { children: React.ReactNode }) {
 }
 
 function AssistantSession({ children }: { children: React.ReactNode }) {
-  const { startSession, autoConnecting, voiceRequested, visitorId, resumed, setResumed } =
-    useChatBubble();
+  const {
+    startSession,
+    autoConnecting,
+    voiceRequested,
+    visitorId,
+    resumed,
+    setResumed,
+    replyLanguage,
+    chooseReplyLanguage,
+    resetReplyLanguage,
+    languagePending,
+  } = useChatBubble();
   const session = useSessionContext();
   const { room, isConnected, connectionState } = session;
 
@@ -279,10 +295,12 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       hideCurrentLive();
       setEarlier([]);
       setResumed({ id, messages: toReceivedMessages(detail) });
+      // It goes on in its own language; a chat from before the pick asks for one.
+      resetReplyLanguage(detail.reply_language ?? null);
       setHistoryOpen(false);
       return true;
     },
-    [visitorId, endLive, hideCurrentLive, setResumed]
+    [visitorId, endLive, hideCurrentLive, setResumed, resetReplyLanguage]
   );
 
   const newChat = useCallback(() => {
@@ -291,9 +309,10 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       hideCurrentLive();
       setEarlier([]);
       setResumed(null);
+      resetReplyLanguage(null);
       setHistoryOpen(false);
     });
-  }, [endLive, hideCurrentLive, setResumed]);
+  }, [endLive, hideCurrentLive, setResumed, resetReplyLanguage]);
 
   const me = useOptionalPortalMe();
   const subscriberId = me?.subscriber_id ?? null;
@@ -310,7 +329,8 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
     if (before === null || before === subscriberId) return;
     setEarlier([]);
     setResumed(null);
-  }, [subscriberId, setResumed]);
+    resetReplyLanguage(null);
+  }, [subscriberId, setResumed, resetReplyLanguage]);
 
   // A session that ends leaves its chat in the panel until a new one starts (the room drops the
   // live transcript, so what was said is kept here). Signed in, it joins `resumed` and the next
@@ -366,6 +386,9 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       toggleMic,
       voiceMode,
       end,
+      replyLanguage,
+      chooseReplyLanguage,
+      languagePending,
     }),
     [
       messages,
@@ -386,6 +409,9 @@ function AssistantSession({ children }: { children: React.ReactNode }) {
       toggleMic,
       voiceMode,
       end,
+      replyLanguage,
+      chooseReplyLanguage,
+      languagePending,
     ]
   );
 

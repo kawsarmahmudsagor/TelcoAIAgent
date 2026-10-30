@@ -73,13 +73,15 @@ export async function POST(req: NextRequest) {
     // gets none. The browser's anonymous visitor id (a participant attribute set by useSession)
     // and the nudge being answered (`nudge_id`) are passed through only when they are UUIDs;
     // `text_start` says a typed message opened the session, and `resume_conversation_id` (a UUID too)
-    // names an earlier chat to carry on -- the agent checks it is this visitor's or subscriber's.
+    // names an earlier chat to carry on -- the agent checks it is this visitor's or subscriber's;
+    // `reply_language` ('en'/'bn') is the language the customer picked for the chat.
     const subscriberId = await resolveSubscriberId(req);
     const metadata = buildDispatchMetadata(subscriberId, {
       visitorId: body?.participant_attributes?.visitor_id,
       nudgeId: body?.participant_attributes?.nudge_id ?? body?.nudge_id,
       textStart: body?.participant_attributes?.text_start,
       resumeConversationId: body?.participant_attributes?.resume_conversation_id,
+      replyLanguage: body?.participant_attributes?.reply_language,
     });
     for (const agent of roomConfig.agents) {
       // useSession adds a bare dispatch when the app config names the agent.

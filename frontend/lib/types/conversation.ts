@@ -1,3 +1,4 @@
+import type { ReplyLanguage } from '@/lib/reply-language';
 import type { DateTimeString, UUID } from './common';
 
 /** Serialized as a plain string by the backend; these are the values it writes. */
@@ -75,6 +76,8 @@ export interface VisitorConversationSummary {
   preview: string | null;
   /** Customer + agent messages (tool rows aren't shown). */
   message_count: number;
+  /** The language the customer picked for this chat; null for chats from before the pick. */
+  reply_language: ReplyLanguage | null;
 }
 
 export interface VisitorConversationPage {
@@ -96,5 +99,7 @@ export interface VisitorConversationDetail {
   started_at: DateTimeString;
   ended_at: DateTimeString | null;
   status: ConversationStatus;
+  /** The language the customer picked for this chat; null for chats from before the pick. */
+  reply_language: ReplyLanguage | null;
   messages: VisitorConversationMessage[];
 }

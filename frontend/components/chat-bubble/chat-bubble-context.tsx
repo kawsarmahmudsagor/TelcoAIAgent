@@ -13,6 +13,7 @@ import { ConnectionState, type Room, TokenSource } from 'livekit-client';
 import { toast } from 'sonner';
 import { type ReceivedMessage, type UseSessionReturn, useSession } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
+import type { ReplyLanguage } from '@/lib/reply-language';
 import { getSandboxTokenSource } from '@/lib/utils';
 import { useVisitorId, useVisitorSessionOptions } from '@/lib/visitor-id';
 
@@ -82,6 +83,18 @@ interface ChatBubbleContextValue {
    */
   resumed: ResumedConversation | null;
   setResumed: React.Dispatch<React.SetStateAction<ResumedConversation | null>>;
+  /**
+   * The language the customer picked for this chat (every reply is in it), or null before the
+   * pick. Fixed for the chat: a new chat, a nudge or a logout clears it, and a chat picked from
+   * the history brings its own.
+   */
+  replyLanguage: ReplyLanguage | null;
+  /** Sets the chat's language and runs any start that was waiting for it. */
+  chooseReplyLanguage: (language: ReplyLanguage) => void;
+  /** For a new chat (null) or a chat picked from the history (its stored language). */
+  resetReplyLanguage: (language: ReplyLanguage | null) => void;
+  /** A start is waiting for the pick: the panel shows the language picker. */
+  languagePending: boolean;
   /** The session's room, e.g. for setting participant attributes from a page. */
   room: Room;
   isConnected: boolean;
@@ -117,12 +130,21 @@ export function ChatBubbleProvider({
     resolve: (ok: boolean) => void;
   } | null>(null);
   const [resumed, setResumed] = useState<ResumedConversation | null>(null);
+  // The chat's picked language rides in every token request. A start before the pick waits
+  // for it (languageWaitRef) with the panel showing the picker.
+  const [replyLanguage, setReplyLanguage] = useState<ReplyLanguage | null>(null);
+  const [languagePending, setLanguagePending] = useState(false);
+  const languageWaitRef = useRef<{
+    options: StartSessionOptions;
+    resolve: (ok: boolean) => void;
+  } | null>(null);
   const sessionOptions = useVisitorSessionOptions(
     appConfig.agentName,
     visitorId,
     nudgeId,
     textStart,
-    resumed?.id ?? null
+    resumed?.id ?? null,
+    replyLanguage
   );
   const session = useSession(tokenSource, sessionOptions);
   const [isOpen, setIsOpen] = useState(false);
@@ -140,6 +162,14 @@ export function ChatBubbleProvider({
       if (session.connectionState !== ConnectionState.Disconnected) {
         if (openPanel) setIsOpen(true);
         return true;
+      }
+      if (replyLanguage === null) {
+        setIsOpen(true);
+        setLanguagePending(true);
+        return new Promise<boolean>((resolve) => {
+          languageWaitRef.current?.resolve(false);
+          languageWaitRef.current = { options, resolve };
+        });
       }
       if (typed !== textStart) {
         // Connecting already, as far as callers can tell (no second start meanwhile).
@@ -164,8 +194,28 @@ export function ChatBubbleProvider({
         return false;
       }
     },
-    [session, textStart]
+    [session, textStart, replyLanguage]
   );
+
+  const chooseReplyLanguage = useCallback((language: ReplyLanguage) => {
+    setReplyLanguage(language);
+    setLanguagePending(false);
+  }, []);
+
+  const resetReplyLanguage = useCallback((language: ReplyLanguage | null) => {
+    languageWaitRef.current?.resolve(false);
+    languageWaitRef.current = null;
+    setLanguagePending(false);
+    setReplyLanguage(language);
+  }, []);
+
+  // The token options carry the pick by now (useSession's effect runs first): start.
+  useEffect(() => {
+    const waiting = languageWaitRef.current;
+    if (!waiting || replyLanguage === null) return;
+    languageWaitRef.current = null;
+    void startSession(waiting.options).then(waiting.resolve);
+  }, [replyLanguage, startSession]);
 
   // The token options carry the new textStart by now (useSession's effect runs first): start.
   useEffect(() => {
@@ -194,6 +244,7 @@ export function ChatBubbleProvider({
         pendingNudgeRef.current = resolve;
         // A notification opens a new conversation, not the one picked from the history.
         setResumed(null);
+        setReplyLanguage(null);
         setNudgeId(id);
       });
     },
@@ -247,6 +298,10 @@ export function ChatBubbleProvider({
       visitorId,
       resumed,
       setResumed,
+      replyLanguage,
+      chooseReplyLanguage,
+      resetReplyLanguage,
+      languagePending,
       room: session.room,
       isConnected,
       session,
@@ -265,6 +320,10 @@ export function ChatBubbleProvider({
       exitFullscreen,
       visitorId,
       resumed,
+      replyLanguage,
+      chooseReplyLanguage,
+      resetReplyLanguage,
+      languagePending,
       isConnected,
       session,
     ]

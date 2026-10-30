@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
+import type { ReplyLanguage } from '@/lib/reply-language';
 
 /**
  * This browser's anonymous visitor id: a random UUID made once and kept in localStorage. The
@@ -71,7 +72,8 @@ export function useVisitorSessionOptions(
   visitorId: string | null,
   nudgeId: string | null = null,
   textStart = false,
-  resumeConversationId: string | null = null
+  resumeConversationId: string | null = null,
+  replyLanguage: ReplyLanguage | null = null
 ) {
   return useMemo(() => {
     const attributes = {
@@ -79,10 +81,11 @@ export function useVisitorSessionOptions(
       ...(nudgeId ? { nudge_id: nudgeId } : {}),
       ...(textStart ? { text_start: '1' } : {}),
       ...(resumeConversationId ? { resume_conversation_id: resumeConversationId } : {}),
+      ...(replyLanguage ? { reply_language: replyLanguage } : {}),
     };
     return {
       ...(agentName ? { agentName } : {}),
       ...(Object.keys(attributes).length > 0 ? { participantAttributes: attributes } : {}),
     };
-  }, [agentName, visitorId, nudgeId, textStart, resumeConversationId]);
+  }, [agentName, visitorId, nudgeId, textStart, resumeConversationId, replyLanguage]);
 }
