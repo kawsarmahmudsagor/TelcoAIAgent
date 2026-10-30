@@ -268,6 +268,22 @@ def _reply_language(text: str, final: bool = False) -> str | None:
     return None
 
 
+def number_speaker(
+    language: str | None,
+) -> Callable[[AsyncIterable[str]], AsyncIterable[str]]:
+    """The `tts_text_transforms` entry for a session: numbers spoken in the
+    customer's picked reply language (app.agent.reply_language), or, with
+    none, in the language each reply turns out to be in."""
+    if language is None:
+        return speak_numbers_as_words
+
+    async def speak(text: AsyncIterable[str]) -> AsyncIterable[str]:
+        async for chunk in _speak_numbers(text, _BN if language == "bn" else _EN):
+            yield chunk
+
+    return speak
+
+
 async def speak_numbers_as_words(text: AsyncIterable[str]) -> AsyncIterable[str]:
     """Streaming `tts_text_transforms` entry for AgentSession.
 
@@ -276,9 +292,13 @@ async def speak_numbers_as_words(text: AsyncIterable[str]) -> AsyncIterable[str]
     reply that opens with a number ("25 লাখ...", "28,000 taka ... shoho.") isn't
     read in English first. Text before the first number streams through.
     """
+    async for chunk in _speak_numbers(text, None):
+        yield chunk
+
+
+async def _speak_numbers(text: AsyncIterable[str], lang: str | None) -> AsyncIterable[str]:
     buffer = ""
     seen = ""
-    lang: str | None = None
     async for chunk in text:
         buffer += chunk
         if lang is None:

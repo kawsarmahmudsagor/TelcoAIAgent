@@ -40,10 +40,11 @@ import httpx
 from livekit.agents import APIConnectOptions, llm
 from livekit.agents.voice.generation import INSTRUCTIONS_MESSAGE_ID
 
-from app.agent import turn_gate
+from app.agent import reply_language, turn_gate
 from app.agent.audio_cache import AudioCache, normalize_text
 from app.agent.quick_models import reasoning_for
 from app.agent.turn_judge import Exchange, Judgement
+from app.agent.reply_language import ReplyLanguage
 from app.bss import care_centres
 from app.config import Settings
 from app.services.agent_config_service import ResolvedAgentConfig
@@ -68,11 +69,15 @@ _HOW_MUCH_RE = re.compile(r"কত\s*টাকা|\bhow\s+much\s+(?:taka|money)\
 # A phone number (seven or more digits, spaces and dashes allowed) or an email.
 _CONTACT_RE = re.compile(r"\+?\d(?:[\s-]?\d){6,}|\S+@\S+\.\w+")
 
+_FAST_LANGUAGE_LINE = (
+    "Reply in the language of the customer's latest message (LANGUAGE above), whatever earlier "
+    "turns used."
+)
 FAST_RULES = f"""
 
 # Quick answer mode
 You are answering this one turn quickly, from the conversation alone, with no tools except end_call.
-Reply in the language of the customer's latest message (LANGUAGE above), whatever earlier turns used.
+{_FAST_LANGUAGE_LINE}
 When the customer wraps up or says goodbye (also informally: tata, bye bye, আসি তাহলে, রাখি তাহলে,
 ভালো থাকবেন), follow the instructions above for ending the call.
 Answer only when everything you need was already said in this conversation or is in the instructions above:
@@ -171,6 +176,9 @@ class QuickReplyRuntime:
     audio_cache: AudioCache | None = None
     # What the small model is doing, for the run log: "asked", "wrote ...", "timed out".
     on_event: Callable[[str], None] | None = None
+    # The customer's picked reply language (app.agent.reply_language): every
+    # filler is in it. None follows the language of their message.
+    language: ReplyLanguage | None = None
     _fast_llm: llm.LLM | None = None
 
     @property
@@ -189,9 +197,10 @@ class QuickReplyRuntime:
         return self._fast_llm
 
     def avoid(self, utterance: str) -> list[str]:
-        """The last lines said in the utterance's script: a line in the other
-        language would pull the new one toward it."""
-        script = turn_gate.classify_script(utterance)
+        """The last lines said in the utterance's script (the picked language's,
+        when there is one): a line in the other language would pull the new one
+        toward it."""
+        script = self.language or turn_gate.classify_script(utterance)
         return [line for line in self.said if turn_gate.classify_script(line) == script][-_AVOID:]
 
     async def compose(
@@ -208,7 +217,15 @@ class QuickReplyRuntime:
         line = (
             None
             if care
-            else fast_filler(utterance, lookup, history, avoid, cache=self.audio_cache, topic=topic)
+            else fast_filler(
+                utterance,
+                lookup,
+                history,
+                avoid,
+                cache=self.audio_cache,
+                topic=topic,
+                language=self.language,
+            )
         )
         if line is not None:
             # One echoing the customer's words is new: its audio may be cached too.
@@ -230,6 +247,7 @@ class QuickReplyRuntime:
             on_event=self.on_event,
             topic=topic,
             care=care,
+            language=self.language,
         )
         if line is not None:
             remember_filler(line)
@@ -1192,6 +1210,7 @@ def fast_filler(
     cache: AudioCache | None = None,
     rng: random.Random | None = None,
     topic: str | None = None,
+    language: ReplyLanguage | None = None,
 ) -> str | None:
     """A template filler for the turn, in well under a millisecond, or None
     when the utterance is empty. Picks at random, so a call doesn't open with
@@ -1201,11 +1220,12 @@ def fast_filler(
     - within it, the lines that open and end on other words than the last
       fillers, when there are any;
     - weighted towards a line whose audio is already cached.
-    topic: Jev's for the turn (judged_topic), else the words decide."""
+    topic: Jev's for the turn (judged_topic), else the words decide.
+    language: the customer's picked reply language; else their words decide."""
     if not utterance.strip():
         return None
     utterance = unicodedata.normalize("NFC", utterance)
-    bangla = _speaks_bangla(utterance, history)
+    bangla = language == "bn" if language else _speaks_bangla(utterance, history)
     avoid = avoid or []
     last = avoid[-1] if avoid else None
     tiers = [
@@ -1214,7 +1234,7 @@ def fast_filler(
     ]
 
     def usable(line: str) -> bool:
-        return safe_filler(line, utterance) is not None
+        return safe_filler(line, utterance) is not None and reply_language.fits(line, language)
 
     pool = next(
         (fresh for tier in tiers if (fresh := [x for x in tier if x not in avoid and usable(x)])),
@@ -1377,12 +1397,27 @@ def end_call_tools(tools: Sequence[llm.Tool]) -> list[llm.Tool]:
     return [tool for tool in tools if isinstance(tool, llm.FunctionTool) and tool.id == "end_call"]
 
 
-def fast_chat_ctx(chat_ctx: llm.ChatContext) -> llm.ChatContext:
+def fast_rules(language: ReplyLanguage | None = None) -> str:
+    """FAST_RULES, with the language line naming the picked language, if any:
+    the rules come last, so their "customer's latest message" would win."""
+    if language is None:
+        return FAST_RULES
+    return FAST_RULES.replace(
+        _FAST_LANGUAGE_LINE,
+        f"Reply only in {reply_language.name(language)}, whatever language the customer used "
+        "(REPLY LANGUAGE above).",
+    )
+
+
+def fast_chat_ctx(
+    chat_ctx: llm.ChatContext, language: ReplyLanguage | None = None
+) -> llm.ChatContext:
     """The conversation for the small model: the agent's instructions plus
     FAST_RULES, without tool calls (fewer tokens, and no other model's tool
     calls for it to choke on). copy() is shallow, so the instructions message is
     replaced, never changed in place -- that would put FAST_RULES into the main
     model's prompt for the rest of the call."""
+    rules = fast_rules(language)
     ctx = chat_ctx.copy(exclude_function_call=True)
     idx = ctx.index_by_id(INSTRUCTIONS_MESSAGE_ID)
     if idx is not None and ctx.items[idx].type == "message":
@@ -1390,12 +1425,12 @@ def fast_chat_ctx(chat_ctx: llm.ChatContext) -> llm.ChatContext:
         ctx.items[idx] = llm.ChatMessage(
             id=INSTRUCTIONS_MESSAGE_ID,
             role="system",
-            content=[(old.text_content or "") + FAST_RULES],
+            content=[(old.text_content or "") + rules],
             created_at=old.created_at,
         )
     else:
         ctx.items.insert(
-            0, llm.ChatMessage(id=INSTRUCTIONS_MESSAGE_ID, role="system", content=[FAST_RULES])
+            0, llm.ChatMessage(id=INSTRUCTIONS_MESSAGE_ID, role="system", content=[rules])
         )
     return ctx
 
@@ -1512,9 +1547,12 @@ def build_filler_request(
     avoid: list[str],
     topic: str | None = None,
     care: bool = False,
+    language: ReplyLanguage | None = None,
 ) -> dict:
     """care: the model writes every line (_CARE_FILLER_SYSTEM), sampled so
-    turns alike don't get the same line; else it fills in for the templates."""
+    turns alike don't get the same line; else it fills in for the templates.
+    language: the customer's picked reply language, which outranks the
+    system prompt's "match the customer's newest message"."""
     lines = ["Conversation so far:"]
     lines += [f"{'Customer' if e.role == 'user' else 'Assistant'}: {e.text}" for e in history]
     if not history:
@@ -1526,6 +1564,11 @@ def build_filler_request(
     if avoid:
         lines.append("Already said (don't repeat): " + " | ".join(avoid))
     lines.append(f"Customer's new message: {utterance}")
+    if language:
+        lines.append(
+            f"LANGUAGE: write the line in {reply_language.name(language)}, "
+            "whatever language the customer used."
+        )
     return {
         "model": model,
         "messages": [
@@ -1555,9 +1598,11 @@ async def compose_filler(
     on_event: Callable[[str], None] | None = None,
     topic: str | None = None,
     care: bool = False,
+    language: ReplyLanguage | None = None,
 ) -> str | None:
-    """A filler line for the turn, or None on any error, timeout or unsafe line."""
-    payload = build_filler_request(model, utterance, lookup, history, avoid, topic, care)
+    """A filler line for the turn, or None on any error, timeout or unsafe line
+    (one in another language than the picked one is unsafe too)."""
+    payload = build_filler_request(model, utterance, lookup, history, avoid, topic, care, language)
     started = time.perf_counter()
 
     def note(text: str) -> None:
@@ -1599,6 +1644,8 @@ async def compose_filler(
     took = time.perf_counter() - started
     max_words = CARE_FILLER_MAX_WORDS if care else FILLER_MAX_WORDS
     line = safe_filler(text, utterance, max_words) if isinstance(text, str) else None
+    if line is not None and not reply_language.fits(line, language):
+        line = None
     if line is None:
         logger.info("filler dropped: %r", text)
         note(f'{model} wrote "{text}" in {took:.2f} s, dropped (unsafe or too long)')

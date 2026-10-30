@@ -27,8 +27,10 @@ from collections.abc import Awaitable, Callable
 import httpx
 from livekit.agents import AgentSession
 
+from app.agent import reply_language
 from app.agent.prompt_defaults import IDLE_CHECKIN_LINES, IDLE_GOODBYE_LINES
 from app.agent.quick_models import reasoning_for
+from app.agent.reply_language import ReplyLanguage
 
 logger = logging.getLogger("agent.idle_checkin")
 
@@ -57,7 +59,10 @@ Reply with JSON only: {"text": "..."}"""
 
 
 def _reply_language(session: AgentSession) -> str:
-    """The language of the agent's last reply; Bangla, the default, when none."""
+    """The customer's picked reply language (app.agent.reply_language), else the
+    language of the agent's last reply; Bangla, the default, when none."""
+    if lang := reply_language.fixed(getattr(session, "userdata", None)):
+        return lang
     for item in reversed(session.history.items):
         if getattr(item, "role", None) == "assistant" and (text := item.text_content):
             return "bn" if _BENGALI_RE.search(text) else "en"
@@ -123,15 +128,22 @@ async def compose_check_in(
     waiting_for: str | None = None,
     *,
     timeout_s: float = 2.5,
+    language: ReplyLanguage | None = None,
 ) -> str | None:
     """A check-in line written for this conversation, or None on any error,
-    timeout or unusable line (too long, or with a number in it)."""
+    timeout or unusable line (too long, with a number in it, or not in the
+    picked `language`)."""
     lines = ["Recent conversation:"]
     lines += [f"{'Customer' if role == 'user' else 'Assistant'}: {text}" for role, text in history]
     if not history:
         lines.append("(the call just started)")
     if waiting_for:
         lines.append(f"Waiting for: {waiting_for}.")
+    if language:
+        lines.append(
+            f"Language: write it in {reply_language.name(language)}, whatever language the "
+            "customer used."
+        )
     payload = {
         "model": model,
         "messages": [
@@ -164,7 +176,12 @@ async def compose_check_in(
         logger.warning("check-in line failed: %s", exc)
         return None
     text = " ".join(text.split()) if isinstance(text, str) else ""
-    if not text or len(text.split()) > _CHECK_IN_MAX_WORDS or re.search(r"\d", text):
+    if (
+        not text
+        or len(text.split()) > _CHECK_IN_MAX_WORDS
+        or re.search(r"\d", text)
+        or not reply_language.fits(text, language)
+    ):
         logger.info("check-in line dropped: %r", text)
         return None
     logger.info("check-in line by %s in %.2fs: %r", model, time.perf_counter() - started, text)
@@ -253,6 +270,7 @@ class IdleCheckIn:
                 self.model,
                 _recent_exchanges(self.session),
                 _waiting_for(getattr(self.session, "userdata", None)),
+                language=reply_language.fixed(getattr(self.session, "userdata", None)),
             )
         # The customer may have spoken, or the call ended, while it was written.
         if not self._started or not self._asked:

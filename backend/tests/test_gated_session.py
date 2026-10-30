@@ -1157,3 +1157,15 @@ def test_the_agents_stt_model_decides_the_endpointing():
     config.stt_tts_provider = "elevenlabs"
     config.elevenlabs_stt_model = "scribe_v2_realtime"
     assert entrypoint._endpoint_min_delay(settings, config) is None
+
+
+def test_other_language_line_follows_the_pick():
+    from app.agent.reply_language import OTHER_LANGUAGE_LINES
+
+    async def go():
+        gate, session, _, _ = _controller(0.9)
+        session.userdata.reply_language = "bn"
+        assert not await _complete(gate, "कल सुबह हम बाज़ार चलेंगे।")
+        assert ("say", OTHER_LANGUAGE_LINES["bn"], False) in session.calls
+
+    asyncio.run(go())

@@ -51,6 +51,7 @@ from app.agent import (
     cards,
     closing_offer,
     quick_reply,
+    reply_language,
     reply_punctuation,
     turn_gate,
     turn_judge,
@@ -60,6 +61,7 @@ from app.agent.audio_cache import normalize_text
 from app.agent.prefetch import Prefetcher
 from app.agent.tools import packages as package_tools
 from app.agent.quick_reply import QuickReplyRuntime
+from app.agent.reply_language import OTHER_LANGUAGE_LINES
 from app.agent.turn_gate import GateState, Thresholds, Verdict
 from app.agent.turn_judge import BotState, Exchange, Judgement
 from app.config import Settings
@@ -76,7 +78,7 @@ GATE_ATTRIBUTE = "turn_gate"
 # the browser can drop it from the transcript.
 IGNORED_TEXT_TOPIC = "ignored-text"
 
-OTHER_LANGUAGE_LINE = "I could not understand that. Could you kindly repeat that?"
+OTHER_LANGUAGE_LINE = OTHER_LANGUAGE_LINES["en"]
 # Said when a turn the gate dropped still reads like a question to the agent.
 UNCLEAR_TURN_LINE = "সরি, ঠিক বুঝতে পারিনি। আরেকবার বলবেন?"
 # Said when the turn's processing or the main model's reply fails.
@@ -846,7 +848,8 @@ class TurnGateController:
         if self.prefetcher is not None:
             self.prefetcher.cancel()
         if verdict is Verdict.OTHER_LANGUAGE:
-            self.session.say(OTHER_LANGUAGE_LINE, add_to_chat_ctx=False)
+            lang = reply_language.fixed(getattr(self.session, "userdata", None))
+            self.session.say(OTHER_LANGUAGE_LINES[lang or "en"], add_to_chat_ctx=False)
             raise StopResponse()
         if verdict is Verdict.DROP:
             # If the user spoke substantive words (not pure filler, silence or sound tags)
@@ -1430,7 +1433,7 @@ class GatedAgent(Agent):
             try:
                 async for chunk in quick_reply.stream_fast(
                     fast_llm,
-                    quick_reply.fast_chat_ctx(chat_ctx),
+                    quick_reply.fast_chat_ctx(chat_ctx, reply_language.fixed(userdata)),
                     quick_reply.end_call_tools(tools),
                     buffer_chars=quick.settings.fast_buffer_chars,
                     first_chunk_timeout_s=quick.settings.fast_timeout_ms / 1000,

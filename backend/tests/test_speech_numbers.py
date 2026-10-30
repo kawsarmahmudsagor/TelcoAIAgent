@@ -303,3 +303,25 @@ def test_bangla_numbers_after_a_capitalised_word_need_the_word_right_before():
 def test_english_address_split_across_chunks_in_a_bangla_reply():
     chunks = ["হেড অফিস House", " 12, Road ", "7, Gulshan 1, Dhaka", " 1212-এ আসুন।"]
     assert _run(chunks) == f"হেড অফিস {_ADDRESS_SPOKEN}-এ আসুন।"
+
+
+def _run_fixed(chunks, language) -> str:
+    from app.agent.speech_numbers import number_speaker
+
+    async def collect():
+        return "".join([c async for c in number_speaker(language)(_stream(chunks))])
+
+    return asyncio.run(collect())
+
+
+def test_number_speaker_fixed_bangla_speaks_bangla_without_bengali_letters():
+    assert _run_fixed(["৳300"], "bn") == numbers_to_bangla_words("৳300")
+    assert "তিন" in _run_fixed(["৳300"], "bn")
+
+
+def test_number_speaker_fixed_english():
+    assert _run_fixed(["দাম 25", " টাকা"], "en") == numbers_to_words("দাম 25 টাকা")
+
+
+def test_number_speaker_unset_is_the_default_transform():
+    assert _run_fixed(["Price is 25", ",000 taka."], None) == _run(["Price is 25", ",000 taka."])

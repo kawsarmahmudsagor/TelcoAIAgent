@@ -63,7 +63,7 @@ from app.agent.prompt_defaults import (
 )
 from app.agent.reply_language import ReplyLanguage
 from app.agent.snapshot import load_session_context
-from app.agent.speech_numbers import speak_numbers_as_words
+from app.agent.speech_numbers import number_speaker
 from app.agent.speech_words import respell_words_for_speech
 from app.agent.tools.search_knowledge_base import build_search_knowledge_base
 from app.agent.tools import registry
@@ -691,13 +691,13 @@ def _build_session(
         tts=tts,
         vad=vad,
         turn_handling=_turn_handling(gated, _endpoint_min_delay(settings, config)),
-        # The first two are the library defaults; speak_numbers_as_words makes TTS say
-        # "200" as "two hundred" instead of digit-by-digit, and respell_words_for_speech
+        # The first two are the library defaults; number_speaker makes TTS say
+        # "200" as "two hundred" instead of digit-by-digit (in the picked reply language), and respell_words_for_speech
         # fixes Bangla words the voice mispronounces (transcript keeps the text as written).
         tts_text_transforms=[
             "filter_markdown",
             "filter_emoji",
-            speak_numbers_as_words,
+            number_speaker(reply_language.fixed(userdata)),
             respell_words_for_speech,
         ],
     )
@@ -757,6 +757,7 @@ def _build_session(
             client=client,
             audio_cache=audio_cache.get_audio_cache(),
             on_event=timing.quick if timing is not None else None,
+            language=reply_language.fixed(userdata),
         )
     # Cards wait for the main model's reply (app.agent.cards), so they don't
     # appear while a filler line plays, and a package card can follow what the

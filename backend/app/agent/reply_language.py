@@ -10,6 +10,8 @@ following the customer's latest message.
 
 from typing import Literal, get_args
 
+from app.agent.turn_gate import classify_script
+
 ReplyLanguage = Literal["en", "bn"]
 
 _NAMES: dict[str, str] = {"en": "English", "bn": "Bangla (Bengali script)"}
@@ -48,6 +50,12 @@ def prompt_block(lang: ReplyLanguage) -> str:
         f"customer's message. For speech you cannot make out, or another language, say exactly "
         f'"{OTHER_LANGUAGE_LINES[lang]}" and nothing else.\n'
     )
+
+
+def fits(text: str, lang: ReplyLanguage | None) -> bool:
+    """Whether a line is in the picked language (a line with no letters is).
+    No pick: any line fits."""
+    return lang is None or classify_script(text) in (lang, "none")
 
 
 def in_language(lang: ReplyLanguage | None, default: str) -> str:

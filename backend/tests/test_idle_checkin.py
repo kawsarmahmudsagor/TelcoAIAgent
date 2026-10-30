@@ -220,3 +220,29 @@ def test_a_written_line_with_a_number_falls_back_to_the_template():
         assert session.said == [IDLE_CHECKIN_LINES["bn"]]
 
     asyncio.run(run())
+
+
+def test_idle_lines_follow_the_pick():
+    async def run():
+        session = FakeSession(last_reply="আপনার ব্যালেন্স যথেষ্ট আছে।")
+        session.userdata.reply_language = "en"
+        _watcher(session, [])
+        await _wait(IDLE)
+        assert session.said == [IDLE_CHECKIN_LINES["en"]]
+        session.emit("agent_state_changed", _state("speaking"))
+        session.emit("agent_state_changed", _state("listening"))
+        await _wait(GRACE)
+        assert session.said[-1] == IDLE_GOODBYE_LINES["en"]
+
+    asyncio.run(run())
+
+
+def test_a_written_line_in_the_wrong_language_falls_back():
+    async def run():
+        session = FakeSession(last_reply="Your balance is enough.")
+        session.userdata.reply_language = "bn"
+        _llm_watcher(session, "Anything else about your balance?")
+        await _wait(IDLE)
+        assert session.said == [IDLE_CHECKIN_LINES["bn"]]
+
+    asyncio.run(run())

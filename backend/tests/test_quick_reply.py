@@ -982,3 +982,62 @@ def test_early_filler_only_on_the_model_written_path():
     assert not quick_reply.early_filler(
         "আমার ব্যালেন্স কত?", SimpleNamespace(pending_action=object()), config
     )
+
+
+# --- picked reply language (app.agent.reply_language) -----------------------------
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_fast_filler_fixed_english_on_bangla_utterance(seed):
+    line = quick_reply.fast_filler(
+        "আমার ব্যালেন্স কত?", "balance", [], [], rng=random.Random(seed), language="en"
+    )
+    assert line is not None and turn_gate.classify_script(line) == "en", line
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_fast_filler_fixed_bangla_on_english_utterance(seed):
+    line = quick_reply.fast_filler(
+        "what is my balance", "balance", [], [], rng=random.Random(seed), language="bn"
+    )
+    assert line is not None and turn_gate.classify_script(line) == "bn", line
+
+
+def test_filler_request_language_line():
+    body = quick_reply.build_filler_request(
+        "m", "আমার ব্যালেন্স কত?", None, [], [], language="en"
+    )
+    assert body["messages"][1]["content"].endswith(
+        "LANGUAGE: write the line in English, whatever language the customer used."
+    )
+    assert "LANGUAGE:" not in quick_reply.build_filler_request("m", "x", None, [], [])["messages"][1]["content"]
+
+
+def test_composed_filler_in_the_wrong_language_is_dropped():
+    async def go():
+        handler = lambda _r: _completion(json.dumps({"text": "আপনার জন্য দেখছি।"}))  # noqa: E731
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await compose_filler(
+                client, _BASE, "k", "m", "ব্যালেন্স কত?", None, [], [], timeout_s=1.0,
+                language="en",
+            )  # fmt: skip
+
+    assert asyncio.run(go()) is None
+
+
+def test_avoid_follows_the_pick():
+    runtime = QuickReplyRuntime(_config(), _settings(), "k", httpx.AsyncClient(), language="en")
+    runtime.said = ["দেখছি।", "One moment."]
+    assert runtime.avoid("প্যাক আছে?") == ["One moment."]
+
+
+def test_fast_rules_follow_the_pick():
+    original = llm.ChatContext.empty()
+    original.items.insert(
+        0, llm.ChatMessage(id=INSTRUCTIONS_MESSAGE_ID, role="system", content=["PROMPT"])
+    )
+    fixed = fast_chat_ctx(original, language="bn").items[0].text_content
+    assert "Reply only in Bangla (Bengali script), whatever language the customer used" in fixed
+    assert "Reply in the language of the customer's latest message" not in fixed
+    plain = fast_chat_ctx(original).items[0].text_content
+    assert plain.endswith(FAST_RULES)
