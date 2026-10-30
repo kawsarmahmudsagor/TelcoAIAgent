@@ -1,12 +1,20 @@
+import io
 import json
+from datetime import datetime, timezone
 
 import httpx
 import pytest
+from docx import Document
+from docx.oxml.ns import qn
 
 from app.config import get_settings
 from app.services.conversation_export import (
+    ExportHeader,
+    ExportLine,
     ExportTranslationError,
+    bangla_digits,
     needs_translation,
+    render_docx,
     translate,
 )
 
@@ -117,3 +125,66 @@ def test_translate_prompt_rules():
     for rule in ("Banglish", "telco", "প্যাকেজ", "*121#"):
         assert rule in system
     assert body["model"] == get_settings().export_translate_model == "google/gemini-3.5-flash"
+
+
+# 2026-10-30 08:32 UTC is 14:32 in Dhaka.
+_STARTED = datetime(2026, 10, 30, 8, 32, tzinfo=timezone.utc)
+
+
+def _header(**overrides) -> ExportHeader:
+    fields = dict(
+        started_at=_STARTED,
+        ended_at=_STARTED,
+        channel="inbound_chat",
+        is_phone_call=False,
+        customer_name="Rahim Uddin",
+        customer_msisdn="01712345678",
+    )
+    return ExportHeader(**(fields | overrides))
+
+
+_LINES = [
+    ExportLine(role="assistant", text="Hello! How can I help?", at=_STARTED),
+    ExportLine(role="user", text="Call 01712345678 please", at=_STARTED),
+]
+
+
+def _text(data: bytes) -> str:
+    return "\n".join(p.text for p in Document(io.BytesIO(data)).paragraphs)
+
+
+def test_render_en_labels_and_title():
+    text = _text(render_docx(_header(), _LINES, "en"))
+    assert "telco chat transcript" in text
+    assert "Assistant:" in text and "User:" in text
+    assert "Hello! How can I help?" in text
+    assert "14:32" in text and "Web chat" in text
+    assert "telco." not in text
+
+
+def test_render_bn_labels_and_digits():
+    text = _text(render_docx(_header(), _LINES, "bn"))
+    assert "telco চ্যাট ট্রান্সক্রিপ্ট" in text
+    assert "সহকারী:" in text and "গ্রাহক:" in text
+    assert "৩০ অক্টোবর ২০২৬" in text
+    assert "Call 01712345678 please" in text
+    assert "Assistant:" not in text
+
+
+def test_render_header_customer():
+    with_customer = _text(render_docx(_header(), _LINES, "en"))
+    assert "Rahim Uddin" in with_customer and "01712345678" in with_customer
+    guest = _text(render_docx(_header(customer_name=None, customer_msisdn=None), _LINES, "en"))
+    assert "Customer" not in guest
+
+
+def test_render_sets_cs_font():
+    doc = Document(io.BytesIO(render_docx(_header(), _LINES, "bn")))
+    runs = [run for p in doc.paragraphs for run in p.runs]
+    assert runs
+    for run in runs:
+        assert run._element.rPr.rFonts.get(qn("w:cs")) == "Nirmala UI"
+
+
+def test_bangla_digits():
+    assert bangla_digits("2026-10-30 14:32") == "২০২৬-১০-৩০ ১৪:৩২"

@@ -4,13 +4,22 @@ Messages not already in the export language are translated by an LLM through
 OpenRouter, Banglish (Bangla in Latin letters) included. A translation that
 fails in any way fails the whole export: never a half-translated file."""
 
+import io
 import json
 import re
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import httpx
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.shared import Pt, RGBColor
+from docx.text.run import Run
 
-from app.config import Settings
+from app.config import Settings, get_settings
 
 ExportLang = Literal["en", "bn"]
 
@@ -106,3 +115,144 @@ def _parse_reply(content: str, expected: set[int]) -> dict[int, str]:
     if set(result) != expected or len(rows) != len(expected):
         raise ExportTranslationError("translation reply does not match the sent messages")
     return result
+
+
+# --- .docx ---------------------------------------------------------------
+
+CS_FONT = "Nirmala UI"
+_ASSISTANT_COLOUR = RGBColor(0x1F, 0x6F, 0xEB)
+_USER_COLOUR = RGBColor(0x2E, 0x7D, 0x32)
+_GREY = RGBColor(0x6B, 0x72, 0x80)
+
+_BN_DIGITS = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
+_BN_MONTHS = (
+    "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+    "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর",
+)
+
+_COPY = {
+    "en": {
+        "title": "telco chat transcript",
+        "assistant": "Assistant:",
+        "user": "User:",
+        "started": "Started",
+        "ended": "Ended",
+        "channel": "Channel",
+        "customer": "Customer",
+        "number": "Number",
+        "web": "Web chat",
+        "phone": "Phone call",
+    },
+    "bn": {
+        "title": "telco চ্যাট ট্রান্সক্রিপ্ট",
+        "assistant": "সহকারী:",
+        "user": "গ্রাহক:",
+        "started": "শুরু",
+        "ended": "শেষ",
+        "channel": "মাধ্যম",
+        "customer": "গ্রাহক",
+        "number": "নম্বর",
+        "web": "ওয়েব চ্যাট",
+        "phone": "ফোন কল",
+    },
+}
+
+
+@dataclass
+class ExportLine:
+    role: Literal["user", "assistant"]
+    text: str
+    at: datetime
+
+
+@dataclass
+class ExportHeader:
+    started_at: datetime
+    ended_at: datetime | None
+    channel: str
+    is_phone_call: bool
+    customer_name: str | None
+    customer_msisdn: str | None
+
+
+def bangla_digits(s: str) -> str:
+    return s.translate(_BN_DIGITS)
+
+
+def _local(at: datetime) -> datetime:
+    return at.astimezone(ZoneInfo(get_settings().agency_timezone))
+
+
+def _date_time(at: datetime, lang: ExportLang) -> str:
+    local = _local(at)
+    if lang == "en":
+        return local.strftime("%d %B %Y, %H:%M").lstrip("0")
+    return bangla_digits(
+        f"{local.day} {_BN_MONTHS[local.month - 1]} {local.year}, {local:%H:%M}"
+    )
+
+
+def _style(run: Run, *, bold: bool = False, size: float | None = None, colour=None) -> Run:
+    """Every run names a complex-script font, so Word shapes Bangla correctly."""
+    run.bold = bold
+    if size is not None:
+        run.font.size = Pt(size)
+    if colour is not None:
+        run.font.color.rgb = colour
+    r_pr = run._element.get_or_add_rPr()
+    r_fonts = r_pr.get_or_add_rFonts()
+    r_fonts.set(qn("w:cs"), CS_FONT)
+    if _BENGALI.search(run.text):
+        r_pr.get_or_add_cs()
+    return run
+
+
+def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang) -> bytes:
+    copy = _COPY[lang]
+    doc = Document()
+    title = doc.add_paragraph()
+    _style(title.add_run(copy["title"]), bold=True, size=18)
+
+    if header.is_phone_call:
+        channel = copy["phone"]
+    elif header.channel == "inbound_chat":
+        channel = copy["web"]
+    else:
+        channel = header.channel
+    fields = [(copy["started"], _date_time(header.started_at, lang))]
+    if header.ended_at is not None:
+        fields.append((copy["ended"], _date_time(header.ended_at, lang)))
+    fields.append((copy["channel"], channel))
+    if header.customer_name:
+        fields.append((copy["customer"], header.customer_name))
+    if header.customer_msisdn:
+        fields.append((copy["number"], header.customer_msisdn))
+    for label, value in fields:
+        row = doc.add_paragraph()
+        row.paragraph_format.space_after = Pt(0)
+        _style(row.add_run(f"{label}: "), bold=True, size=10, colour=_GREY)
+        _style(row.add_run(value), size=10, colour=_GREY)
+    doc.add_paragraph()
+
+    for line in lines:
+        paragraph = doc.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        paragraph.paragraph_format.space_after = Pt(8)
+        is_assistant = line.role == "assistant"
+        _style(
+            paragraph.add_run(copy["assistant"] if is_assistant else copy["user"]),
+            bold=True,
+            colour=_ASSISTANT_COLOUR if is_assistant else _USER_COLOUR,
+        )
+        time = f"{_local(line.at):%H:%M}"
+        _style(
+            paragraph.add_run(f"  {bangla_digits(time) if lang == 'bn' else time}"),
+            size=9,
+            colour=_GREY,
+        )
+        _style(paragraph.add_run()).add_break()
+        _style(paragraph.add_run(line.text))
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
