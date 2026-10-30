@@ -147,6 +147,11 @@ class Settings(BaseSettings):
     # short filler line while a lookup runs. The model is the default for an
     # agent that hasn't picked one (app.agent.quick_models lists the allowed ids).
     quick_reply_model: str = "google/gemini-3.5-flash-lite"
+    # Conversation export (app.services.conversation_export) translates the
+    # transcript into the picked language. Not a live turn, so quality over
+    # latency: Banglish needs a stronger model than flash-lite.
+    export_translate_model: str = "google/gemini-3.5-flash"
+    export_translate_timeout_s: float = Field(60.0, ge=1.0, le=300.0)
     # The small model answers only when Jev is at least this sure no lookup is needed.
     quick_route_min_p: float = Field(0.7, ge=0.0, le=1.0)
     # How long the filler model call may take before it is given up on. Only a
