@@ -34,6 +34,10 @@ _RULES = {
     "digits": ["Bengali digits"],
     "package_wording": ["প্যাকেজ", 'never "প্যাক"'],
     "at_most_3": ["at most 3"],
+    "price_first": ["price first"],
+    "suggestion_ends_with_a_pick": ["ask which they'd like"],
+    "intro_once": ["introduce yourself only once"],
+    "decline_in_own_voice": ["in your own voice"],
     "ask_kind_first": ["what kind"],
     "ending_order": ["ENDING A REPLY"],
     "scope": ["SCOPE"],
@@ -59,4 +63,6 @@ def test_rule_present(rule, case):
 
 
 def test_identity_rules_size_budget():
-    assert len(DEFAULT_IDENTITY_AND_RULES) <= 9500
+    # 15,086 before compaction; 9,500 cut too far (bench 2026-11-06: self-intros,
+    # semicolons, ads order and the suggestion's closing question regressed).
+    assert len(DEFAULT_IDENTITY_AND_RULES) <= 10000

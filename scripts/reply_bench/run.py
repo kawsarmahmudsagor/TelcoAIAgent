@@ -98,6 +98,14 @@ BUY_TURNS = [
     "123456",
 ]
 
+# run_94: a purchase the balance can't cover, the customer drops it, then needs
+# nothing more. The agent must acknowledge in its own voice, then say goodbye.
+DECLINE_TURNS = [
+    "৩৪৯ টাকার ১৫ জিবি মাসিক প্যাকেজটা চালু করে দিন",
+    "আচ্ছা যেহেতু আমার এখন ব্যালেন্স নেই, সো প্যাকেজটা এখন আমি নিতে চাচ্ছি না",
+    "না, আর কোন help লাগবে না। Thank you",
+]
+
 
 class _Tee:
     """Writes the printout to the console and to the --out file."""
@@ -167,6 +175,7 @@ async def main() -> None:
     parser.add_argument("--sim", action="store_true", help="the stolen-SIM conversation")
     parser.add_argument("--packages", action="store_true", help="package questions in Bangla")
     parser.add_argument("--buy", action="store_true", help="a package purchase up to the code")
+    parser.add_argument("--decline", action="store_true", help="drop a purchase, then sign off")
     parser.add_argument("--out", type=Path, help="also write the printout to this file (UTF-8)")
     args = parser.parse_args()
     if args.out:
@@ -197,6 +206,7 @@ async def main() -> None:
         turns = (
             PACKAGE_TURNS if args.packages
             else BUY_TURNS if args.buy
+            else DECLINE_TURNS if args.decline
             else SIM_TURNS if args.sim
             else GUEST_TURNS if args.guest
             else TURNS

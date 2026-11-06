@@ -1,0 +1,35 @@
+> amar balance koto?  (1.6 s)
+  আমি Anika, telco থেকে। আপনার ব্যালেন্স ৯৮.৫০ টাকা।
+
+> amar data koto ache?  (1.4 s)
+  আপনার ১৫ জিবি ডাটা আছে, মেয়াদ ২৮ নভেম্বর পর্যন্ত।
+
+> Which pack do I have?  (4.6 s)
+  You have a 15 GB Monthly package, valid until November 28, and a 100 SMS package with 74 SMS left, valid until November 17.
+
+> Balance?  (1.5 s)
+  Your balance is 98.50 taka.
+
+> How many reward points do I have?  (1.4 s)
+  You have 840 reward points, enough to redeem 3 rewards now. Want me to tell you which offers you can redeem?
+
+> How much data did I use this week?  (3.1 s)
+  [get_usage_breakdown]
+  You used no data in the last 7 days.
+
+> Which package is best for me?  (3.9 s)
+  [recommend_packages]
+  I’d pick our 5 GB + 100 minute package for 179 taka, valid for 7 days. It covers your use over the last 30 days and doesn’t auto-renew. Our 2 GB + 50 minute package for 79 taka is a shorter 3-day option. Would you like to hear about the other package?
+
+> No, explain this one in details  (1.5 s)
+  Our 5 GB + 100 minute package costs 179 taka and is valid for 7 days. It doesn’t auto-renew, so you’d need to buy it again after it expires. It covers your use over the last 30 days.
+
+> Show my usage for the last 30 days  (2.9 s)
+  [get_usage_breakdown]
+  Over the last 30 days, you used 5.1 GB of data, 424 minutes, and 27 SMS. You also had 3 VAS items charged at 17.50 taka. Your heaviest data day was October 20, with 344 MB used.
+
+Same closing question twice in a row: 0
+Calques:
+  শুনবেন/শুনতে চান (hear more): 0
+  two offers in one question: 0
+  কথা বলা নেই / উল্লেখ নেই: 0

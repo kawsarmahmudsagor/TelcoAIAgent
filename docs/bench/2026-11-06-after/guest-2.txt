@@ -1,0 +1,28 @@
+> Which monthly data packs do you have?  (2.7 s)
+  [search_packages]
+  I’m Anika from telco. Our monthly data packages include 15 GB for 349 taka, 30 GB for 549 taka, and 50 GB for 749 taka, each valid for 30 days. There’s another option too—would you like to hear about it?
+
+> amar balance koto?  (1.6 s)
+  ব্যালেন্সটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে লগইন করলেই সাথে সাথে বলে দিচ্ছি। চাইলে এখন আমাদের প্যাকেজগুলো দেখতে পারেন।
+
+> How do I get a new SIM?  (3.7 s)
+  [search_knowledge_base]
+  You can get a new SIM at any telco care centre or retailer, or order one through our website. Bring your NID card or passport; no photocopy is needed. Would you like me to tell you about online delivery?
+
+> Is there a network problem in Dhaka?  (2.5 s)
+  [check_network_status]
+  Which area in Dhaka are you in?
+
+> 300 takar moddhe kono internet pack ache?  (3.6 s)
+  [search_packages]
+  হ্যাঁ, ৩০০ টাকার মধ্যে ১ জিবি ২৯ টাকায় ১ দিনের জন্য, ২ জিবি ৪৯ টাকায় ৩ দিনের জন্য, আর ৩ জিবি ৬৯ টাকায় ৩ দিনের জন্য আছে। আরও কিছু অপশন জানাব?
+
+> Where is your nearest store?  (3.5 s)
+  [search_knowledge_base]
+  Which area are you in? I can find the nearest telco store for you.
+
+Same closing question twice in a row: 0
+Calques:
+  শুনবেন/শুনতে চান (hear more): 0
+  two offers in one question: 0
+  কথা বলা নেই / উল্লেখ নেই: 0

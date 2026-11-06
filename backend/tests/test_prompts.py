@@ -314,3 +314,14 @@ def test_goodbye_texts_follow_pick():
     assert "In English" in entrypoint.end_call_goodbye("en")
     assert "In the language of the customer's latest message" in entrypoint.end_call_goodbye(None)
     assert "latest message" in entrypoint.browser_end_goodbye(None)
+
+
+def test_a_customer_who_needs_nothing_more_gets_the_goodbye_not_anything_else():
+    # bench 2026-11-06 decline: "না, আর কোন help লাগবে না। Thank you" got
+    # "আর কোনো বিষয়ে সাহায্য লাগবে?": the end note listed "no more help needed"
+    # among the wrap-ups that get "anything else?" first.
+    prompt = build_system_prompt(SessionUserdata(channel=Channel.inbound_chat, room=None))
+    ending = _flat(prompt.split("ENDING THE VOICE CHAT")[1])
+    ask_first, goodbye = ending.split("When they then say no")
+    assert "আর কিছু লাগবে না" not in ask_first and "no more help" not in ask_first
+    assert "they need nothing more" in goodbye
