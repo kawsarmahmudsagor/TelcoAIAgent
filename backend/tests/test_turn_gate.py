@@ -386,16 +386,3 @@ def test_gb_misheard_after_a_number_is_mended():
     assert turn_gate.clean_transcript("৫ জীবি প্যাক আছে?") == "৫ জিবি প্যাক আছে?"
     # Not after a number, it is the word itself.
     assert turn_gate.clean_transcript("সবাই জীবিত আছে") == "সবাই জীবিত আছে"
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "না, আ-আর কোন help লাগবে না। Thank you",  # run_94: a stutter made it 9 words
-        "না, আর কোনো সাহায্য লাগবে না",
-        "no, no more help needed",
-        "না, আর কোন help লাগবে না",
-    ],
-)
-def test_a_no_to_more_help_is_closing(text):
-    assert turn_gate.is_closing(text)

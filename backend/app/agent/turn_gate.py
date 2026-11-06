@@ -43,7 +43,7 @@ _CLOSING_PHRASES = (
     "see you", "take care", "have a nice day", "have a good day", "good night", "tata",
     "allah hafez", "khoda hafez", "dhonnobad", "dhonnobaad",
     "বাই", "টাটা", "আল্লাহ হাফেজ", "আল্লাহ হাফিজ", "খোদা হাফেজ", "ধন্যবাদ", "থ্যাংক ইউ",
-    "থ্যাংকস", "আর কিছু লাগবে না", "help লাগবে না", "হেল্প লাগবে না", "সাহায্য লাগবে না", "আর কিছু না", "আর কিছু জানার নেই", "আর লাগবে না",
+    "থ্যাংকস", "আর কিছু লাগবে না", "আর কিছু না", "আর কিছু জানার নেই", "আর লাগবে না",
     "আর দরকার নেই", "আর কিছু দরকার নেই", "এটুকুই", "এই পর্যন্তই", "পরে কথা হবে",
     # Informal Bangla and Banglish sign-offs. Multi-word, so a lone "রাখি" or
     # "আসি" inside a request ("বাজেট ৫০ লাখ রাখি") isn't taken for a goodbye.
@@ -206,18 +206,9 @@ def is_assent_filler(text: str) -> bool:
 _CLOSING_WORDS = [words(phrase) for phrase in _CLOSING_PHRASES]
 
 
-def _without_stutters(ws: list[str]) -> list[str]:
-    """ "আ-আর" -> "আর": a cut-off start of the next word isn't a word (run_94)."""
-    return [
-        w
-        for i, w in enumerate(ws)
-        if not (i + 1 < len(ws) and len(w) < len(ws[i + 1]) <= 4 and ws[i + 1].startswith(w))
-    ]
-
-
 def is_closing(text: str) -> bool:
     """A short turn that says goodbye, thanks or that they need nothing more."""
-    ws = _without_stutters(words(text))
+    ws = words(text)
     if not ws or len(ws) > _CLOSING_MAX_WORDS:
         return False
     return any(

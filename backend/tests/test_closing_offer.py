@@ -97,9 +97,3 @@ def test_reminder_pending_action_still_language():
 def test_reminder_unset_unchanged():
     assert closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud(None, wrap_up=True)) == closing_offer.WRAP_UP_REMINDER
     assert closing_offer.reminder(_ctx("ঠিক আছে?"), _lang_ud(None)) is None
-
-
-def test_no_more_help_with_a_stutter_gets_no_second_offer():
-    # run_94: the judge scored it as wrapping up, so the reminder asked for
-    # "anything else?" again instead of the goodbye.
-    assert not closing_offer.wraps_up(0.9, "না, আ-আর কোন help লাগবে না। Thank you")
