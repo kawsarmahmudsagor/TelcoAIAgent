@@ -1443,3 +1443,11 @@ def test_no_topic_answer_keeps_the_word_rules():
     # Without Jev's topic there is no telling a complaint from a decline.
     j = Judgement(0.9, "none", 0.99, intent="other", intent_p=0.99)
     assert route(j, _Userdata(), _config(), _settings(), text="নেটওয়ার্ক খুব স্লো") == "filler"
+
+
+def test_the_care_filler_speaks_of_our_packages():
+    # run_95: the model-written line echoed the customer's "আপনাদের" ("আপনাদের জন্য
+    # কোন কোন ডাটা প্যাকেজগুলো..."). Naming that word in a rule made it worse (4/30);
+    # one example of the agent's own wording took it to 0/48.
+    assert "আমাদের ডাটা প্যাকেজগুলো" in quick_reply._CARE_FILLER_SYSTEM
+    assert "আপনাদের" not in quick_reply._CARE_FILLER_SYSTEM
