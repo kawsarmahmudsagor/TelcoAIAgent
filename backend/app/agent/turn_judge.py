@@ -104,14 +104,18 @@ _WRAP_UP_INSTRUCTIONS = (
 
 _WRAP_UP_CRITERIA = {
     "true": (
-        "The customer accepts or acknowledges the answer (ok, ঠিক আছে, আচ্ছা, বুঝেছি, বুঝলাম, got "
-        "it), thanks the assistant, says what they'll do now (তাহলে ওটাই করব, I'll go there), "
-        "or declines what was offered without asking anything new (না, লাগবে না)."
+        "After an answer or an offer of something specific (a package, a recharge, a case), the "
+        "customer accepts or acknowledges it (ok, ঠিক আছে, আচ্ছা, বুঝেছি, বুঝলাম, got it), thanks "
+        "the assistant for it, says what they'll do now (তাহলে ওটাই করব, I'll go there), or "
+        "declines that offer without asking anything new (না, লাগবে না). Not when the "
+        "assistant's last message asked whether they need anything else."
     ),
     "false": (
         "The customer asks a question, a follow-up or for more detail, makes a request, gives "
         "information the assistant asked for (a number, a code, a choice, yes to an offer), "
-        "corrects the assistant, or says goodbye outright."
+        "corrects the assistant, says goodbye outright, or says no to the assistant's offer of "
+        "more help (the assistant just asked whether they need anything else and they say no, "
+        "that's all, or thanks): that ends the conversation, it doesn't close a topic."
     ),
 }
 

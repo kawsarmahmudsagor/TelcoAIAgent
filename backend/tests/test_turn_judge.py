@@ -309,3 +309,14 @@ def test_returns_the_intent_choice_and_drops_an_unknown_one():
     judgement = _judgement(handler("dance"), lookup=True, intent=True)
     assert (judgement.intent, judgement.intent_p) == (None, None)
     assert _judgement(handler("buy_named")).p == 0.9
+
+
+def test_a_no_to_more_help_is_not_wrapping_up_a_topic():
+    # run_94: after "আর কোনো বিষয়ে সাহায্য লাগবে?", "না, ... help লাগবে না। Thank you"
+    # scored 0.94 as wrapping up, so the reminder asked "anything else?" again.
+    # Jev now tells a no to the offer of more help (the conversation ends) from
+    # closing a topic (bench: 16/16 on run_94-style turns).
+    from app.agent import turn_judge
+
+    assert "anything else" in turn_judge._WRAP_UP_CRITERIA["true"]
+    assert "offer of more help" in turn_judge._WRAP_UP_CRITERIA["false"]
