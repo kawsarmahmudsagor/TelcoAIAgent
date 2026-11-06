@@ -339,7 +339,7 @@ def test_fast_rules_hand_off_telco_facts_and_codes():
 
 
 def test_filler_examples_are_telco():
-    for line in ("আপনার অসুবিধাটা বুঝতে পেরেছি।", "Say \"প্যাকেজ\", not \"প্যাক\"."):
+    for line in ("আপনার অসুবিধাটা বুঝতে পেরেছি।", "\"প্যাকেজগুলো\" not \"প্যাকগুলো\""):
         assert line in quick_reply._FILLER_SYSTEM
     assert not real_estate_words(quick_reply._FILLER_SYSTEM)
 
