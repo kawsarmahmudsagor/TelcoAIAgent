@@ -156,7 +156,7 @@ def test_boundaries_and_currency_rules_present():
     for name, prompt in _prompts().items():
         assert "BOUNDARIES" in prompt, name
         assert "digits, in every language" in prompt, name
-        assert "reply in Bangla in Bengali\nscript, never in English letters" in prompt, name
+        assert "reply in Bangla in Bengali script, never in English letters" in _flat(prompt), name
         assert '"taka" (টাকা in Bangla script), never "৳"' in prompt, name
 
 
