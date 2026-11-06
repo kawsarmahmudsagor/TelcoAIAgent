@@ -353,6 +353,33 @@ def test_short_numbers_are_no_code(text):
     assert not turn_gate.has_code(text)
 
 
+@pytest.mark.parametrize(
+    ("text", "code"),
+    [
+        ("308 367", "308367"),
+        ("30 83 67.", "308367."),
+        ("3 0 8 3 6 7", "308367"),
+        ("৩০৮ ৩৬৭।", "৩০৮৩৬৭।"),
+        ("308-367", "308367"),
+        ("308, 367", "308367"),
+    ],
+)
+def test_a_code_said_in_groups_is_joined(text, code):
+    # A pause mid-code makes speech-to-text write "308 367": no group is 4 digits,
+    # there are no letters, and the turn was dropped as empty.
+    assert turn_gate.has_code(text)
+    assert turn_gate.join_bare_code(text) == code
+
+
+@pytest.mark.parametrize(
+    "text", ["100 200 টাকার মধ্যে", "12 34", "1 2", "০১৭১১ ২৩৪৫৬৭", "308367", "code is 308 367"]
+)
+def test_only_a_bare_code_in_groups_is_joined(text):
+    # Numbers inside a sentence, too few or too many digits, or a code already
+    # whole stay as they are.
+    assert turn_gate.join_bare_code(text) == text
+
+
 def test_gb_misheard_after_a_number_is_mended():
     # run_27: the STT wrote জিবি (GB) as জীবিত ("alive").
     assert turn_gate.clean_transcript("দুই জীবিতটা দেখান") == "দুই জিবিরটা দেখান"

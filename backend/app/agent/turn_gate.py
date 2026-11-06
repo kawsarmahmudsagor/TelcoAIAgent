@@ -166,7 +166,29 @@ _CODE_RE = re.compile(r"(?<![0-9০-৯])[0-9০-৯]{4,8}(?![0-9০-৯])")
 
 
 def has_code(text: str) -> bool:
-    return bool(_CODE_RE.search(text))
+    return bool(_CODE_RE.search(text)) or join_bare_code(text) != text
+
+
+# A turn that is only a code said with pauses: speech-to-text writes "308 367",
+# "3 0 8 3 6 7" or "৩০৮ ৩৬৭।". No group is 4 digits and there are no letters, so
+# it was dropped as empty. Only a whole turn of 6 to 8 digits in short groups
+# counts: "100 200 টাকার মধ্যে" or "12 34" stay as they are.
+_GROUPED_CODE_RE = re.compile(
+    r"^\s*((?:[0-9০-৯]{1,4}[\s,\-]+)+[0-9০-৯]{1,4})\s*([.।!?]?)\s*$"
+)
+_NOT_DIGIT_RE = re.compile(r"[^0-9০-৯]")
+
+
+def join_bare_code(text: str) -> str:
+    """ "308 367" -> "308367", so the agent gets the code whole. Anything else
+    comes back unchanged."""
+    match = _GROUPED_CODE_RE.match(text)
+    if match is None:
+        return text
+    digits = _NOT_DIGIT_RE.sub("", match.group(1))
+    if not 6 <= len(digits) <= 8:
+        return text
+    return digits + match.group(2)
 
 
 def is_filler_or_empty(text: str) -> bool:

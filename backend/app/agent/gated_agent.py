@@ -816,8 +816,11 @@ class TurnGateController:
             raise StopResponse()
         # Sound tags ("[clears throat]") stay out of the conversation the agent
         # and the transcript see; a turn that is only tags was dropped above. A
-        # phone number said as words reaches the agent as digits.
-        text = spoken_digits_in_text(turn_gate.clean_transcript(new_message.text_content or ""))
+        # phone number said as words reaches the agent as digits, and a code said
+        # in groups ("308 367") as one code.
+        text = turn_gate.join_bare_code(
+            spoken_digits_in_text(turn_gate.clean_transcript(new_message.text_content or ""))
+        )
         if text != new_message.text_content:
             new_message.content = [text]
         # The package cards show only what this turn asks about.

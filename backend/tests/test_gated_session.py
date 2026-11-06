@@ -1068,6 +1068,19 @@ def test_a_code_read_out_alone_as_digits_is_accepted():
     asyncio.run(go())
 
 
+def test_a_code_read_out_in_groups_reaches_the_agent_whole():
+    # A pause mid-code: speech-to-text writes "308 367", which was dropped as empty.
+    async def go():
+        for heard, code in (("308 367", "308367"), ("৩০৮ ৩৬৭।", "৩০৮৩৬৭।"), ("3 0 8 3 6 7", "308367")):
+            gate, session, room, _ = _controller(0.1)
+            message = _msg(heard)
+            await gate.on_user_turn_completed(message)  # raises StopResponse if dropped
+            assert message.text_content == code
+            assert room.sent[-1] == (USER_TURN_TOPIC, code)
+
+    asyncio.run(go())
+
+
 def test_a_spoken_phone_number_reaches_the_agent_as_digits():
     # The LLM miscounts "double"/"triple" when it writes the digits itself.
     async def go():
