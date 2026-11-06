@@ -181,26 +181,24 @@ _BN_MONTHS = (
 
 _COPY = {
     "en": {
-        "title": "telco chat transcript",
-        "assistant": "Assistant:",
+        "title": "Chat Transcript",
+        "assistant": "Agent:",
         "user": "User:",
         "started": "Started",
         "ended": "Ended",
         "channel": "Channel",
         "customer": "Customer",
-        "number": "Number",
         "web": "Web chat",
         "phone": "Phone call",
     },
     "bn": {
-        "title": "telco চ্যাট ট্রান্সক্রিপ্ট",
-        "assistant": "সহকারী:",
+        "title": "চ্যাট ট্রান্সক্রিপ্ট",
+        "assistant": "এজেন্ট:",
         "user": "গ্রাহক:",
         "started": "শুরু",
         "ended": "শেষ",
         "channel": "মাধ্যম",
         "customer": "গ্রাহক",
-        "number": "নম্বর",
         "web": "ওয়েব চ্যাট",
         "phone": "ফোন কল",
     },
@@ -221,7 +219,6 @@ class ExportHeader:
     channel: str
     is_phone_call: bool
     customer_name: str | None
-    customer_msisdn: str | None
 
 
 def bangla_digits(s: str) -> str:
@@ -284,7 +281,7 @@ def _bubble(paragraph, is_assistant: bool, fill: str, *, space_before: float):
         edge = OxmlElement(f"w:{side}")
         edge.set(qn("w:val"), "single")
         edge.set(qn("w:sz"), "4")
-        edge.set(qn("w:space"), "4")
+        edge.set(qn("w:space"), "8")
         edge.set(qn("w:color"), fill)
         borders.append(edge)
     p_pr.insert_element_before(borders, "w:shd")
@@ -309,8 +306,6 @@ def render_docx(header: ExportHeader, lines: list[ExportLine], lang: ExportLang)
     fields.append((copy["channel"], channel))
     if header.customer_name:
         fields.append((copy["customer"], header.customer_name))
-    if header.customer_msisdn:
-        fields.append((copy["number"], header.customer_msisdn))
     for label, value in fields:
         row = doc.add_paragraph()
         row.paragraph_format.space_after = Pt(0)
@@ -384,7 +379,6 @@ def export_conversation(
         channel=conversation.channel,
         is_phone_call=conversation.is_phone_call,
         customer_name=subscriber.full_name if subscriber else None,
-        customer_msisdn=subscriber.msisdn if subscriber else None,
     )
     filename = f"telco-chat-{_local(conversation.started_at):%Y-%m-%d-%H%M}-{lang}.docx"
     # Only reads so far, all copied out above: end the transaction so the pooled

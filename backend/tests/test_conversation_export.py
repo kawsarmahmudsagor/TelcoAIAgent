@@ -158,7 +158,6 @@ def _header(**overrides) -> ExportHeader:
         channel="inbound_chat",
         is_phone_call=False,
         customer_name="Rahim Uddin",
-        customer_msisdn="01712345678",
     )
     return ExportHeader(**(fields | overrides))
 
@@ -175,8 +174,8 @@ def _text(data: bytes) -> str:
 
 def test_render_en_labels_and_title():
     text = _text(render_docx(_header(), _LINES, "en"))
-    assert "telco chat transcript" in text
-    assert "Assistant:" in text and "User:" in text
+    assert "Chat Transcript" in text and "telco" not in text
+    assert "Agent:" in text and "User:" in text
     assert "Hello! How can I help?" in text
     assert "14:32" in text and "Web chat" in text
     assert "telco." not in text
@@ -184,17 +183,18 @@ def test_render_en_labels_and_title():
 
 def test_render_bn_labels_and_digits():
     text = _text(render_docx(_header(), _LINES, "bn"))
-    assert "telco চ্যাট ট্রান্সক্রিপ্ট" in text
-    assert "সহকারী:" in text and "গ্রাহক:" in text
+    assert "চ্যাট ট্রান্সক্রিপ্ট" in text and "telco" not in text
+    assert "এজেন্ট:" in text and "গ্রাহক:" in text
     assert "৩০ অক্টোবর ২০২৬" in text
     assert "Call 01712345678 please" in text
-    assert "Assistant:" not in text
+    assert "Agent:" not in text
 
 
 def test_render_header_customer():
     with_customer = _text(render_docx(_header(), _LINES, "en"))
-    assert "Rahim Uddin" in with_customer and "01712345678" in with_customer
-    guest = _text(render_docx(_header(customer_name=None, customer_msisdn=None), _LINES, "en"))
+    assert "Rahim Uddin" in with_customer
+    assert "Number" not in with_customer
+    guest = _text(render_docx(_header(customer_name=None), _LINES, "en"))
     assert "Customer" not in guest
 
 
@@ -495,7 +495,7 @@ def _fill(paragraph) -> str | None:
 
 def test_render_messages_as_chat_bubbles():
     data = render_docx(_header(), _LINES, "en")
-    a_label, a_text = _message_paragraphs(data, "Assistant:")
+    a_label, a_text = _message_paragraphs(data, "Agent:")
     u_label, u_text = _message_paragraphs(data, "User:")
     # Assistant on the left: indented from the right only.
     for p in (a_label, a_text):
@@ -513,7 +513,7 @@ def test_render_messages_as_chat_bubbles():
 
 
 def test_render_bubble_has_padding_border_in_its_fill():
-    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "bn"), "সহকারী:")
+    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "bn"), "এজেন্ট:")
     borders = a_label._p.pPr.find(qn("w:pBdr"))
     for side in ("top", "left", "bottom", "right"):
         edge = borders.find(qn(f"w:{side}"))
@@ -532,17 +532,17 @@ def test_render_keeps_consecutive_bubbles_apart():
     first_text = next(i for i, p in enumerate(paragraphs) if p.text == "One")
     between = paragraphs[first_text + 1]
     assert between.text == "" and _fill(between) is None
-    assert paragraphs[first_text + 2].text.startswith("Assistant:")
+    assert paragraphs[first_text + 2].text.startswith("Agent:")
 
 
 def test_render_label_stays_with_its_text():
-    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "en"), "Assistant:")
+    a_label, _ = _message_paragraphs(render_docx(_header(), _LINES, "en"), "Agent:")
     assert a_label.paragraph_format.keep_with_next is True
 
 
 def test_render_label_colours():
     data = render_docx(_header(), _LINES, "en")
-    a_label, _ = _message_paragraphs(data, "Assistant:")
+    a_label, _ = _message_paragraphs(data, "Agent:")
     u_label, _ = _message_paragraphs(data, "User:")
     assert str(a_label.runs[0].font.color.rgb) == "2E7D32"
     assert str(u_label.runs[0].font.color.rgb) == "1F6FEB"
