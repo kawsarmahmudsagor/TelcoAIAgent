@@ -29,6 +29,7 @@ from livekit.agents import AgentSession
 
 from app.agent import reply_language
 from app.agent.prompt_defaults import IDLE_CHECKIN_LINES, IDLE_GOODBYE_LINES
+from app.agent.prompt_rules import BANGLA_WORDS, PACKAGE_WORD
 from app.agent.quick_models import reasoning_for
 from app.agent.reply_language import ReplyLanguage
 
@@ -51,8 +52,8 @@ conversation move on, based on the RECENT conversation:
 - A balance, usage or package answer was just given: ask whether they need anything else about it.
 - Little was said yet: ask how you can help with their mobile service.
 Language: the language of the conversation. Bangla in Bengali script, in the respectful আপনি form, \
-the way people actually speak, with the English words Bangla speakers use (চেক, প্যাকেজ, ব্যালেন্স, \
-কোড); you may open with "আপনি কি আছেন?". English: everyday spoken English.
+the way people actually speak; you may open with "আপনি কি আছেন?". """ + BANGLA_WORDS + " " + PACKAGE_WORD + """
+English: everyday spoken English.
 Never repeat the assistant's last message. Never state a balance, price, amount, code or any other \
 number, and never promise anything.
 Reply with JSON only: {"text": "..."}"""

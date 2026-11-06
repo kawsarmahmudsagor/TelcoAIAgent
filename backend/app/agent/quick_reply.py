@@ -46,6 +46,7 @@ from livekit.agents.voice.generation import INSTRUCTIONS_MESSAGE_ID
 
 from app.agent import reply_language, turn_gate
 from app.agent.audio_cache import AudioCache, normalize_text
+from app.agent.prompt_rules import BANGLA_WORDS, BRAND, PACKAGE_WORD
 from app.agent.quick_models import reasoning_for
 from app.agent.turn_judge import Exchange, Judgement
 from app.agent.reply_language import ReplyLanguage
@@ -135,10 +136,8 @@ Styles to vary:
 Language:
 - Follow the language of the customer's newest message.
 - For Bangla or Banglish, reply in natural spoken Bangla using Bengali script and respectful language.
-- Use everyday words such as চেক, প্যাকেজ, ব্যালেন্স and ওকে.
-- Say "দাম", not "প্রাইস".
-- Say "প্যাকেজ", not "প্যাক", in every form: "প্যাকেজগুলো" not "প্যাকগুলো", "প্যাকেজটা" not "প্যাকটা".
-- Avoid literary words such as মিলিয়ে, ঘেঁটে and খুলছি.
+- """ + BANGLA_WORDS + """
+- """ + PACKAGE_WORD + """
 - Never a vague "বিষয়টা" or "ব্যাপারটা" ("বিষয়টা দেখছি"): name what you check, or leave it out.
 - Keep familiar customer-care phrases such as "দেখে জানাচ্ছি", "দেখে বলছি",
   "আপনাকে জানাচ্ছি", and "আপনাকে বলছি" in the template pool.
@@ -182,10 +181,9 @@ Say the one short spoken line a good care agent says first.
   said: don't reuse the shape, opening or ending of lines already said.
 
 Language: match the customer's newest message. Bangla/Banglish: modern spoken Bangla,
-Bengali script, আপনি. Use চেক, প্যাকেজ, ব্যালেন্স, রিচার্জ, অফার, নেটওয়ার্ক, কমপ্লেইন, সরি,
-প্লিজ, ওকে. Say প্যাকেজ not প্যাক in every form (প্যাকেজগুলো not প্যাকগুলো, প্যাকেজটা not প্যাকটা), দাম not প্রাইস, বুঝতে পেরেছি not বুঝতে পারছি, স্লো not ধীর.
-No bookish words (মিলিয়ে, ঘেঁটে, খুলছি, অনুগ্রহপূর্বক), no slang, no vague বিষয়টা/ব্যাপারটা.
-The operator is "telco", never "telco.".
+Bengali script, আপনি. {BANGLA_WORDS} Also নেটওয়ার্ক, কমপ্লেইন, সরি, প্লিজ.
+{PACKAGE_WORD} Say বুঝতে পেরেছি not বুঝতে পারছি, স্লো not ধীর. No slang, no vague বিষয়টা/ব্যাপারটা.
+{BRAND}
 
 Never: state a price, number, balance, validity, availability, policy or result; echo a
 number the customer didn't say; say anything is done, started or successful; answer the
