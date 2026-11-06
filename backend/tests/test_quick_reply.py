@@ -1401,3 +1401,21 @@ def test_a_filler_from_broken_json_or_with_a_question_is_kept():
     assert asyncio.run(go(asked)) == "আমি সবগুলো চেক করে বলছি।"
     only_asks = json.dumps({"text": "ডাটা প্যাকেজ চাচ্ছেন তো?"})
     assert asyncio.run(go(only_asks)) is None
+
+
+def test_a_turn_jev_is_sure_needs_nothing_gets_no_filler_whatever_its_words():
+    # run_94: a decline names the balance and the package, so the word rules
+    # routed it to a filler ("... সাহায্য করতে পারি কি না দেখছি") though Jev was
+    # sure it needs no lookup and is no account ask; the line played after the
+    # reply was already ready.
+    s, c = _settings(), _config()
+    text = "আচ্ছা যেহেতু আমার এখন ব্যালেন্স নেই, সো প্যাকেজটা এখন আমি নিতে চাচ্ছি না"
+    sure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.99)
+    assert route(sure, _Userdata(), c, s, text=text) == "fast"
+    assert route(sure, _Userdata(), _config(quick_fast_answer=False), s, text=text) is None
+    # Jev unsure of the intent: the words still decide.
+    unsure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.5)
+    assert route(unsure, _Userdata(), c, s, text=text) == "filler"
+    # An account ask Jev calls "none" (the snapshot has it) keeps its filler.
+    balance = Judgement(0.9, "none", 0.9, intent="own_account", intent_p=0.99)
+    assert route(balance, _Userdata(), c, s, text="আমার ব্যালেন্স কত?") == "filler"

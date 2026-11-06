@@ -1867,8 +1867,18 @@ def route(
         # main model's tools answer it. The small model could only hand off
         # (FAST_RULES), so it gets a filler however Jev's lookup came out.
         return "filler"
-    if config.quick_filler and (
-        _NEEDS_TOOL_RE.search(turn_text) or says_yes_to_offer(turn_text, last_reply)
+    # Jev sure the turn needs no lookup and is no account ask ("প্যাকেজটা এখন নিতে
+    # চাচ্ছি না", run_94): its telecom words must not buy it a filler. The words
+    # decide only when Jev is unsure.
+    jev_sure_nothing = (
+        judgement.lookup == "none"
+        and lookup_p >= settings.quick_route_min_p
+        and sure_intent(judgement, settings) == "other"
+    )
+    if (
+        config.quick_filler
+        and not jev_sure_nothing
+        and (_NEEDS_TOOL_RE.search(turn_text) or says_yes_to_offer(turn_text, last_reply))
     ):
         return "filler"
     if judgement.lookup == "none":
