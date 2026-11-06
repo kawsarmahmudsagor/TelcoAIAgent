@@ -90,6 +90,29 @@ PACKAGE_TURNS = [
     "সাত দিনের মধ্যে কোনো কম্বো প্যাকেজ আছে?",
 ]
 
+# A purchase up to the code: the reply must ask for the code and never claim
+# success; the made-up code is expected to fail verification.
+BUY_TURNS = [
+    "১ জিবি ডাটা প্যাকেজটা নিতে চাই",
+    "main balance থেকে",
+    "123456",
+]
+
+
+class _Tee:
+    """Writes the printout to the console and to the --out file."""
+
+    def __init__(self, *streams):
+        self.streams = streams
+
+    def write(self, text: str) -> None:
+        for stream in self.streams:
+            stream.write(text)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
+
 # Word-for-word translations the prompt warns about (LANGUAGE).
 CALQUES = {
     "শুনবেন/শুনতে চান (hear more)": re.compile(r"শুনবেন|শুনতে চান"),
@@ -143,7 +166,12 @@ async def main() -> None:
     parser.add_argument("--guest", action="store_true", help="not logged in")
     parser.add_argument("--sim", action="store_true", help="the stolen-SIM conversation")
     parser.add_argument("--packages", action="store_true", help="package questions in Bangla")
+    parser.add_argument("--buy", action="store_true", help="a package purchase up to the code")
+    parser.add_argument("--out", type=Path, help="also write the printout to this file (UTF-8)")
     args = parser.parse_args()
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        sys.stdout = _Tee(sys.stdout, args.out.open("w", encoding="utf-8"))
     if args.baseline:
         _apply_baseline()
 
@@ -168,6 +196,7 @@ async def main() -> None:
         await session.start(agent)
         turns = (
             PACKAGE_TURNS if args.packages
+            else BUY_TURNS if args.buy
             else SIM_TURNS if args.sim
             else GUEST_TURNS if args.guest
             else TURNS

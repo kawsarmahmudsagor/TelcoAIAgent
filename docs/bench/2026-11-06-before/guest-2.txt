@@ -1,0 +1,28 @@
+> Which monthly data packs do you have?  (17.1 s)
+  [search_packages]
+  We have a 15 GB monthly data package for 349 taka, a 30 GB one for 549 taka, and a 50 GB one for 749 taka. They’re valid for 30 days and auto-renew from your main balance. Should I show you the other option too?
+
+> amar balance koto?  (9.3 s)
+  ব্যালেন্সটা আপনার অ্যাকাউন্ট থেকে দেখতে হয়। ওপরের Log in বাটনে লগইন করলেই সাথে সাথে বলে দিচ্ছি। চাইলে মাসিক ডাটা প্যাকেজগুলোর কথাও বলতে পারি।
+
+> How do I get a new SIM?  (20.1 s)
+  [search_knowledge_base]
+  You can get a new SIM at any telco care centre or retail point, or order one through our website. Bring your NID card or passport; no photocopy is needed. Would you like the online delivery details?
+
+> Is there a network problem in Dhaka?  (20.4 s)
+  [check_network_status]
+  Which area of Dhaka are you in? I can check the network there.
+
+> 300 takar moddhe kono internet pack ache?  (23.4 s)
+  [search_packages]
+  ৩০০ টাকার মধ্যে ২২৯ টাকায় ১০ জিবি ডাটা, মেয়াদ ১৫ দিন। ১৪৯ টাকায় ৮ জিবি ডাটা ৭ দিনের জন্য, তবে এটা মেয়াদ শেষে ব্যালেন্স থেকে অটো-রিনিউ হয়। চাইলে বাকিগুলোও জানাতে পারি।
+
+> Where is your nearest store?  (32.0 s)
+  [find_care_centre]
+  What area are you in? I can find the nearest telco care centre for you.
+
+Same closing question twice in a row: 0
+Calques:
+  শুনবেন/শুনতে চান (hear more): 0
+  two offers in one question: 0
+  কথা বলা নেই / উল্লেখ নেই: 0
