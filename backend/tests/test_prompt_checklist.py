@@ -50,6 +50,7 @@ _RULES = {
     "security": ["never ask for a PIN"],
     "troubleshooting": ["explain_deductions", "check_network_status"],
     "care_centres": ["find_care_centre"],
+    "condition_said_to_its_person": ["Say a condition to the person it applies to"],
     "escalation": ["request_human_agent"],
     "boundaries": ["BOUNDARIES"],
     "hard_rules": ["HARD RULE — POLITICS & RELIGION", "HARD RULE — CONFIDENTIALITY"],

@@ -106,6 +106,18 @@ DECLINE_TURNS = [
     "না, আর কোন help লাগবে না। Thank you",
 ]
 
+# The customer's own phone was stolen: the steps are for them ("আপনাকে …"),
+# not for "whoever the SIM is registered to".
+OWN_SIM_TURNS = [
+    "আচ্ছা আমার আ ফোনটাও গতকাল চুরি হয়ে গেছে actually",
+    "তো আমাকে তো এখন নতুন সিম তুলতে হবে। এটার প্রক্রিয়াটা আমাকে একটু বলবেন?",
+]
+
+# Someone else's SIM: here the registered-owner condition must stay.
+OTHER_SIM_TURNS = [
+    "আমার আম্মুর ফোনটা হারিয়ে গেছে, ওনার সিমটা আবার তুলতে চাই। কী করতে হবে?",
+]
+
 
 class _Tee:
     """Writes the printout to the console and to the --out file."""
@@ -176,6 +188,8 @@ async def main() -> None:
     parser.add_argument("--packages", action="store_true", help="package questions in Bangla")
     parser.add_argument("--buy", action="store_true", help="a package purchase up to the code")
     parser.add_argument("--decline", action="store_true", help="drop a purchase, then sign off")
+    parser.add_argument("--own-sim", action="store_true", help="own phone stolen, new SIM steps")
+    parser.add_argument("--other-sim", action="store_true", help="a relative's SIM replaced")
     parser.add_argument("--out", type=Path, help="also write the printout to this file (UTF-8)")
     args = parser.parse_args()
     if args.out:
@@ -208,6 +222,8 @@ async def main() -> None:
             else BUY_TURNS if args.buy
             else DECLINE_TURNS if args.decline
             else SIM_TURNS if args.sim
+            else OWN_SIM_TURNS if args.own_sim
+            else OTHER_SIM_TURNS if args.other_sim
             else GUEST_TURNS if args.guest
             else TURNS
         )
