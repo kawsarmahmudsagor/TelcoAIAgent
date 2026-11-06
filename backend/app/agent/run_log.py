@@ -170,6 +170,9 @@ class RunLog:
         # Turns the turn gate answered itself (gated_agent.on_gate_reply).
         self._gate_replies: list[str] = []
         self._responses: list[float] = []
+        # Input tokens of every AI model call, and how many the provider served from cache.
+        self._prompt_tokens = 0
+        self._cached_tokens = 0
         # The caller stopped and their words haven't come back from the STT yet.
         self._awaiting_text = False
         self._closed = False
@@ -378,10 +381,13 @@ class RunLog:
         elif isinstance(m, LLMMetrics):
             self._turn.llm.append((m.ttft, m.duration))
             state = " (cut off)" if m.cancelled else ""
+            cached = getattr(m, "prompt_cached_tokens", 0) or 0
+            self._prompt_tokens += m.prompt_tokens
+            self._cached_tokens += cached
             self._event(
                 "AI model",
                 f"{_model(m)}: first words after {_s(m.ttft)}, done in {_s(m.duration)}{state} "
-                f"({m.prompt_tokens} tokens in, {m.completion_tokens} out)",
+                f"({m.prompt_tokens} tokens in, {cached} cached, {m.completion_tokens} out)",
             )
         elif isinstance(m, TTSMetrics):
             self._turn.tts.append((m.ttfb, m.duration, m.audio_duration))
@@ -447,6 +453,11 @@ class RunLog:
             r = self._responses
             self._write(_row("Average response time", _s(sum(r) / len(r))))
             self._write(_row("Fastest / slowest", f"{_s(min(r))} / {_s(max(r))}"))
+        if self._prompt_tokens:
+            share = round(100 * self._cached_tokens / self._prompt_tokens)
+            self._write(_row("Prompt cache", f"{share}% of input tokens cached"))
+        else:
+            self._write(_row("Prompt cache", "no AI model calls"))
         self.close()
 
     def close(self) -> None:

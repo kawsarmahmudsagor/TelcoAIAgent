@@ -212,3 +212,52 @@ def test_barge_in_lines(tmp_path):
     assert "Barge-in          speech over the agent" in text
     assert re.search(r"Barge-in\s+paused the agent: voice at the caller's level", text)
     assert re.search(r"Barge-in\s+agent resumed \(rejected, score 0\.10\)", text)
+
+
+def _llm_tokens(prompt, cached, out=20):
+    return LLMMetrics(
+        label="openai", request_id="r", timestamp=0, duration=1.0, ttft=0.5,
+        cancelled=False, completion_tokens=out, prompt_tokens=prompt,
+        prompt_cached_tokens=cached, total_tokens=prompt + out, tokens_per_second=40.0,
+    )
+
+
+def _log(tmp_path):
+    file = open(tmp_path / "run_1.log", "x", encoding="utf-8")
+    return RunLog("room-1", 1, file, clock=_Clock())
+
+
+def _summary(tmp_path) -> str:
+    text = (tmp_path / "run_1.log").read_text(encoding="utf-8")
+    return re.sub(r" \.+ ", " : ", " ".join(text.split("=== Call summary")[1].split()))
+
+
+def test_ai_model_line_shows_cached_tokens(tmp_path):
+    log = _log(tmp_path)
+    log._on_metrics(_metrics(_llm_tokens(7262, 6100, 85)))
+    log.close()
+    text = (tmp_path / "run_1.log").read_text(encoding="utf-8")
+    assert "(7262 tokens in, 6100 cached, 85 out)" in text
+
+
+def test_ai_model_line_without_cache_says_zero(tmp_path):
+    # A provider that reports no cached count at all.
+    log = _log(tmp_path)
+    fields = _llm_tokens(900, 0).model_dump() | {"prompt_cached_tokens": None}
+    log._on_metrics(_metrics(LLMMetrics.model_construct(**fields)))
+    log.close()
+    assert "(900 tokens in, 0 cached, 20 out)" in (tmp_path / "run_1.log").read_text(encoding="utf-8")
+
+
+def test_call_summary_shows_cache_share(tmp_path):
+    log = _log(tmp_path)
+    log._on_metrics(_metrics(_llm_tokens(1000, 0)))
+    log._on_metrics(_metrics(_llm_tokens(1000, 800)))
+    log._on_close(None)
+    assert "Prompt cache : 40% of input tokens cached" in _summary(tmp_path)
+
+
+def test_call_summary_without_ai_calls(tmp_path):
+    log = _log(tmp_path)
+    log._on_close(None)
+    assert "Prompt cache : no AI model calls" in _summary(tmp_path)
