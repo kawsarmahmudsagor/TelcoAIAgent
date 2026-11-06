@@ -1678,6 +1678,9 @@ def _word_topics(utterance: str) -> set[str]:
 # Jev's intents (turn_judge.INTENT_KEY) that act on the account: a guest needs
 # a login for them, a logged-in customer the main model's tools.
 _ACCOUNT_INTENTS = frozenset({"buy_named", "recharge_do", "own_account", "person"})
+# Jev's topics for a turn with nothing for a tool to check: none of the listed
+# topics ("other"), or a package already on the table ("pack": declining it).
+_NOTHING_TO_CHECK_TOPICS = frozenset({"other", "pack"})
 # The guest topic of each, own_account's by Jev's topic (_ACCOUNT_TOPICS).
 _INTENT_TOPICS = {"buy_named": "buy", "recharge_do": "recharge_do", "person": "human"}
 _ACCOUNT_TOPICS = {
@@ -1867,13 +1870,16 @@ def route(
         # main model's tools answer it. The small model could only hand off
         # (FAST_RULES), so it gets a filler however Jev's lookup came out.
         return "filler"
-    # Jev sure the turn needs no lookup and is no account ask ("প্যাকেজটা এখন নিতে
-    # চাচ্ছি না", run_94): its telecom words must not buy it a filler. The words
-    # decide only when Jev is unsure.
+    # Jev sure the turn needs no lookup, is no account ask, and is about nothing a
+    # tool checks ("প্যাকেজটা এখন নিতে চাচ্ছি না", run_94): its telecom words must
+    # not buy it a filler. Network trouble is intent "other" with lookup "none"
+    # too, but its topic ("network") says a tool will run, so it keeps the filler.
+    # The words decide when Jev is unsure or gave no topic.
     jev_sure_nothing = (
         judgement.lookup == "none"
         and lookup_p >= settings.quick_route_min_p
         and sure_intent(judgement, settings) == "other"
+        and judgement.topic in _NOTHING_TO_CHECK_TOPICS
     )
     if (
         config.quick_filler

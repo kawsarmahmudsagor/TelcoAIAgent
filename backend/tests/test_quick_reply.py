@@ -1410,12 +1410,36 @@ def test_a_turn_jev_is_sure_needs_nothing_gets_no_filler_whatever_its_words():
     # reply was already ready.
     s, c = _settings(), _config()
     text = "আচ্ছা যেহেতু আমার এখন ব্যালেন্স নেই, সো প্যাকেজটা এখন আমি নিতে চাচ্ছি না"
-    sure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.99)
+    sure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.99, topic="pack", topic_p=0.62)
     assert route(sure, _Userdata(), c, s, text=text) == "fast"
     assert route(sure, _Userdata(), _config(quick_fast_answer=False), s, text=text) is None
     # Jev unsure of the intent: the words still decide.
-    unsure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.5)
+    unsure = Judgement(0.8, "none", 0.99, intent="other", intent_p=0.5, topic="pack", topic_p=0.62)
     assert route(unsure, _Userdata(), c, s, text=text) == "filler"
     # An account ask Jev calls "none" (the snapshot has it) keeps its filler.
     balance = Judgement(0.9, "none", 0.9, intent="own_account", intent_p=0.99)
     assert route(balance, _Userdata(), c, s, text="আমার ব্যালেন্স কত?") == "filler"
+
+
+@pytest.mark.parametrize(
+    ("text", "judgement"),
+    [
+        # Live Jev answers (2026-11-06): network trouble is intent "other" and
+        # lookup "none", but its topic says a tool will be called.
+        ("my internet is really slow in Mirpur since morning",
+         Judgement(0.9, "none", 0.73, intent="other", intent_p=0.93, topic="network", topic_p=0.99)),
+        ("আমি একটা কমপ্লেইন করতে চাই, নেটওয়ার্ক সমস্যা নিয়ে",
+         Judgement(0.9, "none", 1.0, intent="other", intent_p=0.94, topic="network", topic_p=0.65)),
+        ("জি, দেখেন",
+         Judgement(0.9, "none", 0.87, intent="other", intent_p=0.92, topic="network", topic_p=0.84)),
+    ],
+)
+def test_a_complaint_jev_calls_other_keeps_its_filler(text, judgement):
+    last = "চাইলে আপনার এলাকার নেটওয়ার্ক চেক করে দেবো?"
+    assert route(judgement, _Userdata(), _config(), _settings(), text=text, last_reply=last) == "filler"
+
+
+def test_no_topic_answer_keeps_the_word_rules():
+    # Without Jev's topic there is no telling a complaint from a decline.
+    j = Judgement(0.9, "none", 0.99, intent="other", intent_p=0.99)
+    assert route(j, _Userdata(), _config(), _settings(), text="নেটওয়ার্ক খুব স্লো") == "filler"
